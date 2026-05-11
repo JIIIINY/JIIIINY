@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025년 디자인 트렌드 - Keynote Style</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #000;
+            min-height: 100vh;
+            padding: 0;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .slide {
+            width: 100%;
+            height: 100%;
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: fadeIn 0.8s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px;
+            text-align: center;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 제목 슬라이드 */
+        .title-slide {
+            background: linear-gradient(135deg, #1a1a1a 0%, #000 100%);
+        }
+
+        .title-slide h1 {
+            font-size: 5em;
+            font-weight: 800;
+            margin-bottom: 20px;
+            letter-spacing: -2px;
+            line-height: 1.1;
+        }
+
+        .title-slide .subtitle {
+            font-size: 1.8em;
+            font-weight: 300;
+            margin-top: 40px;
+            opacity: 0.8;
+            letter-spacing: 0.5px;
+        }
+
+        /* 한 단어/이미지 슬라이드 */
+        .hero-slide {
+            background: #fff;
+            color: #000;
+        }
+
+        .hero-slide h2 {
+            font-size: 6em;
+            font-weight: 800;
+            letter-spacing: -3px;
+            margin-bottom: 60px;
+            line-height: 1;
+        }
+
+        .visual-container {
+            width: 100%;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 40px 0;
+            position: relative;
+        }
+
+        .visual-placeholder {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            color: #888;
+            font-weight: 300;
+        }
+
+        /* 어두운 배경 슬라이드 */
+        .dark-slide {
+            background: #000;
+        }
+
+        .dark-slide h2 {
+            font-size: 5em;
+            font-weight: 800;
+            margin-bottom: 40px;
+            letter-spacing: -2px;
+        }
+
+        .dark-slide .content {
+            font-size: 2em;
+            font-weight: 300;
+            line-height: 1.6;
+            max-width: 900px;
+            opacity: 0.9;
+        }
+
+        /* 밝은 배경 슬라이드 */
+        .light-slide {
+            background: #fff;
+            color: #000;
+        }
+
+        .light-slide h2 {
+            font-size: 4em;
+            font-weight: 800;
+            margin-bottom: 40px;
+            letter-spacing: -2px;
+        }
+
+        .light-slide .content {
+            font-size: 1.8em;
+            font-weight: 300;
+            line-height: 1.8;
+            max-width: 900px;
+        }
+
+        /* 포인트 슬라이드 */
+        .point-slide {
+            background: #f5f5f5;
+            color: #000;
+        }
+
+        .point-slide h2 {
+            font-size: 3.5em;
+            font-weight: 700;
+            margin-bottom: 60px;
+            letter-spacing: -1px;
+        }
+
+        .points {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 1000px;
+        }
+
+        .point {
+            flex: 0 1 280px;
+            padding: 40px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .point h3 {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #000;
+        }
+
+        .point p {
+            font-size: 1.1em;
+            font-weight: 400;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* 이미지 그리드 */
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin: 40px 0;
+            max-width: 1000px;
+        }
+
+        .grid-item {
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            aspect-ratio: 1;
+            border-radius: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #888;
+            font-weight: 300;
+        }
+
+        .grid-item-label {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 1em;
+            font-weight: 600;
+            color: #000;
+        }
+
+        /* 통계 슬라이드 */
+        .stat-slide {
+            background: #000;
+        }
+
+        .stat-slide h2 {
+            font-size: 4em;
+            font-weight: 800;
+            margin-bottom: 80px;
+            letter-spacing: -2px;
+        }
+
+        .stat-item {
+            display: inline-block;
+            margin: 0 60px;
+            vertical-align: top;
+        }
+
+        .stat-value {
+            font-size: 4em;
+            font-weight: 800;
+            color: #0071e3;
+            line-height: 1;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 1.4em;
+            font-weight: 300;
+            color: #999;
+        }
+
+        /* 결론 슬라이드 */
+        .conclusion-slide {
+            background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+        }
+
+        .conclusion-slide h2 {
+            font-size: 4.5em;
+            font-weight: 800;
+            margin-bottom: 40px;
+            letter-spacing: -2px;
+            line-height: 1.2;
+        }
+
+        .conclusion-slide p {
+            font-size: 1.5em;
+            font-weight: 300;
+            opacity: 0.8;
+            margin-top: 40px;
+        }
+
+        /* 네비게이션 */
+        .nav-container {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 1000;
+        }
+
+        .nav-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            color: #fff;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.6);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .slide-counter {
+            position: fixed;
+            top: 40px;
+            right: 40px;
+            font-size: 1em;
+            opacity: 0.6;
+            font-weight: 400;
+        }
+
+        /* Keynote 스타일 액센트 */
+        .accent {
+            color: #0071e3;
+        }
+
+        @media (max-width: 1024px) {
+            .slide {
+                padding: 60px 40px;
+            }
+
+            .title-slide h1 {
+                font-size: 3.5em;
+            }
+
+            .hero-slide h2 {
+                font-size: 4em;
+            }
+
+            .dark-slide h2 {
+                font-size: 3.5em;
+            }
+
+            .dark-slide .content {
+                font-size: 1.5em;
+            }
+
+            .image-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-item {
+                display: block;
+                margin: 30px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Title -->
+    <div class="container">
+        <div class="slide active title-slide">
+            <h1>2025<br/>디자인 트렌드</h1>
+            <div class="subtitle">우리가 만드는 경험의 미래</div>
+        </div>
+
+        <!-- Slide 2: One Word -->
+        <div class="slide hero-slide">
+            <h2>AI</h2>
+            <div class="visual-container">
+                <div class="visual-placeholder">시각적 표현</div>
+            </div>
+        </div>
+
+        <!-- Slide 3: The Question -->
+        <div class="slide dark-slide">
+            <h2>기술과 감성</h2>
+            <div class="content">
+                최첨단 AI 기술로<br/>
+                손으로 만든 듯한 따뜻함을 표현한다면?
+            </div>
+        </div>
+
+        <!-- Slide 4: Visual Showcase -->
+        <div class="slide light-slide">
+            <h2>아날로그와 AI의 만남</h2>
+            <div class="image-grid">
+                <div class="grid-item">콜라주<br/>스타일</div>
+                <div class="grid-item">손글씨<br/>감성</div>
+                <div class="grid-item">스크랩북<br/>디자인</div>
+                <div class="grid-item">AI 생성<br/>일러스트</div>
+            </div>
+        </div>
+
+        <!-- Slide 5: The Problem -->
+        <div class="slide dark-slide">
+            <h2>그런데 한 가지<br/>문제가 있었다</h2>
+            <div class="content" style="margin-top: 60px;">
+                AI는 아름답지만<br/>
+                어딘가 어색하다
+            </div>
+        </div>
+
+        <!-- Slide 6: The Solution -->
+        <div class="slide hero-slide">
+            <h2>해결책</h2>
+            <div class="visual-container">
+                <div class="visual-placeholder">우아한 미니멀리즘</div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Elegant Minimalism -->
+        <div class="slide light-slide">
+            <h2>절제된 우아함</h2>
+            <div class="content" style="margin-top: 60px; font-size: 1.6em;">
+                <span class="accent">뮤트 톤</span> + <span class="accent">단순 형태</span> + <span class="accent">럭셔리</span><br/>
+                <div style="margin-top: 40px; opacity: 0.7; font-weight: 300;">
+                    덜 그리고 더 우아하게
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Three Points -->
+        <div class="slide point-slide">
+            <h2>세 가지 핵심</h2>
+            <div class="points">
+                <div class="point">
+                    <h3>56%</h3>
+                    <p>형태 검색 증가</p>
+                </div>
+                <div class="point">
+                    <h3>33%</h3>
+                    <p>우아함 검색 증가</p>
+                </div>
+                <div class="point">
+                    <h3>30%</h3>
+                    <p>럭셔리 검색 증가</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: Motion -->
+        <div class="slide hero-slide">
+            <h2>동작</h2>
+            <div class="visual-container">
+                <div class="visual-placeholder">모션 & 애니메이션</div>
+            </div>
+        </div>
+
+        <!-- Slide 10: Motion Stats -->
+        <div class="slide stat-slide">
+            <h2>이제 화면이 살아난다</h2>
+            <div style="margin-top: 80px;">
+                <div class="stat-item">
+                    <div class="stat-value">109%</div>
+                    <div class="stat-label">모션</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">78%</div>
+                    <div class="stat-label">애니메이션</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">46%</div>
+                    <div class="stat-label">인터랙티브</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 11: Seriousness -->
+        <div class="slide dark-slide">
+            <h2>그리고 재미</h2>
+            <div class="content" style="margin-top: 60px;">
+                진지하면서도 가볍게<br/>
+                전문적이면서도 친근하게<br/>
+                <div style="margin-top: 40px; font-size: 1.4em; opacity: 0.7;">
+                    92% 증가
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 12: Visual Story -->
+        <div class="slide light-slide">
+            <h2>여섯 가지 트렌드</h2>
+            <div class="image-grid" style="margin-top: 60px;">
+                <div class="grid-item">1. AI + 아날로그</div>
+                <div class="grid-item">2. 우아한 미니멀</div>
+                <div class="grid-item">3. Serious Fun</div>
+                <div class="grid-item">4. 동적 표현</div>
+            </div>
+        </div>
+
+        <!-- Slide 13: Two More -->
+        <div class="slide light-slide">
+            <h2>더 있다</h2>
+            <div class="image-grid" style="margin-top: 60px; grid-template-columns: 1fr 1fr;">
+                <div class="grid-item">5. 정교한<br/>세련됨</div>
+                <div class="grid-item">6. 자연 +<br/>기술</div>
+            </div>
+        </div>
+
+        <!-- Slide 14: What Disappeared -->
+        <div class="slide dark-slide">
+            <h2>사라진 것</h2>
+            <div class="content" style="margin-top: 60px;">
+                초현실주의<br/>네온 컬러<br/>
+                <div style="margin-top: 40px; opacity: 0.7;">
+                    사회가 정상화되었기 때문이다
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 15: For Us -->
+        <div class="slide hero-slide">
+            <h2>우리는</h2>
+            <div class="visual-container">
+                <div class="visual-placeholder">모바일 브랜드 경험</div>
+            </div>
+        </div>
+
+        <!-- Slide 16: Focus -->
+        <div class="slide dark-slide">
+            <h2>세 가지에<br/>집중해야 한다</h2>
+            <div class="content" style="margin-top: 60px;">
+                <span class="accent">절제된 우아함</span><br/>
+                <span class="accent">동적 표현</span><br/>
+                <span class="accent">인간적 터치</span>
+            </div>
+        </div>
+
+        <!-- Slide 17: Action Items -->
+        <div class="slide point-slide">
+            <h2>즉시 실행</h2>
+            <div class="points" style="flex-direction: column; gap: 20px;">
+                <div class="point">
+                    <h3>1순위</h3>
+                    <p>모션 & 애니메이션 강화</p>
+                </div>
+                <div class="point">
+                    <h3>2순위</h3>
+                    <p>컬러 팔레트 전환 (뮤트 톤)</p>
+                </div>
+                <div class="point">
+                    <h3>3순위</h3>
+                    <p>AI 도구 도입 (윤리 검토)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 18: Conclusion -->
+        <div class="slide conclusion-slide">
+            <h2>2025년은<br/>창의성이<br/>극대화되는 시대</h2>
+            <p>기술이 민주화되고<br/>심미안이 성숙하는 순간<br/>우리가 해야 할 일은</p>
+            <p style="margin-top: 60px; font-size: 1.8em; font-weight: 600;">
+                더 나은 경험을 만드는 것
+            </p>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-container">
+        <button class="nav-btn" onclick="previousSlide()" id="prevBtn">‹</button>
+        <button class="nav-btn" onclick="nextSlide()" id="nextBtn">›</button>
+    </div>
+
+    <div class="slide-counter">
+        <span id="current">1</span> / <span id="total">18</span>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        document.getElementById('total').textContent = totalSlides;
+
+        function showSlide(n) {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (n + totalSlides) % totalSlides;
+            slides[currentSlide].classList.add('active');
+            document.getElementById('current').textContent = currentSlide + 1;
+
+            document.getElementById('prevBtn').disabled = currentSlide === 0;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function previousSlide() {
+            if (currentSlide > 0) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextSlide();
+                e.preventDefault();
+            }
+            if (e.key === 'ArrowLeft') previousSlide();
+        });
+
+        // Initialize
+        showSlide(0);
+    </script>
+</body>
+</html>

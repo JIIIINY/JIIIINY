@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025년 디자인 트렌드 분석 보고서 - 모바일 UX 적용</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #1a1a1a;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .slide {
+            background: white;
+            border-radius: 16px;
+            padding: 80px 60px;
+            margin-bottom: 60px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+            display: none;
+            animation: slideIn 0.6s ease;
+            border: 1px solid #f0f0f0;
+        }
+
+        .slide.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 타이틀 슬라이드 */
+        .title-slide {
+            background: linear-gradient(135deg, #0f2557 0%, #1a3a5c 100%);
+            color: white;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 700px;
+            padding: 100px 60px;
+        }
+
+        .title-slide h1 {
+            font-size: 3.2em;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .title-slide .subtitle {
+            font-size: 1.2em;
+            font-weight: 400;
+            opacity: 0.9;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .title-slide .meta {
+            font-size: 0.95em;
+            opacity: 0.7;
+            margin-top: 60px;
+        }
+
+        /* 섹션 제목 - 강 */
+        .slide-title {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin-bottom: 48px;
+            padding-bottom: 24px;
+            border-bottom: 2px solid #0f2557;
+            color: #0f2557;
+            letter-spacing: -0.3px;
+        }
+
+        /* 소제목 - 중 */
+        .section-subtitle {
+            font-size: 1.4em;
+            font-weight: 600;
+            color: #1a3a5c;
+            margin: 32px 0 20px 0;
+        }
+
+        /* 일반 본문 - 약 */
+        .slide-content {
+            font-size: 1em;
+            line-height: 1.8;
+            color: #3a3a3a;
+        }
+
+        .slide-content p {
+            margin-bottom: 16px;
+        }
+
+        /* 정보 계층화 */
+        .strong-info {
+            font-weight: 600;
+            color: #0f2557;
+        }
+
+        .medium-info {
+            font-weight: 500;
+            color: #1a3a5c;
+        }
+
+        .weak-info {
+            font-weight: 400;
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        /* 트렌드 카드 */
+        .trend-item {
+            background: linear-gradient(135deg, #f9fbfd 0%, #f5f8fb 100%);
+            padding: 32px;
+            margin: 24px 0;
+            border-left: 4px solid #0f2557;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .trend-item:hover {
+            box-shadow: 0 4px 12px rgba(15, 37, 87, 0.08);
+            transform: translateX(4px);
+        }
+
+        .trend-item h3 {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #0f2557;
+            margin-bottom: 12px;
+        }
+
+        .trend-item p {
+            color: #3a3a3a;
+            margin-bottom: 12px;
+            line-height: 1.7;
+        }
+
+        .trend-item ul {
+            margin-left: 20px;
+            color: #3a3a3a;
+        }
+
+        .trend-item li {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        /* 통계 카드 - 강조 */
+        .stat-card {
+            background: linear-gradient(135deg, #0f2557 0%, #1a3a5c 100%);
+            color: white;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+
+        /* 테이블 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+            font-size: 0.95em;
+        }
+
+        th {
+            background: #f0f2f5;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #0f2557;
+            border-bottom: 2px solid #0f2557;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #e8eaed;
+            color: #3a3a3a;
+        }
+
+        tr:hover {
+            background: #fafbfc;
+        }
+
+        /* 요약 박스 */
+        .summary-box {
+            background: #f0f2f5;
+            padding: 32px;
+            border-radius: 8px;
+            border-left: 4px solid #0f2557;
+            margin: 32px 0;
+        }
+
+        .summary-box h3 {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #0f2557;
+            margin-bottom: 16px;
+        }
+
+        .summary-box p {
+            color: #3a3a3a;
+            line-height: 1.7;
+        }
+
+        /* 그리드 */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin: 24px 0;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 24px;
+            margin: 24px 0;
+        }
+
+        /* 하이라이트 */
+        .highlight {
+            background-color: #fef3c7;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        /* 네비게이션 */
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 40px;
+            gap: 20px;
+            padding-top: 24px;
+            border-top: 1px solid #e8eaed;
+        }
+
+        button {
+            background: #0f2557;
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 500;
+            transition: all 0.3s;
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        button:hover:not(:disabled) {
+            background: #1a3a5c;
+            box-shadow: 0 4px 12px rgba(15, 37, 87, 0.2);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #d0d0d0;
+            cursor: not-allowed;
+        }
+
+        .slide-counter {
+            color: #0f2557;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        /* Executive Summary */
+        .executive-summary {
+            background: linear-gradient(135deg, #f9fbfd 0%, #f5f8fb 100%);
+            padding: 40px;
+            border-radius: 8px;
+            margin: 32px 0;
+            border-left: 4px solid #0f2557;
+        }
+
+        .executive-summary h2 {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #0f2557;
+            margin-bottom: 20px;
+        }
+
+        .key-point {
+            margin: 12px 0;
+            padding-left: 20px;
+            border-left: 2px solid #1a3a5c;
+            color: #3a3a3a;
+            line-height: 1.7;
+        }
+
+        /* 인포그래픽 */
+        .impact-box {
+            background: linear-gradient(135deg, #ffffff 0%, #f9fbfd 100%);
+            border: 2px solid #0f2557;
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 16px 0;
+        }
+
+        .impact-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #0f2557;
+            margin-bottom: 8px;
+        }
+
+        .impact-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .slide {
+                padding: 40px 24px;
+            }
+
+            .title-slide {
+                padding: 60px 24px;
+                min-height: 500px;
+            }
+
+            .slide-title {
+                font-size: 1.6em;
+            }
+
+            .grid-2, .grid-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .title-slide h1 {
+                font-size: 2em;
+            }
+
+            .navigation {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Slide 1: Title Slide -->
+        <div class="slide active title-slide">
+            <h1>2025년 디자인 트렌드 분석</h1>
+            <div class="subtitle">
+                모바일 앱과 브랜드 경험 설계에 필요한<br/>
+                최신 디자인 트렌드 보고서
+            </div>
+            <div class="meta">
+                기반: Canva 사용자 데이터 (2억 2천만 계정) | 2024년 분석 | 모바일 UX 관점 해석
+            </div>
+        </div>
+
+        <!-- Slide 2: Executive Summary -->
+        <div class="slide">
+            <h2 class="slide-title">Executive Summary</h2>
+            <div class="slide-content">
+                <div class="executive-summary">
+                    <h2>보고 개요</h2>
+                    <div class="key-point">
+                        <span class="strong-info">2025년 디자인의 핵심:</span>
+                        <span class="medium-info">기술 민주화</span>와 
+                        <span class="medium-info">심미적 성숙</span>의 만남
+                    </div>
+                    <div class="key-point">
+                        <span class="strong-info">모바일 UX의 변화:</span>
+                        AI를 활용한 <span class="medium-info">개인화</span>, 
+                        <span class="medium-info">절제된 미학</span>, 
+                        <span class="medium-info">동적 표현</span>의 중요성 급증
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle" style="margin-top: 40px;">주요 데이터</h3>
+                <div class="grid-3">
+                    <div class="impact-box">
+                        <div class="impact-value">2억 2천만</div>
+                        <div class="impact-label">캔바 사용자 계정</div>
+                    </div>
+                    <div class="impact-box">
+                        <div class="impact-value">100억+</div>
+                        <div class="impact-label">AI 툴 사용 횟수</div>
+                    </div>
+                    <div class="impact-box">
+                        <div class="impact-value">6가지</div>
+                        <div class="impact-label">2025년 주요 트렌드</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: Trend 1 -->
+        <div class="slide">
+            <h2 class="slide-title">Trend 1. AI와 아날로그의 융합</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">정의</h3>
+                <p class="weak-info">AI 기술로 손으로 만든 듯한 자연스러운 감성 표현 | 고도의 디지털 기술과 인간적 따뜻함의 결합</p>
+
+                <h3 class="section-subtitle">모바일 UX 적용</h3>
+                <div class="trend-item">
+                    <h3>모바일 앱 설계에서의 의미</h3>
+                    <ul>
+                        <li><span class="medium-info">온보딩 화면:</span> AI 생성 일러스트 + 손글씨 같은 폰트</li>
+                        <li><span class="medium-info">알림 디자인:</span> 자동화된 메시지에 개인화된 터치 추가</li>
+                        <li><span class="medium-info">이모션:</span> 정교한 애니메이션으로 감정 전달</li>
+                    </ul>
+                </div>
+
+                <h3 class="section-subtitle">데이터 지표</h3>
+                <div class="stat-card">
+                    <span class="stat-value">92%</span> 스크랩북/콜라주 스타일 검색 증가
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">100억회+</span> AI 디자인 도구 활용 횟수
+                </div>
+
+                <h3 class="section-subtitle">주의사항</h3>
+                <p class="weak-info">
+                    ⚠ AI 이미지의 '기이한 골짜기' 현상 주의 | 
+                    저작권 및 편향성 검토 필수 | 
+                    명시적 AI 사용 공지 고려
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 4: Trend 2 -->
+        <div class="slide">
+            <h2 class="slide-title">Trend 2. 우아한 미니멀리즘</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">정의</h3>
+                <p class="weak-info">뮤트 컬러 + 기본 도형 + 고급스러운 이미지 = 럭셔리한 단순함</p>
+
+                <h3 class="section-subtitle">모바일 UX 적용</h3>
+                <div class="grid-2">
+                    <div class="trend-item">
+                        <h3>컬러 팔레트</h3>
+                        <p><span class="medium-info">Primary:</span> 톤다운된 네이비, 회색</p>
+                        <p><span class="medium-info">Accent:</span> 따뜻한 톤 (테라코타, 올리브)</p>
+                        <p><span class="weak-info">네온/극채도 색 회피</span></p>
+                    </div>
+                    <div class="trend-item">
+                        <h3>레이아웃</h3>
+                        <p><span class="medium-info">그리드:</span> 체계적인 모듈식 구성</p>
+                        <p><span class="medium-info">여백:</span> 풍부한 화이트스페이스</p>
+                        <p><span class="weak-info">밀집된 정보 구성 지양</span></p>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">데이터 지표</h3>
+                <table>
+                    <tr>
+                        <th>키워드</th>
+                        <th>증가율</th>
+                        <th>의미</th>
+                    </tr>
+                    <tr>
+                        <td>형태(Shapes)</td>
+                        <td><span class="strong-info">56%</span></td>
+                        <td>기본 도형 활용 극대화</td>
+                    </tr>
+                    <tr>
+                        <td>우아함(Elegant)</td>
+                        <td><span class="strong-info">33%</span></td>
+                        <td>고급스러운 미학 추구</td>
+                    </tr>
+                    <tr>
+                        <td>럭셔리(Luxury)</td>
+                        <td><span class="strong-info">30%</span></td>
+                        <td>프리미엄 감성 대중화</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Slide 5: Trend 3 -->
+        <div class="slide">
+            <h2 class="slide-title">Trend 3. Serious Fun</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">정의</h3>
+                <p class="weak-info">전문성 + 친근감 | 진지한 메시지를 유머와 캐주얼함으로 전달</p>
+
+                <h3 class="section-subtitle">모바일 UX 적용</h3>
+                <div class="trend-item">
+                    <h3>콘텐츠 전략</h3>
+                    <ul>
+                        <li><span class="medium-info">에러 페이지:</span> 고객 문제를 진지하면서도 가볍게 표현</li>
+                        <li><span class="medium-info">빈 상태(Empty State):</span> 유머러스한 일러스트로 대기 시간 표현</li>
+                        <li><span class="medium-info">마이크로카피:</span> 기능 설명을 재미있게 작성</li>
+                        <li><span class="medium-info">보상 시스템:</span> 성취감을 즐겁게 표현</li>
+                    </ul>
+                </div>
+
+                <h3 class="section-subtitle">데이터 지표</h3>
+                <div class="stat-card">
+                    <span class="stat-value">92%</span> 우스운/장난스러운 느낌 검색 증가
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">36%</span> 재미있는 스타일 검색 증가
+                </div>
+
+                <h3 class="section-subtitle">성공 사례</h3>
+                <p class="weak-info">
+                    온보딩 튜토리얼에서 재미있는 캐릭터 활용 | 
+                    오류 메시지의 톤다운된 유머 | 
+                    업데이트 노트의 개성 있는 표현
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 6: Trend 4 -->
+        <div class="slide">
+            <h2 class="slide-title">Trend 4. 동적 표현 (Motion & Animation)</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">정의</h3>
+                <p class="weak-info">텍스트 애니메이션 + 모션그래픽 + 인터랙티브 요소로 정적 콘텐츠를 생생하게 표현</p>
+
+                <h3 class="section-subtitle">모바일 앱 우선순위</h3>
+                <div class="grid-2">
+                    <div class="trend-item">
+                        <h3>필수 적용</h3>
+                        <p><span class="medium-info">로딩 애니메이션:</span> 진행 상황 시각화</p>
+                        <p><span class="medium-info">트랜지션:</span> 화면 전환 부드럽게</p>
+                        <p><span class="medium-info">터치 피드백:</span> 상호작용 반응</p>
+                    </div>
+                    <div class="trend-item">
+                        <h3>고급 적용</h3>
+                        <p><span class="medium-info">상태 변화:</span> 데이터 업데이트 애니메이션</p>
+                        <p><span class="medium-info">스크롤 효과:</span> 패럴랙스 활용</p>
+                        <p><span class="medium-info">제스처 반응:</span> 스와이프, 핸들 등</p>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">데이터 지표</h3>
+                <div class="stat-card">
+                    <span class="stat-value">109%</span> 모션(Motion) 검색 증가
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">78%</span> 애니메이션(Animation) 검색 증가
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">46%</span> 인터랙티브(Interactive) 검색 증가
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Trend 5 -->
+        <div class="slide">
+            <h2 class="slide-title">Trend 5. 정교한 세련됨</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">정의</h3>
+                <p class="weak-info">거칠어 보이지만 정교한 디테일 | 빈티지 + 현대, 대담함 + 우아함의 동시 표현</p>
+
+                <h3 class="section-subtitle">모바일 디자인 시스템에서</h3>
+                <div class="trend-item">
+                    <h3>타이포그래피</h3>
+                    <p><span class="medium-info">본문:</span> 클래식하고 읽기 쉬운 세리프 혹은 세리프리스 폰트</p>
+                    <p><span class="medium-info">강조:</span> 세련된 디스플레이 폰트로 임팩트</p>
+                    <p><span class="weak-info">과도한 폰트 변형 지양</span></p>
+                </div>
+
+                <div class="trend-item">
+                    <h3>이미지 스타일</h3>
+                    <p><span class="medium-info">포토:</span> 자연스럽고 정직한 이미지</p>
+                    <p><span class="medium-info">일러스트:</span> 섬세한 라인 작업으로 세련됨 표현</p>
+                    <p><span class="medium-info">대비:</span> 강렬한 색감 조합으로 눈길 사로잡기</p>
+                </div>
+
+                <h3 class="section-subtitle">데이터 지표</h3>
+                <table>
+                    <tr>
+                        <th>키워드</th>
+                        <th>증가율</th>
+                    </tr>
+                    <tr>
+                        <td>세련된/최신식(Cutting-edge)</td>
+                        <td><span class="strong-info">71%</span></td>
+                    </tr>
+                    <tr>
+                        <td>대담한(Bold)</td>
+                        <td><span class="strong-info">40%</span></td>
+                    </tr>
+                    <tr>
+                        <td>독특한(Edge)</td>
+                        <td><span class="strong-info">23%</span></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Slide 8: Trend 6 -->
+        <div class="slide">
+            <h2 class="slide-title">Trend 6. 자연 + 기술의 조화</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">정의</h3>
+                <p class="weak-info">자연 이미지와 기술적 요소의 결합 | ESG, 웰니스 등 지속가능성 가치 반영</p>
+
+                <h3 class="section-subtitle">모바일 브랜드 경험에서의 활용</h3>
+                <div class="trend-item">
+                    <h3>활용 분야</h3>
+                    <ul>
+                        <li><span class="medium-info">웰니스/건강 앱:</span> 식물, 자연 이미지로 평온함 표현</li>
+                        <li><span class="medium-info">지속가능성 통신:</span> 기술과 환경의 공존</li>
+                        <li><span class="medium-info">브랜드 아이덴티티:</span> 혁신과 신뢰의 동시 표현</li>
+                        <li><span class="medium-info">온보딩/프로모션:</span> 미래지향적이면서도 따뜻한 느낌</li>
+                    </ul>
+                </div>
+
+                <h3 class="section-subtitle">데이터 지표</h3>
+                <div class="stat-card">
+                    <span class="stat-value">30%</span> 테크노/기술 스타일 검색 증가
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value">32%</span> 사이버 이미지 검색 증가
+                </div>
+                <p style="margin-top: 16px; color: #666; font-size: 0.9em;">
+                    ↳ 동시에 식물, 자연 관련 검색어도 함께 상승 추세
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 9: Disappeared Trends -->
+        <div class="slide">
+            <h2 class="slide-title">주목: 2025년 사라진 트렌드</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">초현실주의 & 네온 컬러</h3>
+                <div class="trend-item">
+                    <h3>특징</h3>
+                    <p><span class="medium-info">초현실주의:</span> 현실도피적, 꿈 같은 이미지</p>
+                    <p><span class="medium-info">네온 컬러:</span> 극도로 밝고 활기찬 색감</p>
+                </div>
+
+                <div class="trend-item">
+                    <h3>사라진 이유</h3>
+                    <p><span class="medium-info">팬데믹 종료:</span> 사회 정상화로 현실도피 필요성 감소</p>
+                    <p><span class="medium-info">심미 변화:</span> 극단적 표현에서 절제된 우아함으로 전환</p>
+                    <p><span class="medium-info">심리 상태:</span> 극단적 낙관주의보다 균형잡힌 현실성 추구</p>
+                </div>
+
+                <div class="summary-box">
+                    <h3>모바일 UX에 미치는 영향</h3>
+                    <p>
+                        <span class="medium-info">❌ 불필요:</span> 극채도 색 집중 사용, 비현실적 판타지 콘셉트<br/>
+                        <span class="medium-info">✓ 권장:</span> 차분한 색감, 신뢰감 있는 비주얼, 현실적 가치 제시
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 10: Strategic Recommendations -->
+        <div class="slide">
+            <h2 class="slide-title">전략적 제언</h2>
+            <div class="slide-content">
+                <h3 class="section-subtitle">즉시 적용 (Q2-Q3 2025)</h3>
+                <div class="trend-item">
+                    <h3>우선순위</h3>
+                    <ul>
+                        <li><span class="strong-info">1순위:</span> 동적 표현 강화 (모션, 애니메이션)</li>
+                        <li><span class="strong-info">2순위:</span> 컬러 팔레트 재정의 (뮤트 톤으로 전환)</li>
+                        <li><span class="strong-info">3순위:</span> AI 생성 콘텐츠 도입 (윤리 준수 하에)</li>
+                    </ul>
+                </div>
+
+                <h3 class="section-subtitle">중기 전략 (Q3-Q4 2025)</h3>
+                <div class="trend-item">
+                    <h3>조직 역량 강화</h3>
+                    <ul>
+                        <li><span class="strong-info">팀 교육:</span> 모션 디자인, 타이포그래피 심화 과정</li>
+                        <li><span class="strong-info">도구 도입:</span> AI 디자인 보조 도구 평가 및 도입</li>
+                        <li><span class="strong-info">가이드라인:</span> 새로운 브랜드 디자인 시스템 구축</li>
+                    </ul>
+                </div>
+
+                <h3 class="section-subtitle">고려사항</h3>
+                <p class="weak-info">
+                    • AI 사용 투명성 확보<br/>
+                    • 다양성 & 포용성 검토<br/>
+                    • 접근성 (A11y) 준수<br/>
+                    • 성능 최적화 (모션 안 무겁게)
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 11: Conclusion -->
+        <div class="slide title-slide">
+            <h1 style="font-size: 2.5em; font-weight: 700;">2025년은</h1>
+            <div style="font-size: 1.3em; font-weight: 500; line-height: 1.8; margin: 40px 0; opacity: 0.95;">
+                기술 민주화와 심미 성숙이 만나<br/>
+                개인의 창의성이 극대화되는 시대
+            </div>
+            <div style="font-size: 1.1em; opacity: 0.8; line-height: 1.8; margin-top: 60px;">
+                모바일 브랜드 경험 설계에서는<br/>
+                절제된 우아함 + 동적 표현 + 인간적 터치의 균형이 핵심
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <div class="navigation">
+            <button onclick="previousSlide()" id="prevBtn">← 이전</button>
+            <span class="slide-counter"><span id="current">1</span> / <span id="total">11</span></span>
+            <button onclick="nextSlide()" id="nextBtn">다음 →</button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        document.getElementById('total').textContent = totalSlides;
+
+        function showSlide(n) {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (n + totalSlides) % totalSlides;
+            slides[currentSlide].classList.add('active');
+            document.getElementById('current').textContent = currentSlide + 1;
+
+            document.getElementById('prevBtn').disabled = currentSlide === 0;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+        }
+
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+
+        function previousSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextSlide();
+            if (e.key === 'ArrowLeft') previousSlide();
+        });
+
+        // Initialize
+        showSlide(0);
+    </script>
+</body>
+</html>
