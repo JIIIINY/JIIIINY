@@ -46,6 +46,7 @@
   .scrub-row{ display:flex; align-items:center; gap:8px; margin-top:8px; }
   .scrub-row input[type=checkbox]{ accent-color:#f0c45a; }
   .scrub-row .lp{ font-size:11px; color:#b9b9c0; white-space:nowrap; }
+  textarea#codeBox{ width:100%; height:86px; background:#0f0f12; color:#cfe8d8; border:1px solid #2a2a31; border-radius:10px; padding:8px; font:11px/1.4 ui-monospace,Menlo,Consolas,monospace; resize:vertical; }
   #toggle{ position:fixed; top:14px; right:14px; z-index:30; width:44px; height:44px; border-radius:50%; background:rgba(30,30,36,.85); border:1px solid #34343c; color:#e8e8ea; font-size:18px; backdrop-filter:blur(6px); }
   body.panel-open #toggle{ right:314px; }
   @media (max-width: 760px){ body.panel-open #toggle{ right:14px; } }
@@ -84,6 +85,14 @@
     </div>
 
     <div id="sliders"></div>
+
+    <div class="sec-title">코드 (저장 / 불러오기)</div>
+    <textarea id="codeBox" spellcheck="false" placeholder="설정 코드(JSON)"></textarea>
+    <div class="btns">
+      <button id="codeRefresh">↻ 현재값</button>
+      <button id="codeCopy" class="pal">📋 코드 복사</button>
+      <button id="codeApply" class="primary">📥 코드 반영</button>
+    </div>
   </div>
 
 <script>
@@ -105,7 +114,8 @@ const PARAMS = {
   edgeContrast: { def:0.88, min:0,    max:1,    step:0.01 },
   blurAmt:      { def:0.12, min:0.02, max:0.26, step:0.005 },
   // 라이팅(앰비언트)
-  lightSize:    { def:0.30, min:0.05, max:0.85, step:0.005 }, // 빛 레이어 크기(도형과 별도)
+  lightSize:    { def:0.30, min:0.05, max:0.85, step:0.005 }, // 빛 코어 크기(도형과 별도)
+  lightReach:   { def:0.30, min:0.05, max:1.20, step:0.01 },  // 빛 길이(외곽 번짐)
   lightAmt:     { def:0.55, min:0,    max:1.6,  step:0.01 },  // 빛 세기
   lightUneven:  { def:0.65, min:0,    max:1,    step:0.02 },  // 불균등 정도
   // 컬러/할로
@@ -123,7 +133,7 @@ const LABELS = {
   orbSize:'도형 크기', shapeSides:'형태(0원/3세모/4네모)', shapeRound:'모서리 둥글기', shapeRot:'도형 회전(°/s)',
   distortAmt:'외곽 왜곡 세기', distortFreq:'왜곡 빈도',
   edgeAC:'엣지A 위치(°)', edgeAW:'엣지A 폭(±°)', edgeBC:'엣지B 위치(°)', edgeBW:'엣지B 폭(±°)', edgeContrast:'엣지 대비', blurAmt:'블러 세기',
-  lightSize:'빛 레이어 크기', lightAmt:'빛 세기', lightUneven:'빛 불균등',
+  lightSize:'빛 코어 크기', lightReach:'빛 길이(번짐)', lightAmt:'빛 세기', lightUneven:'빛 불균등',
   hue:'색조(hue °)', haloMix:'색 선명도', intensity:'할로 강도', exposure:'밝기', haloOuter:'할로 크기', falloff:'할로 폴오프',
   rot:'할로 회전(°/s)', breath:'호흡'
 };
@@ -131,7 +141,7 @@ const SECTIONS = [
   { title:'중앙 도형', keys:['orbSize','shapeSides','shapeRound','shapeRot'] },
   { title:'외곽 왜곡', keys:['distortAmt','distortFreq'] },
   { title:'엣지 / 블러 위치', keys:['edgeAC','edgeAW','edgeBC','edgeBW','edgeContrast','blurAmt'] },
-  { title:'라이팅 (앰비언트)', keys:['lightSize','lightAmt','lightUneven'] },
+  { title:'라이팅 (앰비언트)', keys:['lightSize','lightReach','lightAmt','lightUneven'] },
   { title:'컬러 / 할로', keys:['hue','haloMix','intensity','exposure','haloOuter','falloff'] },
   { title:'모션', keys:['rot','breath'] },
 ];
@@ -146,6 +156,7 @@ const PALETTES = [
 let palIdx=0;
 
 const state={}; Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def);
+let codeReady=false;
 function hexToRGB(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255]; }
 function lerp(a,b,t){ return a+(b-a)*t; }
 
@@ -170,6 +181,7 @@ uniform vec2  u_edgeB;
 uniform float u_sharpFeather;
 uniform float u_blurFeather;
 uniform float u_lightSize;
+uniform float u_lightReach;
 uniform float u_lightAmt;
 uniform float u_lightUneven;
 uniform float u_glowSpread;
@@ -247,9 +259,11 @@ void main(){
   vec3 hc=clamp(hueShift(haloColor(mod(angBase+u_angle,360.0)),u_hue),0.0,1.0);
 
   // ===== 앰비언트 라이트 레이어 (Ray 아님 / 불균등 / 은은) =====
-  // 도형과 독립 크기(u_lightSize), 부드러운 가우시안 + 저주파 불균등 모듈레이션
-  float lr=max(u_lightSize*W, 1.0);
-  float lightFall=exp(-(r*r)/(2.0*lr*lr));
+  // 코어(u_lightSize) 안은 꽉 찬 빛, 그 바깥으로 u_lightReach 길이만큼 부드럽게 번짐
+  float core=u_lightSize*W;
+  float reach=max(u_lightReach*W, 1.0);
+  float dd=max(r-core, 0.0);
+  float lightFall=exp(-(dd*dd)/(2.0*reach*reach));
   float a1=0.5+0.5*sin(2.0*th + u_t*0.55);
   float a2=0.5+0.5*sin(3.0*th - u_t*0.42 + 1.3);
   float a3=0.5+0.5*sin(1.0*th + u_t*0.30 + 4.1);
@@ -299,7 +313,7 @@ gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 
 const U={};
 ['u_res','u_center','u_radius','u_shapeSides','u_shapeRound','u_shapeAngle','u_distortAmt','u_distortFreq',
- 'u_edgeA','u_edgeB','u_sharpFeather','u_blurFeather','u_lightSize','u_lightAmt','u_lightUneven',
+ 'u_edgeA','u_edgeB','u_sharpFeather','u_blurFeather','u_lightSize','u_lightReach','u_lightAmt','u_lightUneven',
  'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_bg']
  .forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 const uStops=gl.getUniformLocation(prog,'u_stops[0]');
@@ -319,7 +333,7 @@ SECTIONS.forEach(sec=>{
     const row=document.createElement('div'); row.className='row';
     row.innerHTML=`<label><span>${LABELS[k]}</span><span class="val" data-val="${k}">–</span></label>`;
     const inp=document.createElement('input'); inp.type='range'; inp.min=P.min; inp.max=P.max; inp.step=P.step; inp.value=state[k];
-    inp.addEventListener('input',()=>{ state[k]=parseFloat(inp.value); updateVal(k); refreshShapeBtns(); });
+    inp.addEventListener('input',()=>{ state[k]=parseFloat(inp.value); updateVal(k); refreshShapeBtns(); if(codeReady) refreshCode(); });
     row.appendChild(inp); slidersEl.appendChild(row); inputs[k]=inp; });
 });
 const loopRow=document.createElement('div'); loopRow.className='scrub-row';
@@ -329,7 +343,7 @@ const loopChk=loopRow.querySelector('#loopChk');
 
 function fmt(k){ const st=PARAMS[k].step; return state[k].toFixed(st<0.01?3:(st<1?2:0)); }
 function updateVal(k){ const e=document.querySelector(`[data-val="${k}"]`); if(e) e.textContent=fmt(k); }
-function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].value=state[k]; updateVal(k); }); refreshShapeBtns(); }
+function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].value=state[k]; updateVal(k); }); refreshShapeBtns(); if(codeReady) refreshCode(); }
 
 // 도형 버튼
 const shapeBtns=document.querySelectorAll('#shapeBtns button');
@@ -342,7 +356,7 @@ let playing=true, startT=performance.now(), pausedT=0;
 const playBtn=document.getElementById('playBtn');
 playBtn.addEventListener('click',()=>{ playing=!playing; playBtn.textContent=playing?'⏸ 일시정지':'▶ 재생'; if(playing) startT=performance.now()-pausedT; });
 document.getElementById('resetBtn').addEventListener('click',()=>{ Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def); applyPalette(0); syncUI(); playing=true; playBtn.textContent='⏸ 일시정지'; startT=performance.now(); pausedT=0; loopChk.checked=true; });
-document.getElementById('palBtn').addEventListener('click',()=>applyPalette(palIdx+1));
+document.getElementById('palBtn').addEventListener('click',()=>{ applyPalette(palIdx+1); if(codeReady) refreshCode(); });
 
 function rand(a,b){ return a+Math.random()*(b-a); }
 document.getElementById('rndBtn').addEventListener('click',()=>{
@@ -353,7 +367,7 @@ document.getElementById('rndBtn').addEventListener('click',()=>{
   state.edgeAC=Math.round(rand(0,360)); state.edgeAW=Math.round(rand(20,90));
   state.edgeBC=Math.round(rand(0,360)); state.edgeBW=Math.round(rand(20,90));
   state.edgeContrast=rand(0.55,1.0); state.blurAmt=rand(0.06,0.22);
-  state.lightSize=rand(0.16,0.46); state.lightAmt=rand(0.2,0.7); state.lightUneven=rand(0.3,1.0);
+  state.lightSize=rand(0.16,0.46); state.lightReach=rand(0.15,0.8); state.lightAmt=rand(0.2,0.7); state.lightUneven=rand(0.3,1.0);
   state.hue=Math.round(rand(-180,180)); state.haloMix=rand(0.5,1.0); state.intensity=rand(0.6,1.2);
   state.exposure=rand(0.82,1.04); state.haloOuter=rand(0.52,0.80); state.falloff=rand(1.2,3.0);
   state.rot=Math.round(rand(4,36)); state.breath=rand(0.02,0.12);
@@ -372,6 +386,26 @@ recBtn.addEventListener('click',()=>{ if(recorder&&recorder.state==='recording')
   recorder.start(); recBtn.classList.add('active'); recBtn.textContent='■ 정지'; recDot.classList.add('on'); });
 
 document.getElementById('toggle').addEventListener('click',()=>document.body.classList.toggle('panel-open'));
+
+/* 코드 복사 / 반영 (설정 저장·불러오기 — 다음 버전에서도 그대로 재현) */
+const codeBox=document.getElementById('codeBox');
+function exportConfig(){ const p={}; Object.keys(PARAMS).forEach(k=>p[k]=state[k]);
+  return JSON.stringify({ app:'iridescent-halo-orb', v:3, palette:PALETTES[palIdx].name, params:p }); }
+function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.value=exportConfig(); }
+function applyConfig(txt){ const o=JSON.parse(txt);
+  if(o.params) Object.keys(o.params).forEach(k=>{ if(k in state){ const v=parseFloat(o.params[k]); if(!isNaN(v)) state[k]=v; } });
+  if(o.palette){ const i=PALETTES.findIndex(x=>x.name===o.palette); if(i>=0) applyPalette(i); }
+  syncUI(); }
+function flash(btn,msg){ const o=btn.textContent; btn.textContent=msg; setTimeout(()=>btn.textContent=o,1200); }
+document.getElementById('codeRefresh').addEventListener('click',()=>{ codeBox.value=exportConfig(); });
+document.getElementById('codeCopy').addEventListener('click',()=>{ codeBox.value=exportConfig();
+  codeBox.focus(); codeBox.select(); codeBox.setSelectionRange(0,99999);
+  try{ document.execCommand('copy'); }catch(e){}
+  if(navigator.clipboard){ navigator.clipboard.writeText(codeBox.value).catch(()=>{}); }
+  flash(document.getElementById('codeCopy'),'✓ 복사됨'); });
+document.getElementById('codeApply').addEventListener('click',()=>{ try{ applyConfig(codeBox.value);
+  flash(document.getElementById('codeApply'),'✓ 반영됨'); }catch(e){ alert('코드 형식 오류: '+e.message); } });
+codeReady=true; refreshCode();
 
 /* ========================= 렌더 ========================= */
 function frame(now){
@@ -398,6 +432,7 @@ function frame(now){
   gl.uniform1f(U.u_sharpFeather,sharpF);
   gl.uniform1f(U.u_blurFeather,state.blurAmt);
   gl.uniform1f(U.u_lightSize,state.lightSize);
+  gl.uniform1f(U.u_lightReach,state.lightReach);
   gl.uniform1f(U.u_lightAmt,state.lightAmt);
   gl.uniform1f(U.u_lightUneven,state.lightUneven);
   gl.uniform1f(U.u_glowSpread,0.08);
