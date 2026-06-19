@@ -1,0 +1,6 @@
+# 렌더링 결과물 — 로컬에만 보관 (커밋/푸시 안 함)
+output/
+renders/
+
+# macOS
+.DS_Store
