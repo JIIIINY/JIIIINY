@@ -138,8 +138,8 @@ const SPEC = {
     [120,"#E2B98B"], [150,"#DAC9B5"], [180,"#D8BEC9"], [210,"#E4A2BE"],
     [240,"#E85BA0"], [270,"#E99267"], [300,"#E07237"], [330,"#E47B39"]
   ],
-  rotPerSec: 3.0,        // 18°/6s
-  breathAmp: 0.04,       // scale 1.0 -> 1.04
+  rotPerSec: 12.0,       // 색이 둘레를 흐르듯 — 모션 가시성 ↑
+  breathAmp: 0.05,       // scale 1.0 -> 1.05
   intensityBase: 1.0
 };
 
@@ -187,6 +187,8 @@ uniform float u_haloOuter;
 uniform float u_falloff;
 uniform float u_intensity;
 uniform float u_angle;     // degrees
+uniform float u_exposure;  // 전체 밝기(노출)
+uniform float u_haloMix;   // 0=가산(밝음) .. 1=오버블렌드(색 선명)
 uniform vec3  u_bg;
 uniform vec3  u_stops[12];
 
@@ -227,19 +229,28 @@ void main(){
   // --- 배경 ---
   vec3 color = u_bg;
 
-  // --- 할로 (가산 합성) ---
+  // --- 할로 ---
+  // 가산(additive)만 쓰면 밝은 배경 위에서 색이 흰색으로 날아감.
+  // over-blend(색 유지) 와 가산(발광) 을 u_haloMix 로 섞어 색이 보이게 함.
   float t = clamp((r - innerPx) / max(outerPx - innerPx, 1.0), 0.0, 1.0);
   float haloA = pow(1.0 - t, u_falloff);
   if(r > outerPx) haloA = 0.0;
-  color += haloColor(ang) * haloA * u_intensity * 0.85;
+  vec3  hc = haloColor(ang);
+  float a  = clamp(haloA * u_intensity, 0.0, 1.0);
+  vec3 overBlend = mix(color, hc, a);          // 색이 선명하게 유지
+  vec3 additive  = color + hc * haloA * u_intensity * 0.85; // 발광(밝음)
+  color = mix(additive, overBlend, u_haloMix);
 
   // --- 오브 엣지 블룸 (상태 B 글로우) ---
   float bloom = u_glow * exp(- (r - radPx) * (r - radPx) / (2.0 * spreadPx * spreadPx + 1.0));
-  color += vec3(1.0) * bloom * 0.8;
+  color += hc * bloom * 0.35 + vec3(1.0) * bloom * 0.35;
 
   // --- 오브 본체 (흰색) ---
   float orbA = 1.0 - smoothstep(radPx - featPx, radPx + featPx, r);
   color = mix(color, vec3(1.0), orbA);
+
+  // --- 노출(밝기) ---
+  color *= u_exposure;
 
   gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }
@@ -266,7 +277,7 @@ gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
 const U = {};
 ['u_res','u_center','u_radius','u_feather','u_sharpness','u_glow','u_glowSpread',
- 'u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_bg']
+ 'u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_exposure','u_haloMix','u_bg']
  .forEach(n => U[n] = gl.getUniformLocation(prog, n));
 const uStops = gl.getUniformLocation(prog, 'u_stops[0]');
 
@@ -284,7 +295,11 @@ const controls = [
   { key:'falloff',   name:'할로 폴오프', min:0.5, max:4, step:0.05 },
   { key:'rot',       name:'회전 속도(×)', min:0, max:4, step:0.05 },
   { key:'breath',    name:'호흡(×)', min:0, max:3, step:0.05 },
+  { key:'exposure',  name:'밝기(노출)', min:0.40, max:1.30, step:0.01 },
+  { key:'haloMix',   name:'색 선명도', min:0, max:1, step:0.02 },
 ];
+// auto 트랙이 없는 컨트롤의 기본값
+const DEFAULTS = { exposure:0.90, haloMix:0.72, rot:1.0, breath:1.0 };
 const override = {};   // key -> {on:false, value:number}
 const slidersEl = document.getElementById('sliders');
 controls.forEach(c => {
@@ -390,8 +405,10 @@ function frame(now){
   const glow  = pick('glow',      glowAuto);
   const inten = pick('intensity', intAuto);
   const fall  = pick('falloff',   fallAuto);
-  const rotMul= pick('rot',       1.0);
-  const breMul= pick('breath',    1.0);
+  const rotMul= pick('rot',       DEFAULTS.rot);
+  const breMul= pick('breath',    DEFAULTS.breath);
+  const expo  = pick('exposure',  DEFAULTS.exposure);
+  const hmix  = pick('haloMix',   DEFAULTS.haloMix);
 
   const tSec  = now/1000;
   const angle = (tSec * SPEC.rotPerSec * rotMul) % 360;
@@ -411,13 +428,15 @@ function frame(now){
   gl.uniform1f(U.u_falloff, fall);
   gl.uniform1f(U.u_intensity, inten);
   gl.uniform1f(U.u_angle, angle);
+  gl.uniform1f(U.u_exposure, expo);
+  gl.uniform1f(U.u_haloMix, hmix);
   gl.uniform3f(U.u_bg, bg[0], bg[1], bg[2]);
   gl.uniform3fv(uStops, stopsFlat);
 
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   // 슬라이더 값 표시 갱신
-  const cur = { sharpness:sharp, feather:feat, glow, intensity:inten, falloff:fall, rot:rotMul, breath:breMul };
+  const cur = { sharpness:sharp, feather:feat, glow, intensity:inten, falloff:fall, rot:rotMul, breath:breMul, exposure:expo, haloMix:hmix };
   controls.forEach(c => {
     const el = document.querySelector(`[data-val="${c.key}"]`);
     if(el) el.textContent = cur[c.key].toFixed(c.step < 0.01 ? 3 : 2);
