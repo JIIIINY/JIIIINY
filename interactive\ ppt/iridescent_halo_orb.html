@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Iridescent Halo Orb</title>
+<style>
+  :root { --bg: #0d0d0f; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg);
+    color: #e8e8ea;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .stage {
+    min-height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    gap: 32px; padding: 32px; flex-wrap: wrap;
+  }
+  .canvas-wrap {
+    position: relative;
+    width: 360px; height: 760px;
+    border-radius: 26px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55);
+    overflow: hidden;
+  }
+  canvas#orb {
+    display: block;
+    width: 360px; height: 760px;
+    border-radius: 26px;
+  }
+  .rec-dot {
+    position: absolute; top: 14px; left: 14px;
+    display: none; align-items: center; gap: 6px;
+    font-size: 12px; color: #fff;
+    background: rgba(0,0,0,.35); padding: 4px 10px; border-radius: 999px;
+    backdrop-filter: blur(6px);
+  }
+  .rec-dot.on { display: flex; }
+  .rec-dot .blink {
+    width: 9px; height: 9px; border-radius: 50%; background: #ff3b30;
+    animation: blink 1s steps(2, start) infinite;
+  }
+  @keyframes blink { 50% { opacity: .15; } }
+
+  .panel {
+    width: 320px;
+    background: #151518;
+    border: 1px solid #26262b;
+    border-radius: 16px;
+    padding: 18px 18px 6px;
+  }
+  .panel h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .2px; }
+  .panel .sub { font-size: 11px; color: #8a8a92; margin: 0 0 16px; }
+  .row { margin-bottom: 14px; }
+  .row label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; color: #b9b9c0; margin-bottom: 6px;
+  }
+  .row label .val { font-variant-numeric: tabular-nums; color: #f0c45a; font-size: 11px; }
+  .row label .auto { font-size: 10px; color: #5cc8a0; }
+  .row label .auto.off { color: #6b6b73; }
+  input[type=range] {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 4px; border-radius: 4px; background: #2c2c33; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #f0c45a; cursor: pointer; border: 2px solid #151518;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #f0c45a; cursor: pointer; border: 2px solid #151518;
+  }
+  .btns { display: flex; gap: 8px; margin: 6px 0 14px; flex-wrap: wrap; }
+  button {
+    flex: 1 1 auto;
+    background: #232329; color: #e8e8ea; border: 1px solid #34343c;
+    border-radius: 10px; padding: 9px 10px; font-size: 12px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover { background: #2c2c34; }
+  button.primary { background: #f0c45a; color: #1a1206; border-color: #f0c45a; font-weight: 600; }
+  button.primary:hover { background: #f3cd72; }
+  button.rec.active { background: #ff3b30; color: #fff; border-color: #ff3b30; }
+  .scrub-row { display: flex; align-items: center; gap: 8px; }
+  .scrub-row input[type=checkbox] { accent-color: #f0c45a; }
+  .scrub-row .lp { font-size: 11px; color: #b9b9c0; white-space: nowrap; }
+  hr { border: none; border-top: 1px solid #26262b; margin: 4px 0 14px; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="canvas-wrap">
+      <canvas id="orb" width="720" height="1520"></canvas>
+      <div class="rec-dot" id="recDot"><span class="blink"></span> REC</div>
+    </div>
+
+    <div class="panel">
+      <h1>Iridescent Halo Orb</h1>
+      <p class="sub">JSON 스펙 기반 · 블러/엣지/컬러 실시간 조정 · WebGL</p>
+
+      <div class="btns">
+        <button id="playBtn" class="primary">⏸ 일시정지</button>
+        <button id="resetBtn">↺ 초기화</button>
+        <button id="recBtn" class="rec">● 녹화</button>
+      </div>
+
+      <div class="row">
+        <div class="scrub-row">
+          <input type="checkbox" id="loopChk" checked />
+          <span class="lp">자동 루프 (6s)</span>
+          <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" />
+        </div>
+      </div>
+      <hr />
+
+      <!-- sliders injected here -->
+      <div id="sliders"></div>
+    </div>
+  </div>
+
+<script>
+/* ---------- JSON 스펙 (요약) ---------- */
+const SPEC = {
+  duration: 6.0,
+  center: { x: 0.5, y: 0.46 },
+  haloInner: 0.30,
+  innerGlowSpread: 0.08,
+  // 상태 A(선명) / B(글로우)
+  A: { sharpness:1.00, feather:0.012, glow:0.0, radius:0.30, haloOuter:0.62, falloff:2.0, bg:"#F5F5F3" },
+  B: { sharpness:0.25, feather:0.100, glow:0.9, radius:0.32, haloOuter:0.68, falloff:1.5, bg:"#D1D8DE" },
+  // 할로 conic 컬러 스톱 (30° 균등, 각도→색)
+  stops: [
+    [0,  "#F2B244"], [30, "#EDD960"], [60, "#EDD960"], [90, "#DEE09F"],
+    [120,"#E2B98B"], [150,"#DAC9B5"], [180,"#D8BEC9"], [210,"#E4A2BE"],
+    [240,"#E85BA0"], [270,"#E99267"], [300,"#E07237"], [330,"#E47B39"]
+  ],
+  rotPerSec: 3.0,        // 18°/6s
+  breathAmp: 0.04,       // scale 1.0 -> 1.04
+  intensityBase: 1.0
+};
+
+function hexToRGB(h){
+  h = h.replace('#','');
+  return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255];
+}
+function lerp(a,b,t){ return a + (b-a)*t; }
+function easeInOutSine(t){ return -(Math.cos(Math.PI*t)-1)/2; }
+// 트랙 키프레임 보간 (세그먼트별 easeInOutSine)
+function track(prog, kfs){
+  for(let i=0;i<kfs.length-1;i++){
+    const a=kfs[i], b=kfs[i+1];
+    if(prog>=a.t && prog<=b.t){
+      const f = (b.t===a.t)?0:(prog-a.t)/(b.t-a.t);
+      return lerp(a.v, b.v, easeInOutSine(f));
+    }
+  }
+  return kfs[kfs.length-1].v;
+}
+const MORPH_KF = [{t:0,v:0},{t:0.5,v:1},{t:1,v:0}];
+const SCALE_KF = [{t:0,v:0},{t:0.5,v:1},{t:1,v:0}];      // 0..1 -> breathAmp 적용
+const INT_KF   = [{t:0,v:0.9},{t:0.5,v:1.15},{t:1,v:0.9}];
+
+/* ---------- WebGL 셋업 ---------- */
+const canvas = document.getElementById('orb');
+const gl = canvas.getContext('webgl', { preserveDrawingBuffer:true, antialias:true });
+if(!gl){ alert('이 브라우저는 WebGL을 지원하지 않습니다.'); }
+
+const VERT = `
+attribute vec2 a_pos;
+void main(){ gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+const FRAG = `
+precision highp float;
+uniform vec2  u_res;
+uniform vec2  u_center;
+uniform float u_radius;
+uniform float u_feather;
+uniform float u_sharpness;
+uniform float u_glow;
+uniform float u_glowSpread;
+uniform float u_haloInner;
+uniform float u_haloOuter;
+uniform float u_falloff;
+uniform float u_intensity;
+uniform float u_angle;     // degrees
+uniform vec3  u_bg;
+uniform vec3  u_stops[12];
+
+const float PI = 3.14159265359;
+
+vec3 haloColor(float deg){
+  float a = mod(deg, 360.0) / 30.0; // 0..12
+  vec3 col = u_stops[0];
+  for(int i=0;i<12;i++){
+    float lo = float(i);
+    if(a >= lo && a < lo+1.0){
+      vec3 c0 = u_stops[i];
+      vec3 c1 = (i==11) ? u_stops[0] : u_stops[i+1];
+      col = mix(c0, c1, a-lo);
+    }
+  }
+  return col;
+}
+
+void main(){
+  // 화면 좌표(상단=y작음), 픽셀 단위
+  vec2 p  = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y);
+  vec2 c  = u_center * u_res;
+  vec2 d  = p - c;
+  float r = length(d);
+
+  float W = u_res.x;            // 반지름 기준 = 폭
+  float radPx   = u_radius   * W;
+  float featPx  = u_feather  * W * (2.0 - u_sharpness);
+  float innerPx = u_haloInner* W;
+  float outerPx = u_haloOuter* W;
+  float spreadPx= u_glowSpread* W;
+
+  // 각도 (math 컨벤션: 0=오른쪽, 반시계로 위)
+  float ang = degrees(atan(-d.y, d.x)); // -d.y => y up
+  ang = mod(ang + u_angle, 360.0);
+
+  // --- 배경 ---
+  vec3 color = u_bg;
+
+  // --- 할로 (가산 합성) ---
+  float t = clamp((r - innerPx) / max(outerPx - innerPx, 1.0), 0.0, 1.0);
+  float haloA = pow(1.0 - t, u_falloff);
+  if(r > outerPx) haloA = 0.0;
+  color += haloColor(ang) * haloA * u_intensity * 0.85;
+
+  // --- 오브 엣지 블룸 (상태 B 글로우) ---
+  float bloom = u_glow * exp(- (r - radPx) * (r - radPx) / (2.0 * spreadPx * spreadPx + 1.0));
+  color += vec3(1.0) * bloom * 0.8;
+
+  // --- 오브 본체 (흰색) ---
+  float orbA = 1.0 - smoothstep(radPx - featPx, radPx + featPx, r);
+  color = mix(color, vec3(1.0), orbA);
+
+  gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+}
+`;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'a_pos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const U = {};
+['u_res','u_center','u_radius','u_feather','u_sharpness','u_glow','u_glowSpread',
+ 'u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_bg']
+ .forEach(n => U[n] = gl.getUniformLocation(prog, n));
+const uStops = gl.getUniformLocation(prog, 'u_stops[0]');
+
+// 스톱 색 → flat Float32Array (각도 30° 균등이라 index=각도/30)
+const stopsFlat = new Float32Array(36);
+SPEC.stops.forEach((s, i) => { const c = hexToRGB(s[1]); stopsFlat[i*3]=c[0]; stopsFlat[i*3+1]=c[1]; stopsFlat[i*3+2]=c[2]; });
+const bgA = hexToRGB(SPEC.A.bg), bgB = hexToRGB(SPEC.B.bg);
+
+/* ---------- 컨트롤(오버라이드) ---------- */
+const controls = [
+  { key:'sharpness', name:'엣지 선명도', min:0.05, max:1, step:0.01 },
+  { key:'feather',   name:'블러(feather)', min:0.004, max:0.18, step:0.002 },
+  { key:'glow',      name:'이너 글로우', min:0, max:1.2, step:0.01 },
+  { key:'intensity', name:'할로 강도', min:0, max:2, step:0.01 },
+  { key:'falloff',   name:'할로 폴오프', min:0.5, max:4, step:0.05 },
+  { key:'rot',       name:'회전 속도(×)', min:0, max:4, step:0.05 },
+  { key:'breath',    name:'호흡(×)', min:0, max:3, step:0.05 },
+];
+const override = {};   // key -> {on:false, value:number}
+const slidersEl = document.getElementById('sliders');
+controls.forEach(c => {
+  override[c.key] = { on:false, value:(c.min+c.max)/2 };
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <label>
+      <span>${c.name} <span class="auto" data-auto="${c.key}">자동</span></span>
+      <span class="val" data-val="${c.key}">–</span>
+    </label>
+    <input type="range" min="${c.min}" max="${c.max}" step="${c.step}" data-key="${c.key}" />`;
+  slidersEl.appendChild(row);
+  const input = row.querySelector('input');
+  input.addEventListener('input', () => {
+    override[c.key].on = true;
+    override[c.key].value = parseFloat(input.value);
+    row.querySelector('[data-auto]').classList.add('off');
+    row.querySelector('[data-auto]').textContent = '수동';
+  });
+});
+
+/* ---------- 재생/스크럽/녹화 상태 ---------- */
+let playing = true;
+let startT = performance.now();
+let pausedProg = 0;
+const loopChk = document.getElementById('loopChk');
+const scrub   = document.getElementById('scrub');
+const playBtn = document.getElementById('playBtn');
+
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸ 일시정지' : '▶ 재생';
+  if(playing) startT = performance.now() - pausedProg*SPEC.duration*1000;
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  Object.values(override).forEach(o => o.on = false);
+  document.querySelectorAll('[data-auto]').forEach(e => { e.classList.remove('off'); e.textContent='자동'; });
+  loopChk.checked = true; scrub.value = 0;
+  playing = true; playBtn.textContent='⏸ 일시정지'; startT = performance.now();
+});
+scrub.addEventListener('input', () => { if(loopChk.checked) loopChk.checked = false; });
+
+/* ---------- 녹화 ---------- */
+let recorder = null, chunks = [];
+const recBtn = document.getElementById('recBtn');
+const recDot = document.getElementById('recDot');
+recBtn.addEventListener('click', () => {
+  if(recorder && recorder.state === 'recording'){ recorder.stop(); return; }
+  chunks = [];
+  const stream = canvas.captureStream(60);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+  recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 });
+  recorder.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type:'video/webm' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'iridescent-halo-orb.webm';
+    a.click();
+    recBtn.classList.remove('active'); recBtn.textContent = '● 녹화';
+    recDot.classList.remove('on');
+  };
+  recorder.start();
+  recBtn.classList.add('active'); recBtn.textContent = '■ 정지';
+  recDot.classList.add('on');
+});
+
+/* ---------- 렌더 루프 ---------- */
+function pick(key, autoVal){ return override[key].on ? override[key].value : autoVal; }
+
+function frame(now){
+  let prog;
+  if(playing && loopChk.checked){
+    prog = ((now - startT) % (SPEC.duration*1000)) / (SPEC.duration*1000);
+    scrub.value = prog.toFixed(3);
+    pausedProg = prog;
+  } else if(loopChk.checked){
+    prog = pausedProg;
+  } else {
+    prog = parseFloat(scrub.value);
+    pausedProg = prog;
+  }
+
+  const morph = track(prog, MORPH_KF);
+  // 상태 A↔B 보간
+  const A=SPEC.A, B=SPEC.B;
+  const sharpAuto = lerp(A.sharpness, B.sharpness, morph);
+  const featAuto  = lerp(A.feather,   B.feather,   morph);
+  const glowAuto  = lerp(A.glow,      B.glow,      morph);
+  const radius    = lerp(A.radius,    B.radius,    morph);
+  const outerAuto = lerp(A.haloOuter, B.haloOuter, morph);
+  const fallAuto  = lerp(A.falloff,   B.falloff,   morph);
+  const bg = [lerp(bgA[0],bgB[0],morph), lerp(bgA[1],bgB[1],morph), lerp(bgA[2],bgB[2],morph)];
+
+  // 트랙
+  const scaleN  = track(prog, SCALE_KF);                    // 0..1
+  const intAuto = track(prog, INT_KF) * SPEC.intensityBase;
+
+  // 오버라이드 적용
+  const sharp = pick('sharpness', sharpAuto);
+  const feat  = pick('feather',   featAuto);
+  const glow  = pick('glow',      glowAuto);
+  const inten = pick('intensity', intAuto);
+  const fall  = pick('falloff',   fallAuto);
+  const rotMul= pick('rot',       1.0);
+  const breMul= pick('breath',    1.0);
+
+  const tSec  = now/1000;
+  const angle = (tSec * SPEC.rotPerSec * rotMul) % 360;
+  const scale = 1.0 + SPEC.breathAmp * breMul * scaleN;
+
+  // 유니폼
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.uniform2f(U.u_res, canvas.width, canvas.height);
+  gl.uniform2f(U.u_center, SPEC.center.x, SPEC.center.y);
+  gl.uniform1f(U.u_radius, radius * scale);
+  gl.uniform1f(U.u_feather, feat);
+  gl.uniform1f(U.u_sharpness, sharp);
+  gl.uniform1f(U.u_glow, glow);
+  gl.uniform1f(U.u_glowSpread, SPEC.innerGlowSpread);
+  gl.uniform1f(U.u_haloInner, SPEC.haloInner);
+  gl.uniform1f(U.u_haloOuter, outerAuto);
+  gl.uniform1f(U.u_falloff, fall);
+  gl.uniform1f(U.u_intensity, inten);
+  gl.uniform1f(U.u_angle, angle);
+  gl.uniform3f(U.u_bg, bg[0], bg[1], bg[2]);
+  gl.uniform3fv(uStops, stopsFlat);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // 슬라이더 값 표시 갱신
+  const cur = { sharpness:sharp, feather:feat, glow, intensity:inten, falloff:fall, rot:rotMul, breath:breMul };
+  controls.forEach(c => {
+    const el = document.querySelector(`[data-val="${c.key}"]`);
+    if(el) el.textContent = cur[c.key].toFixed(c.step < 0.01 ? 3 : 2);
+    const inp = document.querySelector(`input[data-key="${c.key}"]`);
+    if(inp && !override[c.key].on) inp.value = cur[c.key];
+  });
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
