@@ -42,14 +42,14 @@
     line-height: 1.15;
     font-weight: 700;
     font-size: clamp(2.2rem, 9vw, 8rem);
-    letter-spacing: -0.02em;
+    letter-spacing: 0.04em;
   }
 
-  /* 단어 단위로 줄바꿈은 자연스럽게, 단어 내부 글자는 붙여서 융합 */
+  /* 단어 단위로 줄바꿈은 자연스럽게, 단어 내부 글자는 약간 떨어뜨려 가독성 유지 */
   .word {
     display: inline-block;
     white-space: nowrap;
-    margin: 0 0.18em;
+    margin: 0 0.22em;
   }
 
   /* 개별 글자 */
@@ -62,12 +62,11 @@
     animation-delay: var(--d, 0s);
   }
 
-  /* 메타볼 모핑: 부풀며 이웃과 융합 → 표면장력 풀리며 분리 */
+  /* 메타볼 모핑: 글자는 항상 읽히고, 가장자리만 액체처럼 살짝 녹았다 붙음 */
   @keyframes blob {
     0%   { transform: skewX(var(--skew)) scale(1.00) translate(0, 0) rotate(0deg); }
-    45%  { transform: skewX(var(--skew)) scale(1.30) translate(-0.03em, 0.06em) rotate(-3deg); }
-    60%  { transform: skewX(var(--skew)) scale(1.35) translate(0.02em, 0.10em) rotate(3deg); }
-    100% { transform: skewX(var(--skew)) scale(1.00) translate(0, -0.04em) rotate(0deg); }
+    50%  { transform: skewX(var(--skew)) scale(1.18) translate(0, 0.05em) rotate(-2deg); }
+    100% { transform: skewX(var(--skew)) scale(1.00) translate(0, -0.03em) rotate(0deg); }
   }
 
   /* 컨트롤 */
@@ -105,7 +104,7 @@
   <svg width="0" height="0" aria-hidden="true" style="position:absolute">
     <defs>
       <filter id="goo">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+        <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
         <feColorMatrix in="blur" mode="matrix"
           values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -11" result="goo" />
         <feComposite in="SourceGraphic" in2="goo" operator="atop" />
@@ -119,7 +118,7 @@
 
   <div class="ui">
     <label>점성
-      <input id="goo-amt" type="range" min="4" max="20" step="1" value="12" />
+      <input id="goo-amt" type="range" min="2" max="14" step="1" value="8" />
     </label>
     <label>속도
       <input id="speed" type="range" min="1.8" max="6" step="0.2" value="3.6" />
