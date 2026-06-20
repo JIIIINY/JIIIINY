@@ -20,8 +20,22 @@
     "renderHints": {
       "colorSpace": "display-p3",
       "blendMode": "screen",
-      "filmGrain": { "enabled": true, "opacity": 0.04, "scale": 1.2 },
+      "filmGrain": { "enabled": true, "opacity": 0.09, "scale": 1.4 },
       "globalBlur": { "min": 8, "max": 60, "unit": "px" }
+    },
+    "renderModel": {
+      "comment": "핵심: 단일 가우시안 블러를 형태 전체에 먹이지 말 것. 세 영역을 분리한다.",
+      "layers": [
+        { "name": "glow",  "role": "형태 뒤로 깔리는 부드러운 헤일로(블러 영역). dominant 컬러, 큰 spread, 낮은 opacity. 형태와 분리됨." },
+        { "name": "form",  "role": "선명한 실루엣 + 채도 높은 내부 그라디언트. 얇은 edgeFeather만 적용해 형태가 또렷이 읽혀야 함. 내부 색은 블러로 뭉개지지 않음." },
+        { "name": "grain", "role": "표면 노이즈 텍스처. 그라디언트 위에 overlay로 얹어 디테일/질감 부여." }
+      ],
+      "params": {
+        "edgeFeather": "실루엣 경계 부드러움(뷰박스 비율 0..1). 작을수록 또렷. SHAPES 37처럼 형태가 선명한 것은 0.01 근처, 구름 군집은 0.045.",
+        "interiorContrast": "내부 그라디언트 채도/대비 배율(>1 강조). 색이 회색으로 죽지 않게.",
+        "glow": "{ spread(헤일로 반경 0..1), opacity }. form과 독립적인 블러 영역.",
+        "grain": "노이즈 강도 0..1"
+      }
     }
   },
 
@@ -94,6 +108,7 @@
         "edgeGlow": { "color": "#FFD9EC", "intensity": 0.7 }
       },
       "blur": 22,
+      "render": { "edgeFeather": 0.018, "interiorContrast": 1.20, "glow": { "spread": 0.08, "opacity": 0.55 }, "grain": 0.05 },
       "opacity": 0.95
     },
 
@@ -134,6 +149,7 @@
         "edgeGlow": { "color": "#FFC79A", "intensity": 0.4 }
       },
       "blur": 30,
+      "render": { "edgeFeather": 0.022, "interiorContrast": 1.15, "glow": { "spread": 0.10, "opacity": 0.42 }, "grain": 0.05 },
       "opacity": 0.97
     },
 
@@ -172,6 +188,7 @@
         "edgeGlow": { "color": "#E6C2D6", "intensity": 0.25 }
       },
       "blur": 46,
+      "render": { "edgeFeather": 0.045, "interiorContrast": 1.10, "glow": { "spread": 0.13, "opacity": 0.45 }, "grain": 0.04 },
       "opacity": 0.9
     },
 
@@ -213,6 +230,7 @@
         "edgeGlow": { "color": "#FF9ECF", "intensity": 0.6 }
       },
       "blur": 26,
+      "render": { "edgeFeather": 0.016, "interiorContrast": 1.20, "glow": { "spread": 0.08, "opacity": 0.50 }, "grain": 0.05 },
       "opacity": 0.96
     },
 
@@ -253,6 +271,7 @@
         "edgeGlow": { "color": "#FFC474", "intensity": 0.45 }
       },
       "blur": 38,
+      "render": { "edgeFeather": 0.030, "interiorContrast": 1.25, "glow": { "spread": 0.11, "opacity": 0.42 }, "grain": 0.05 },
       "opacity": 0.95
     },
 
@@ -262,17 +281,18 @@
       "form": {
         "archetype": "flowing-ribbon",
         "topology": "open-stroke",
-        "description": "수평으로 흐르는 물결 리본/연기. 가늘고 길며 우상단 끝이 살짝 솟음.",
+        "description": "수평으로 흐르는 가는 물결 리본/연기. 우상단 끝(오렌지)이 솟고, 가운데가 잘록한 S자 흐름.",
         "blob": {
-          "points": 8,
+          "points": 10,
+          "concave": true,
           "controlPoints": [
-            [0.16, 0.56], [0.34, 0.48], [0.50, 0.54],
-            [0.66, 0.46], [0.82, 0.40], [0.78, 0.52],
-            [0.54, 0.60], [0.30, 0.62]
+            [0.84, 0.38], [0.70, 0.33], [0.55, 0.45], [0.40, 0.42],
+            [0.26, 0.51], [0.16, 0.58], [0.28, 0.63], [0.44, 0.55],
+            [0.60, 0.60], [0.74, 0.47]
           ],
-          "tension": 0.75,
+          "tension": 0.7,
           "elongation": 2.1,
-          "rotation": -8
+          "rotation": -6
         }
       },
       "color": {
@@ -295,6 +315,7 @@
         "edgeGlow": { "color": "#B6C8F0", "intensity": 0.5 }
       },
       "blur": 28,
+      "render": { "edgeFeather": 0.020, "interiorContrast": 1.20, "glow": { "spread": 0.09, "opacity": 0.42 }, "grain": 0.05 },
       "opacity": 0.92
     },
 
@@ -332,6 +353,7 @@
         "edgeGlow": { "color": "#FFD27A", "intensity": 0.85 }
       },
       "blur": 18,
+      "render": { "edgeFeather": 0.008, "interiorContrast": 1.30, "glow": { "spread": 0.14, "opacity": 0.60 }, "grain": 0.04 },
       "opacity": 1.0
     },
 
@@ -341,16 +363,18 @@
       "form": {
         "archetype": "rounded-triangle-soft",
         "topology": "closed-blob",
-        "description": "둥근 삼각 조약돌(05와 형태 유사). 표면이 더 말랑하고 굴곡이 많음.",
+        "description": "뼈/T 자형 유기체. 상단에 두 개의 둥근 로브(목 부분이 오목하게 들어감)와 하단으로 뻗는 꼬리.",
         "blob": {
-          "points": 7,
+          "points": 10,
+          "concave": true,
           "controlPoints": [
-            [0.52, 0.20], [0.70, 0.32], [0.74, 0.54],
-            [0.62, 0.74], [0.42, 0.78], [0.28, 0.58], [0.32, 0.36]
+            [0.82, 0.40], [0.74, 0.22], [0.60, 0.30], [0.46, 0.20],
+            [0.26, 0.40], [0.34, 0.58], [0.50, 0.62], [0.52, 0.82],
+            [0.66, 0.60], [0.76, 0.50]
           ],
           "tension": 0.86,
           "elongation": 1.15,
-          "rotation": 8
+          "rotation": 4
         }
       },
       "color": {
@@ -373,6 +397,7 @@
         "edgeGlow": { "color": "#F2A8D8", "intensity": 0.55 }
       },
       "blur": 34,
+      "render": { "edgeFeather": 0.012, "interiorContrast": 1.30, "glow": { "spread": 0.07, "opacity": 0.32 }, "grain": 0.08 },
       "opacity": 0.95
     },
 
@@ -414,6 +439,7 @@
         "edgeGlow": { "color": "#FFC79A", "intensity": 0.6 }
       },
       "blur": 40,
+      "render": { "edgeFeather": 0.028, "interiorContrast": 1.15, "glow": { "spread": 0.12, "opacity": 0.50 }, "grain": 0.05 },
       "opacity": 0.93
     }
   ],

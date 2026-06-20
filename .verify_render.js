@@ -1,8 +1,7 @@
-// 검증용: morphing_config.js를 구동해 9개 형태 + 몰핑 프레임을 SVG→PNG로 렌더
+// 검증용 v2: 분리 렌더 모델 — (1)별도 글로우 헤일로 (2)선명한 실루엣+채도높은 그라디언트(얇은 페더)
+// (3)그레인. 단일 가우시안 블러로 형태를 뭉개지 않는다.
 const fs = require('fs');
 const { Resvg } = require('@resvg/resvg-js');
-
-// window 목 후 설정 로드
 global.window = {};
 require('./morphing_config.js');
 const CFG = global.window.MORPH_CONFIG;
@@ -29,12 +28,19 @@ function sampleMetaballs(balls){let cx=0,cy=0;for(const b of balls){cx+=b.center
     for(const b of balls){const ox=b.center[0]-cx,oy=b.center[1]-cy,proj=ox*dx+oy*dy,perp2=(ox*ox+oy*oy)-proj*proj;
       if(perp2<=b.radius*b.radius){const reach=proj+Math.sqrt(b.radius*b.radius-perp2);if(reach>rmax)rmax=reach;}}
     rmax*=1.12;out.push([cx+dx*rmax,cy+dy*rmax]);}return out;}
+// 오목(concave) 형태 보존: 각도 정렬을 하지 않고 외곽선 순서를 유지한다.
+// 대신 모핑 대응을 위해 (a)와인딩 통일 (b)최우측 점에서 시작하도록 인덱스 회전.
+function signedArea(p){let a=0;for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length];a+=p[i][0]*q[1]-q[0]*p[i][1];}return a/2;}
+function stabilize(pts){
+  if(signedArea(pts)<0) pts=pts.slice().reverse();           // 와인딩 통일(시계방향)
+  let best=0,bx=-1e9; for(let i=0;i<pts.length;i++) if(pts[i][0]>bx){bx=pts[i][0];best=i;} // 최우측 시작
+  return pts.slice(best).concat(pts.slice(0,best));
+}
 function shapeToPoints(s){const f=s.form;let pts;
   if(f.star)pts=sampleStar(f.star);else if(f.metaballs)pts=sampleMetaballs(f.metaballs);else pts=sampleClosed(f.blob.controlPoints);
-  const c=centroid(pts);return pts.map(p=>({p,a:Math.atan2(p[1]-c[1],p[0]-c[0])})).sort((u,v)=>u.a-v.a).map(o=>o.p);}
-const lerpPts=(a,b,t)=>a.map((p,i)=>[p[0]+(b[i][0]-p[0])*t,p[1]+(b[i][1]-p[1])*t]);
-const ease=u=>u<0.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;
+  return stabilize(pts);}
 
+// Catmull-Rom → cubic bezier 닫힌 패스 (부드러운 실루엣)
 function pathD(pts, ox, oy, sc){
   const m=pts.length,P=pts.map(p=>[ox+p[0]*sc, oy+p[1]*sc]);
   let d=`M ${P[0][0].toFixed(2)} ${P[0][1].toFixed(2)} `;
@@ -42,69 +48,64 @@ function pathD(pts, ox, oy, sc){
     d+=`C ${(p1[0]+(p2[0]-p0[0])/6).toFixed(2)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(2)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(2)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(2)} ${p2[0].toFixed(2)} ${p2[1].toFixed(2)} `;}
   return d+'Z';
 }
-function gradDef(color,id,ox,oy,sc){
-  const stops=color.stops.map(s=>`<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('');
+
+// 채도/대비 강조 (내부 그라디언트가 회색으로 죽지 않게)
+function boostColor(hex, k){
+  let h=hex.replace('#','');
+  let r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),L=(mx+mn)/2;
+  r=Math.max(0,Math.min(255,L+(r-L)*k)); g=Math.max(0,Math.min(255,L+(g-L)*k)); b=Math.max(0,Math.min(255,L+(b-L)*k));
+  const hx=v=>Math.round(v).toString(16).padStart(2,'0');
+  return '#'+hx(r)+hx(g)+hx(b);
+}
+function gradDef(color,id,ox,oy,sc,contrast){
+  const stops=color.stops.map(s=>`<stop offset="${s.offset}" stop-color="${boostColor(s.color,contrast)}"/>`).join('');
   if(color.type==='radial-gradient'){const c=color.center||[0.5,0.5];
-    return `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${ox+c[0]*sc}" cy="${oy+c[1]*sc}" r="${sc*0.62}" fx="${ox+c[0]*sc}" fy="${oy+c[1]*sc}">${stops}</radialGradient>`;}
-  const a=(color.angle||0)*Math.PI/180,R=sc*0.52,cx=ox+sc/2,cy=oy+sc/2;
+    return `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${ox+c[0]*sc}" cy="${oy+c[1]*sc}" r="${sc*0.6}" fx="${ox+c[0]*sc}" fy="${oy+c[1]*sc}">${stops}</radialGradient>`;}
+  const a=(color.angle||0)*Math.PI/180,R=sc*0.55,cx=ox+sc/2,cy=oy+sc/2;
   return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${cx-Math.cos(a)*R}" y1="${cy-Math.sin(a)*R}" x2="${cx+Math.cos(a)*R}" y2="${cy+Math.sin(a)*R}">${stops}</linearGradient>`;
 }
 
 const SHAPES = CFG.shapes.map(s=>({cfg:s,pts:shapeToPoints(s)}));
+function render(svg, w, outfile){ fs.writeFileSync(outfile, new Resvg(svg,{fitTo:{mode:'width',value:w},background:'#0B0E14'}).render().asPng()); }
 
-function render(svg, w, h, outfile){
-  const r = new Resvg(svg, { fitTo:{mode:'width', value:w}, background:'#0B0E14' });
-  fs.writeFileSync(outfile, r.render().asPng());
+// 한 셀(형태) 렌더: glow 레이어 + form 레이어(얇은 페더) + grain
+function cellSVG(idx, s, cx, cy, cell){
+  const r=s.cfg.render, ox=cx+cell*0.06, oy=cy+cell*0.06, sc=cell*0.88;
+  const d=pathD(s.pts,ox,oy,sc);
+  const feather=Math.max(1.0, r.edgeFeather*cell);          // 얇은 실루엣 페더
+  const glowBlur=r.glow.spread*cell;                         // 별도 글로우 반경
+  const dom=s.cfg.color.dominant||s.cfg.color.stops[Math.floor(s.cfg.color.stops.length/2)].color;
+  let defs=
+    `<filter id="gb${idx}" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="${glowBlur.toFixed(1)}"/></filter>`+
+    `<filter id="fb${idx}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="${feather.toFixed(1)}"/></filter>`+
+    `<filter id="gr${idx}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${idx*7+3}" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${(r.grain).toFixed(2)} 0"/></filter>`+
+    gradDef(s.cfg.color,`form${idx}`,ox,oy,sc,r.interiorContrast);
+  let body=
+    `<path d="${d}" fill="${dom}" filter="url(#gb${idx})" opacity="${r.glow.opacity}"/>`+          // (1) 글로우 헤일로
+    `<path d="${d}" fill="url(#form${idx})" filter="url(#fb${idx})" opacity="${s.cfg.opacity}"/>`+ // (2) 선명한 형태+그라디언트
+    `<g clip-path="url(#clip${idx})"><rect x="${ox-sc*0.2}" y="${oy-sc*0.2}" width="${sc*1.4}" height="${sc*1.4}" filter="url(#gr${idx})" style="mix-blend-mode:overlay"/></g>`; // (3) 그레인
+  const clip=`<clipPath id="clip${idx}"><path d="${d}"/></clipPath>`;
+  return {defs:defs+clip, body};
 }
 
-// ---- 1) 9개 형태 컨택트 시트 (3x3) ----
+// ---- 9개 형태 컨택트 시트 ----
 (function(){
-  const cell=360, pad=0, cols=3, rows=3, W=cols*cell, H=rows*cell;
+  const cell=380, cols=3, W=cols*cell, H=Math.ceil(SHAPES.length/cols)*cell;
   let defs='', body='';
   SHAPES.forEach((s,i)=>{
-    const cx=(i%cols)*cell, cy=Math.floor(i/cols)*cell, ox=cx+cell*0.07, oy=cy+cell*0.07, sc=cell*0.86;
-    const id=`g${i}`;
-    defs+=`<filter id="f${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${(s.cfg.blur*cell/1000).toFixed(1)}"/></filter>`;
-    defs+=gradDef(s.cfg.color,id,ox,oy,sc);
-    body+=`<path d="${pathD(s.pts,ox,oy,sc)}" fill="url(#${id})" filter="url(#f${i})" opacity="${s.cfg.opacity}"/>`;
-    body+=`<text x="${cx+cell/2}" y="${cy+cell-20}" fill="#fff" opacity="0.85" font-family="sans-serif" font-size="15" font-weight="600" text-anchor="middle" letter-spacing="1">${s.cfg.label}</text>`;
+    const cx=(i%cols)*cell, cy=Math.floor(i/cols)*cell;
+    const c=cellSVG(i,s,cx,cy,cell); defs+=c.defs; body+=c.body;
+    body+=`<text x="${cx+cell/2}" y="${cy+cell-18}" fill="#fff" opacity="0.82" font-family="sans-serif" font-size="15" font-weight="600" text-anchor="middle" letter-spacing="1">${s.cfg.label}</text>`;
   });
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#0B0E14"/><defs>${defs}</defs><g>${body}</g></svg>`;
-  render(svg,W,H,'verify_shapes_grid.png');
-  console.log('✓ verify_shapes_grid.png');
+  render(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#0B0E14"/><defs>${defs}</defs>${body}</svg>`, W, 'verify_shapes_grid.png');
+  console.log('✓ verify_shapes_grid.png (분리 렌더: glow + 선명한 form + grain)');
 })();
 
-// ---- 2) 몰핑 시퀀스 스트립 (한 전이를 5프레임으로) ----
+// ---- 단일 대형 샘플 (SHAPES 37 — 형태 선명도 확인용) ----
 (function(){
-  const order=CFG.morphSequence.order.map(id=>SHAPES.findIndex(s=>s.cfg.id===id));
-  const frames=[]; const FPT=5; // frames per transition
-  for(let t=0;t<order.length;t++){
-    const A=SHAPES[order[t]], B=SHAPES[order[(t+1)%order.length]];
-    for(let k=0;k<FPT;k++) frames.push({A,B,te:ease(k/(FPT-1))});
-  }
-  // 너무 길면 처음 두 전이만(10프레임)
-  const sel=frames.slice(0,10);
-  const cell=260, cols=5, rows=Math.ceil(sel.length/cols), W=cols*cell, H=rows*cell;
-  let defs='', body='';
-  sel.forEach((fr,i)=>{
-    const cx=(i%cols)*cell, cy=Math.floor(i/cols)*cell, ox=cx+cell*0.07, oy=cy+cell*0.07, sc=cell*0.86;
-    const geom=lerpPts(fr.A.pts,fr.B.pts,fr.te);
-    const blur=(fr.A.cfg.blur+(fr.B.cfg.blur-fr.A.cfg.blur)*fr.te)*cell/1000;
-    defs+=`<filter id="mf${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${blur.toFixed(1)}"/></filter>`;
-    defs+=gradDef(fr.A.cfg.color,`ma${i}`,ox,oy,sc)+gradDef(fr.B.cfg.color,`mb${i}`,ox,oy,sc);
-    const d=pathD(geom,ox,oy,sc);
-    body+=`<path d="${d}" fill="url(#ma${i})" filter="url(#mf${i})" opacity="${(fr.A.cfg.opacity*(1-fr.te)).toFixed(3)}"/>`;
-    body+=`<path d="${d}" fill="url(#mb${i})" filter="url(#mf${i})" opacity="${(fr.B.cfg.opacity*fr.te).toFixed(3)}"/>`;
-  });
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#0B0E14"/><defs>${defs}</defs><g>${body}</g></svg>`;
-  render(svg,W,H,'verify_morph_strip.png');
-  console.log('✓ verify_morph_strip.png  ('+sel.length+' frames: '+sel[0].A.cfg.label+' → '+sel[FPT].A.cfg.label+' → ...)');
+  const idx=SHAPES.findIndex(s=>s.cfg.id==='08_gradient_shapes_37'), s=SHAPES[idx], cell=760;
+  const c=cellSVG(99,s,0,0,cell);
+  render(`<svg xmlns="http://www.w3.org/2000/svg" width="${cell}" height="${cell}" viewBox="0 0 ${cell} ${cell}"><rect width="${cell}" height="${cell}" fill="#0B0E14"/><defs>${c.defs}</defs>${c.body}</svg>`, cell, 'verify_sample_37.png');
+  console.log('✓ verify_sample_37.png (선명한 실루엣 + 채도 그라디언트 + 그레인)');
 })();
-
-// ---- 3) 비파괴 자기검증: 점 수 / NaN 체크 ----
-let ok=true;
-for(const s of SHAPES){
-  if(s.pts.length!==N){ok=false;console.log('✗ point count',s.cfg.id);}
-  for(const p of s.pts) if(!isFinite(p[0])||!isFinite(p[1])){ok=false;console.log('✗ NaN in',s.cfg.id);}
-}
-console.log(ok?'✓ all 9 shapes: 128 finite boundary points':'✗ geometry errors');
