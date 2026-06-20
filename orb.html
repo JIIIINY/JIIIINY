@@ -183,7 +183,7 @@ function newFont(text){ const f={text:text||'',color:'#2a2a2a',align:'center',sh
 let pages=[]; let activePage=0; let FONT=newFont('Hey!');
 let screens=[]; let activeScreen=0;
 let seqPlaying=false, seqTrans=0.8, seqHold=1.2;
-const SEQP={ hold:{def:1.5,min:0,max:8,step:0.1}, trans:{def:1.5,min:0.1,max:6,step:0.05} };
+const SEQP={ hold:{def:1.5,min:0,max:8,step:0.1}, trans:{def:1.5,min:0.1,max:6,step:0.05}, fadeIn:{def:0,min:0,max:3,step:0.1} };
 let seqInputs=null;
 
 /* ===================== 팔레트 (AI 5색 상시 포함) ===================== */
@@ -205,7 +205,7 @@ let palIdx=0;
 const state={}; Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def);
 state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[];
 state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
-state.hold=1.5; state.trans=1.5;
+state.hold=1.5; state.trans=1.5; state.fadeIn=0;
 let codeReady=false;
 const RATIOS=[[3,2,1],[2,1,1],[1,1,1],[4,2,1]]; let ratioIdx=0;
 function generateEdges(){ const ratio=RATIOS[ratioIdx],sum=ratio.reduce((a,b)=>a+b,0); let acc=0; const arcs=[],gap=6;
@@ -232,6 +232,7 @@ uniform vec2 u_edgeA,u_edgeB; uniform float u_edgeAOn,u_edgeBOn; uniform vec3 u_
 uniform float u_sharpFeather,u_blurFeather,u_lightSize,u_lightReach,u_lightAmt,u_lightUneven,u_outerSize,u_outerAmt;
 uniform float u_glowSpread,u_haloInner,u_haloOuter,u_falloff,u_intensity,u_angle,u_hue,u_exposure,u_haloMix,u_t;
 uniform float u_haloWarp,u_haloWarpFreq,u_surfWarp,u_surfFreq;
+uniform float u_reveal;
 uniform vec3 u_bg1,u_bg2,u_bg3; uniform vec3 u_stops[12];
 const float PI=3.14159265359;
 float adist(float a,float b){ float d=abs(mod(a-b,360.0)); return min(d,360.0-d); }
@@ -263,7 +264,7 @@ void main(){
   float acc=smoothstep(0.9,0.0,distance(uv,vec2(0.8,0.16)));
   bg=mix(bg,u_bg3,acc*0.45);
   float cen=1.0-smoothstep(0.0,0.95,distance(uv,vec2(0.5,0.46)));
-  vec3 color=bg+cen*0.035;
+  vec3 color=bg+cen*0.035; vec3 bgOnly=color;
   // 표면 왜곡(wrap): 색 샘플 각도를 휘게 — 반경에 따라 감기듯 변형
   float aWarp=u_surfWarp*70.0*sin(u_surfFreq*th + r*0.013 + u_t*0.6);
   vec3 hc=clamp(hueShift(haloColor(mod(angBase+u_angle+aWarp,360.0)),u_hue),0.0,1.0);
@@ -280,6 +281,7 @@ void main(){
   float glowAmt=mix(0.4,1.0,1.0-edgeness)*(0.25+0.45*(0.5+0.5*sin(u_t))); float bloom=glowAmt*exp(-(r-rb)*(r-rb)/(2.0*spreadPx*spreadPx+1.0)); color+=hc*bloom*0.30+vec3(1.0)*bloom*0.35;
   float rimW=max(featPx*1.5,2.0); float rim=exp(-(r-(rb+rimW))*(r-(rb+rimW))/(2.0*rimW*rimW))*step(rb,r); color*=1.0-0.28*rim*edgeness;
   float orbA=1.0-smoothstep(rb-featPx,rb+featPx,r); color=mix(color,vec3(1.0),orbA);
+  color=mix(bgOnly,color,clamp(u_reveal,0.0,1.0)); // 중앙요소(오브+할로+라이트) 페이드인
   color*=u_exposure; gl_FragColor=vec4(clamp(color,0.0,1.0),1.0);
 }`;
 function compile(t,s){ const sh=gl.createShader(t); gl.shaderSource(sh,s); gl.compileShader(sh); if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)) console.error('SHADER',gl.getShaderInfoLog(sh)); return sh; }
@@ -290,7 +292,7 @@ const aPos=gl.getAttribLocation(prog,'a_pos'); gl.enableVertexAttribArray(aPos);
 const U={};
 ['u_res','u_center','u_radius','u_shapeSides','u_shapeRound','u_shapeAngle','u_blobAmt','u_blobLobes','u_blobSpeed','u_distortAmt','u_distortFreq',
  'u_edgeA','u_edgeB','u_edgeAOn','u_edgeBOn','u_sharpFeather','u_blurFeather','u_lightSize','u_lightReach','u_lightAmt','u_lightUneven','u_outerSize','u_outerAmt',
- 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_haloWarp','u_haloWarpFreq','u_surfWarp','u_surfFreq','u_bg1','u_bg2','u_bg3'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+ 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_haloWarp','u_haloWarpFreq','u_surfWarp','u_surfFreq','u_reveal','u_bg1','u_bg2','u_bg3'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 const uStops=gl.getUniformLocation(prog,'u_stops[0]'); const uGen=gl.getUniformLocation(prog,'u_gen[0]');
 const stopsFlat=new Float32Array(36);
 function applyPalette(idx){ palIdx=(idx+PALETTES.length)%PALETTES.length; PALETTES[palIdx].stops.forEach((s,i)=>{ const c=hexToRGB(s); stopsFlat[i*3]=c[0]; stopsFlat[i*3+1]=c[1]; stopsFlat[i*3+2]=c[2]; }); refreshPaletteUI(); }
@@ -434,6 +436,7 @@ function buildSeqTab(p){
   seqTabArr.push(mkSlider(p,'typeSpeed',FONTP.typeSpeed,'텍스트 등장 속도(자/초)',()=>FONT.typeSpeed,v=>FONT.typeSpeed=v));
   p.appendChild(secTitle('② 중앙 요소(오브)'));
   seqTabArr.push(mkSlider(p,'orbSize',PARAMS.orbSize,'중앙 요소 크기 (0=숨김/텍스트만)',()=>state.orbSize,v=>state.orbSize=v));
+  seqTabArr.push(mkSlider(p,'fadeIn',SEQP.fadeIn,'중앙 요소 fade-in(s) · 텍스트 뒤 등장',()=>state.fadeIn,v=>state.fadeIn=v));
   p.appendChild(secTitle('③ 타이밍'));
   seqTabArr.push(mkSlider(p,'hold',SEQP.hold,'이 페이지 유지(s)',()=>state.hold,v=>state.hold=v));
   seqTabArr.push(mkSlider(p,'trans',SEQP.trans,'다음으로 전환(s)',()=>state.trans,v=>state.trans=v));
@@ -444,19 +447,19 @@ function buildSeqTab(p){
 }
 /* 페이지 = 장면 스냅샷(모든 파라미터+팔레트+엣지+폰트) */
 function captureScene(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]);
-  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], hold:state.hold, trans:state.trans, font:Object.assign({},FONT) }; }
+  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], hold:state.hold, trans:state.trans, fadeIn:state.fadeIn, font:Object.assign({},FONT) }; }
 function normScene(o){ o=o||{}; const params={}; Object.keys(PARAMS).forEach(k=> params[k]=(o.params&&k in o.params)?+o.params[k]:PARAMS[k].def);
   const arcsrc = Array.isArray(o.genArcs)?o.genArcs : (Array.isArray(o.edges)?o.edges:[]);
   const bg = Array.isArray(o.bg)&&o.bg.length>=3 ? o.bg.slice(0,3) : ['#E9E4F5','#E2EEF6','#F7E8E2'];
   return { params, palette:o.palette||'AI', ratioIdx:(typeof o.ratioIdx==='number')?o.ratioIdx:0,
     genArcs:arcsrc.map(a=>({relC:+a.relC||0,hw:+a.hw||10,on:a.on?1:0})),
     edgeAOn:('edgeAOn'in o)?(o.edgeAOn?1:0):1, edgeBOn:('edgeBOn'in o)?(o.edgeBOn?1:0):1, bg,
-    hold:(o.hold!=null?+o.hold:1.5), trans:(o.trans!=null?+o.trans:1.5),
+    hold:(o.hold!=null?+o.hold:1.5), trans:(o.trans!=null?+o.trans:1.5), fadeIn:(o.fadeIn!=null?+o.fadeIn:0),
     font:Object.assign(newFont(''), o.font||{}) }; }
 function applyScene(sc){ Object.keys(PARAMS).forEach(k=>state[k]=sc.params[k]);
   state.genArcs=sc.genArcs.map(a=>({...a})); state.edgeAOn=sc.edgeAOn; state.edgeBOn=sc.edgeBOn; ratioIdx=sc.ratioIdx;
   if(Array.isArray(sc.bg)){ state.bg1=sc.bg[0]; state.bg2=sc.bg[1]; state.bg3=sc.bg[2]; }
-  state.hold=(sc.hold!=null?sc.hold:1.5); state.trans=(sc.trans!=null?sc.trans:1.5);
+  state.hold=(sc.hold!=null?sc.hold:1.5); state.trans=(sc.trans!=null?sc.trans:1.5); state.fadeIn=(sc.fadeIn!=null?sc.fadeIn:0);
   const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':');
   const pi=PALETTES.findIndex(x=>x.name===sc.palette); applyPalette(pi>=0?pi:0);
   FONT=Object.assign(newFont(''), sc.font); syncFontUI(); syncUI(); }
@@ -620,7 +623,7 @@ function seqRestore(){ if(!_seqBk) return; Object.keys(PARAMS).forEach(k=>state[
 function frame(now){
   let tSec; if(playing){ tSec=(now-startT)/1000; pausedT=now-startT; } else { tSec=pausedT/1000; }
   // 페이지 모션(연결 재생): 장면 보간을 state/stops에 임시 주입
-  let seqText=null;
+  let seqText=null, revealVal=1;
   if(seqPlaying && pages.length>1){ savePage(); seqBackup();
     // 페이지별 유지(hold)+전환(trans) 타이밍
     const segs=pages.map(pg=>(pg.hold!=null?pg.hold:1.5)+(pg.trans!=null?pg.trans:1.5));
@@ -633,6 +636,9 @@ function frame(now){
     const src=(f<0.5)?A:B; state.genArcs=src.genArcs.map(a=>({...a})); state.edgeAOn=src.edgeAOn; state.edgeBOn=src.edgeBOn; ratioIdx=src.ratioIdx;
     lerpStopsInto(stopsFlat,A.palette,B.palette,f);
     const ab=A.bg||['#E9E4F5','#E2EEF6','#F7E8E2'], bb=B.bg||ab; state.bg1=lerpHex(ab[0],bb[0],f); state.bg2=lerpHex(ab[1],bb[1],f); state.bg3=lerpHex(ab[2],bb[2],f);
+    // 중앙요소 페이드인: 텍스트 먼저 → fadeIn 동안 오브 등장(전환 중엔 항상 표시)
+    const fadeA=A.fadeIn||0;
+    if(local>=hold) revealVal=1; else if(fadeA>0){ const delay=Math.min(0.6,hold*0.45); revealVal=Math.max(0,Math.min(1,(local-delay)/Math.max(fadeA,0.001))); } else revealVal=1;
     seqText={A:A.font,B:B.font,f, typedA:typedLinear(A.font, local), typedB:typedLinear(B.font, 0)};
   }
   const lc=document.getElementById('loopChk'); const motion=(lc&&lc.checked)?1.0:0.0;
@@ -655,6 +661,7 @@ function frame(now){
   gl.uniform1f(U.u_falloff,state.falloff); gl.uniform1f(U.u_intensity,intPulse); gl.uniform1f(U.u_angle,haloAngle);
   gl.uniform1f(U.u_hue,state.hue); gl.uniform1f(U.u_exposure,state.exposure); gl.uniform1f(U.u_haloMix,state.haloMix); gl.uniform1f(U.u_t,motion?tSec:0.0);
   gl.uniform1f(U.u_haloWarp,state.haloWarp); gl.uniform1f(U.u_haloWarpFreq,state.haloWarpFreq); gl.uniform1f(U.u_surfWarp,state.surfWarp); gl.uniform1f(U.u_surfFreq,state.surfFreq);
+  gl.uniform1f(U.u_reveal,revealVal);
   const b1=hexToRGB(state.bg1),b2=hexToRGB(state.bg2),b3=hexToRGB(state.bg3);
   gl.uniform3f(U.u_bg1,b1[0],b1[1],b1[2]); gl.uniform3f(U.u_bg2,b2[0],b2[1],b2[2]); gl.uniform3f(U.u_bg3,b3[0],b3[1],b3[2]);
   gl.uniform3fv(uStops,stopsFlat); uploadGen(); gl.uniform3fv(uGen,genFlatU);
@@ -669,13 +676,13 @@ const BASE_PARAMS={"orbSize":0.3,"blobAmt":0.03,"blobLobes":4,"blobSpeed":1.75,"
 function _pg(t){ return {params:BASE_PARAMS,palette:"Aurora",ratioIdx:2,genArcs:[{relC:60,hw:54,on:0},{relC:180,hw:54,on:0},{relC:300,hw:54,on:1}],edgeAOn:1,edgeBOn:0,font:{text:t,x:0.5,y:0.52}}; }
 const P1={palette:"AI",ratioIdx:0,genArcs:[{relC:90,hw:84,on:0},{relC:240,hw:54,on:1},{relC:330,hw:24,on:1}],edgeAOn:1,edgeBOn:0,font:{text:"Hey!",x:0.5,y:0.45},params:{"orbSize":0.12,"blobAmt":0.21481615785637828,"blobLobes":5,"blobSpeed":1.65,"shapeRound":0.32020601926006004,"shapeRot":8,"shapeSides":0,"distortAmt":0.0787147651042138,"distortFreq":2,"edgeAC":109,"edgeAW":80,"edgeBC":178,"edgeBW":52,"edgeContrast":0.83,"blurAmt":0.035,"compRot":176,"lightSize":0.14,"lightReach":0.58,"lightAmt":0.32,"lightUneven":1,"outerSize":0.4,"outerAmt":0,"hue":-121,"haloMix":0.72,"intensity":1.07,"exposure":0.86,"haloOuter":0.95,"falloff":1.5,"rot":8,"breath":0.2}};
 const _A={palette:"Aurora",ratioIdx:2,genArcs:[{relC:60,hw:54,on:0},{relC:180,hw:54,on:0},{relC:300,hw:54,on:1}],edgeAOn:1,edgeBOn:0};
-function _aur(t,orb,la,bg){ return Object.assign({},_A,{params:Object.assign({},BASE_PARAMS,{orbSize:orb,lightAmt:la}),font:{text:t,x:0.5,y:0.5},bg}); }
+function _sp(t,orb,fade,bg){ return Object.assign({},_A,{params:Object.assign({},BASE_PARAMS,{orbSize:orb,lightAmt:0.6,blobAmt:0.16}),font:{text:t,x:0.5,y:0.5},bg,fadeIn:fade,hold:1.6,trans:1.4}); }
 const SCREEN1={pages:[
-  Object.assign({},P1,{params:Object.assign({},P1.params,{orbSize:0.08,lightAmt:0.22}),bg:['#E9E4F5','#E2EEF6','#F7E8E2']}), // 1) Hey! — 텍스트 먼저(형태 거의 없음)
-  _aur("",0.72,0.72,['#E2EEF6','#E0F2EE','#F7ECE2']),                 // 2) 중앙 패턴 형태 등장(텍스트 없음)
-  _aur("Welcome to",0.42,0.55,['#E0F2EE','#EAF3DF','#F2E2EE']),       // 3) 중간 — Welcome to
-  _aur("Galaxy AI",0.6,0.62,['#FCEAE2','#F7E8F2','#E6EEF7'])          // 4) 마무리 — Galaxy AI
-],activePage:0,seq:{trans:2.0,hold:1.6}};
+  _sp("Hey!",0.55,1.0,['#E9E4F5','#E2EEF6','#F7E8E2']),     // 1) Hey! 텍스트 먼저 → 중앙요소 fade-in
+  _sp("Welcome to",0.66,0,['#E2EEF6','#E0F2EE','#F7ECE2']), // 2) 배경 몰핑 + Welcome to
+  _sp("Galaxy AI",0.8,0,['#FCEAE2','#F7E8F2','#E6EEF7']),   // 3) Galaxy AI — 중앙요소 완성 중
+  _sp("",0.98,0,['#F7E8F2','#E9E4F5','#E2EEF6'])            // 4) 빈 페이지: 중앙 원형 요소 크게(완성)
+],activePage:0};
 const SCREEN2={pages:[{palette:"Ocean",ratioIdx:0,genArcs:[],edgeAOn:0,edgeBOn:0,font:{text:"",x:0.5,y:0.5},params:{orbSize:0.5,blobAmt:0.12,blobLobes:3,shapeSides:4,shapeRound:0.4,hue:0,haloOuter:0.8,lightAmt:0.5}}],activePage:0,seq:{trans:0.8,hold:1.8}};
 const SCREEN3={pages:[{palette:"Sunset",ratioIdx:0,genArcs:[],edgeAOn:1,edgeBOn:1,font:{text:"",x:0.5,y:0.5},params:{orbSize:0.4,blobAmt:0.2,blobLobes:6,shapeSides:0,hue:0,haloOuter:1.0,lightAmt:0.6}}],activePage:0,seq:{trans:0.8,hold:1.8}};
 const INIT={app:"iridescent-halo-orb",v:9,activeScreen:0,screens:[SCREEN1,SCREEN2,SCREEN3]};
