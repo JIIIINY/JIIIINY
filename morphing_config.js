@@ -54,7 +54,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.60,0.37], "color": "#FBD0E0", "radius": 0.28, "weight": 1.2 },
         { "pos": [0.66,0.32], "color": "#FFFFFF", "radius": 0.15, "weight": 1.4 }
       ] },
-      "render": { "edgeFeather": 0.012, "glow": { "spread": 0.06, "opacity": 0.16 }, "grain": 0.06 },
+      "render": { "edgeFeather": 0.01, "glow": { "spread": 0.06, "opacity": 0.1 }, "grain": 0.08 },
       "opacity": 0.96
     },
 
@@ -73,7 +73,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.50,0.52], "color": "#E8612C", "radius": 0.45, "weight": 1.05 },
         { "pos": [0.55,0.38], "color": "#F0512A", "radius": 0.40, "weight": 1.15 }
       ] },
-      "render": { "edgeFeather": 0.009, "glow": { "spread": 0.05, "opacity": 0.14 }, "grain": 0.06 },
+      "render": { "edgeFeather": 0.004, "glow": { "spread": 0.0, "opacity": 0.0 }, "grain": 0.08 },
       "opacity": 0.97
     },
 
@@ -96,7 +96,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.48,0.46], "color": "#DE96AC", "radius": 0.22, "weight": 1.05 },
         { "pos": [0.74,0.36], "color": "#9CC8C0", "radius": 0.16, "weight": 0.95 }
       ] },
-      "render": { "edgeFeather": 0.045, "glow": { "spread": 0.1, "opacity": 0.28 }, "grain": 0.05 },
+      "render": { "edgeFeather": 0.045, "glow": { "spread": 0.1, "opacity": 0.22 }, "grain": 0.06 },
       "opacity": 0.90
     },
 
@@ -116,7 +116,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.42,0.46], "color": "#F0C0D8", "radius": 0.24, "weight": 1.1 },
         { "pos": [0.34,0.34], "color": "#E2479A", "radius": 0.30, "weight": 1.15 }
       ] },
-      "render": { "edgeFeather": 0.012, "glow": { "spread": 0.05, "opacity": 0.16 }, "grain": 0.06 },
+      "render": { "edgeFeather": 0.006, "glow": { "spread": 0.0, "opacity": 0.0 }, "grain": 0.08 },
       "opacity": 0.96
     },
 
@@ -136,7 +136,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.50,0.66], "color": "#E8B85A", "radius": 0.28, "weight": 1.05 },
         { "pos": [0.60,0.50], "color": "#F0913C", "radius": 0.30, "weight": 1.15 }
       ] },
-      "render": { "edgeFeather": 0.013, "glow": { "spread": 0.05, "opacity": 0.14 }, "grain": 0.06 },
+      "render": { "edgeFeather": 0.008, "glow": { "spread": 0.0, "opacity": 0.0 }, "grain": 0.08 },
       "opacity": 0.95
     },
 
@@ -157,7 +157,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.66,0.46], "color": "#5B8FD6", "radius": 0.22, "weight": 1.0 },
         { "pos": [0.80,0.40], "color": "#F0A348", "radius": 0.16, "weight": 1.2 }
       ] },
-      "render": { "edgeFeather": 0.02, "glow": { "spread": 0.06, "opacity": 0.18 }, "grain": 0.05 },
+      "render": { "edgeFeather": 0.012, "glow": { "spread": 0.05, "opacity": 0.08 }, "grain": 0.07 },
       "opacity": 0.93
     },
 
@@ -175,7 +175,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.50,0.50], "color": "#FFC24A", "radius": 0.20, "weight": 1.2 },
         { "pos": [0.50,0.50], "color": "#FFF1C8", "radius": 0.10, "weight": 1.5 }
       ] },
-      "render": { "edgeFeather": 0.006, "glow": { "spread": 0.16, "opacity": 0.55 }, "grain": 0.05 },
+      "render": { "edgeFeather": 0.005, "glow": { "spread": 0.16, "opacity": 0.5 }, "grain": 0.06 },
       "opacity": 1.0
     },
 
@@ -197,7 +197,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.54,0.80], "color": "#3A7AC8", "radius": 0.14, "weight": 0.95 },
         { "pos": [0.46,0.44], "color": "#F6F1F4", "radius": 0.26, "weight": 1.45 }
       ] },
-      "render": { "edgeFeather": 0.004, "glow": { "spread": 0.03, "opacity": 0.1 }, "grain": 0.12 },
+      "render": { "edgeFeather": 0.003, "glow": { "spread": 0.0, "opacity": 0.0 }, "grain": 0.16 },
       "opacity": 0.96
     },
 
@@ -217,7 +217,7 @@ window.MORPH_CONFIG = {
         { "pos": [0.58,0.42], "color": "#E89A50", "radius": 0.30, "weight": 1.1 },
         { "pos": [0.64,0.34], "color": "#F0B070", "radius": 0.20, "weight": 1.15 }
       ] },
-      "render": { "edgeFeather": 0.038, "glow": { "spread": 0.1, "opacity": 0.32 }, "grain": 0.05 },
+      "render": { "edgeFeather": 0.04, "glow": { "spread": 0.1, "opacity": 0.26 }, "grain": 0.06 },
       "opacity": 0.93
     }
   ],
