@@ -40,6 +40,21 @@
       "comment": "stdDeviation가 클수록 글자가 멀리서도 융합. alphaMultiplier/Offset로 끈적한 가장자리 임계값 조절."
     }
   },
+  "writeOn": {
+    "enabled": true,
+    "durationSec": 0.5,
+    "staggerSec": 0.08,
+    "reveal": "clip-path inset 좌→우 + opacity",
+    "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+    "comment": "글씨가 왼쪽에서 오른쪽으로 써지듯 등장하며 동시에 빛난다."
+  },
+  "light": {
+    "color": "255,255,255",
+    "intensity": { "value": 60, "min": 0, "max": 100, "maps": "drop-shadow 번짐/밝기" },
+    "direction": { "value": 270, "min": 0, "max": 360, "unit": "deg", "comment": "0=오른쪽, 90=아래, 180=왼쪽, 270=위. glow 오프셋 방향." },
+    "technique": "filter 체인에서 goo 다음에 drop-shadow 2겹(방향성 + 앰비언트)을 적용. goo의 알파 임계값에 글로우가 지워지지 않도록 순서가 중요.",
+    "editableParams": ["text", "intensity", "direction", "goo", "speed"]
+  },
   "animation": {
     "loop": true,
     "durationSec": 3.6,
@@ -63,6 +78,8 @@
   "apply": {
     "text": "Welcome to Galaxy AI",
     "splitBy": "char",
-    "preserveSpaces": true
+    "preserveSpaces": true,
+    "editableInUI": true,
+    "copyCodeButton": true
   }
 }

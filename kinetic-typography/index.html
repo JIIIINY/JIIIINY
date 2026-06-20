@@ -3,100 +3,107 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Kinetic Typography · Liquid Gooey Morphing</title>
+<title>Kinetic Typography · Glow Write-on Morphing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #0d0d0d;
+    --bg: #0a0a0c;
     --fg: #ffffff;
-    --dur: 3.6s;
-    --stagger: 0.12s;
-    --skew: -10deg;
+    --dur: 3.6s;          /* 액체 wobble 주기 */
+    --skew: -10deg;       /* 이탤릭 기울기 */
+    --goo: 8;             /* 점성(SVG blur)은 JS로 stdDeviation에 반영 */
+    /* 빛(글로우) 파라미터 */
+    --glow-color: 255, 255, 255;  /* RGB */
+    --glow-x: 0px;        /* 방향 오프셋 X */
+    --glow-y: 0px;        /* 방향 오프셋 Y */
+    --glow-blur: 10px;    /* 강도(번짐) */
+    --glow-spread: 28px;  /* 강도(앰비언트 번짐) */
+    --glow-a: 0.85;       /* 강도(밝기/알파) */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    background: var(--bg);
+    background: radial-gradient(120% 120% at 50% 40%, #14141a 0%, var(--bg) 70%);
     color: var(--fg);
     font-family: "Fredoka", "Baloo 2", "Nunito", system-ui, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; overflow: hidden;
   }
 
-  /* 무대 */
-  .stage {
-    width: 100%;
-    text-align: center;
-    padding: 4vh 4vw;
-  }
+  .stage { width: 100%; text-align: center; padding: 4vh 4vw; }
 
-  /* gooey 필터가 적용되는 글자 컨테이너 */
+  /* goo(액체 융합) 다음 단계에 directional glow 두 겹을 체인으로 적용 */
   .morph {
-    filter: url(#goo);
     display: inline-block;
-    line-height: 1.15;
+    line-height: 1.18;
     font-weight: 700;
     font-size: clamp(2.2rem, 9vw, 8rem);
     letter-spacing: 0.04em;
+    filter:
+      url(#goo)
+      drop-shadow(var(--glow-x) var(--glow-y) var(--glow-blur) rgba(var(--glow-color), var(--glow-a)))
+      drop-shadow(0 0 var(--glow-spread) rgba(var(--glow-color), calc(var(--glow-a) * 0.7)));
   }
 
-  /* 단어 단위로 줄바꿈은 자연스럽게, 단어 내부 글자는 약간 떨어뜨려 가독성 유지 */
-  .word {
-    display: inline-block;
-    white-space: nowrap;
-    margin: 0 0.22em;
-  }
+  .word { display: inline-block; white-space: nowrap; margin: 0 0.22em; }
 
-  /* 개별 글자 */
+  /* 개별 글자: writeOn(써지며 등장, 1회) + blob(액체 wobble, 무한) 동시 적용
+     writeOn은 opacity/clip만, blob은 transform만 → 서로 충돌 없음 */
   .ch {
     display: inline-block;
+    opacity: 0;
     transform: skewX(var(--skew));
     transform-origin: 50% 60%;
-    will-change: transform;
-    animation: blob var(--dur) cubic-bezier(0.45, 0, 0.25, 1) infinite alternate;
-    animation-delay: var(--d, 0s);
+    will-change: transform, opacity, clip-path;
+    animation:
+      writeOn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards var(--d, 0s),
+      blob var(--dur) cubic-bezier(0.45, 0, 0.25, 1) infinite alternate calc(var(--d, 0s) + 0.5s);
   }
 
-  /* 메타볼 모핑: 글자는 항상 읽히고, 가장자리만 액체처럼 살짝 녹았다 붙음 */
+  /* 써지는 느낌: 왼쪽→오른쪽으로 드러나며 등장 */
+  @keyframes writeOn {
+    0%   { opacity: 0; clip-path: inset(0 100% 0 0); }
+    60%  { opacity: 1; }
+    100% { opacity: 1; clip-path: inset(0 0 0 0); }
+  }
+
+  /* 액체 모핑: 글자는 또렷하게 읽히고 가장자리만 녹았다 붙음 */
   @keyframes blob {
     0%   { transform: skewX(var(--skew)) scale(1.00) translate(0, 0) rotate(0deg); }
     50%  { transform: skewX(var(--skew)) scale(1.18) translate(0, 0.05em) rotate(-2deg); }
     100% { transform: skewX(var(--skew)) scale(1.00) translate(0, -0.03em) rotate(0deg); }
   }
 
-  /* 컨트롤 */
+  /* ===== 컨트롤 패널 ===== */
   .ui {
-    position: fixed;
-    left: 50%;
-    bottom: 22px;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 14px;
-    align-items: center;
-    font-size: 13px;
-    color: #9a9a9a;
-    font-family: system-ui, sans-serif;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    padding: 8px 14px;
-    border-radius: 999px;
-    backdrop-filter: blur(6px);
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center;
+    max-width: 94vw;
+    font: 13px system-ui, sans-serif; color: #b9b9c2;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 10px 16px; border-radius: 16px;
+    backdrop-filter: blur(8px);
   }
-  .ui label { display: flex; align-items: center; gap: 6px; }
-  .ui input[type="range"] { width: 110px; }
+  .ui .grp { display: flex; align-items: center; gap: 7px; }
+  .ui label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .ui input[type="range"] { width: 96px; accent-color: #6ea8ff; }
+  .ui input[type="text"] {
+    width: 180px; padding: 6px 10px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.35);
+    color: #fff; font: 14px inherit;
+  }
+  .ui .sep { width: 1px; height: 22px; background: rgba(255,255,255,0.14); }
   .ui button {
-    background: #fff; color: #111; border: 0; border-radius: 999px;
-    padding: 5px 12px; font-weight: 600; cursor: pointer; font-size: 12px;
+    background: #fff; color: #111; border: 0; border-radius: 10px;
+    padding: 7px 13px; font-weight: 600; cursor: pointer; font-size: 12px;
   }
+  .ui button.ghost { background: rgba(255,255,255,0.12); color: #fff; }
+  .ui button:active { transform: translateY(1px); }
 
-  @media (prefers-reduced-motion: reduce) {
-    .ch { animation: none; }
-  }
+  @media (prefers-reduced-motion: reduce) { .ch { animation: none; opacity: 1; } }
 </style>
 </head>
 <body>
@@ -117,30 +124,49 @@
   </main>
 
   <div class="ui">
+    <label>단어
+      <input id="text" type="text" value="Welcome to Galaxy AI" />
+    </label>
+    <span class="sep"></span>
+    <label>빛 강도
+      <input id="intensity" type="range" min="0" max="100" step="1" value="60" />
+    </label>
+    <label>빛 방향
+      <input id="direction" type="range" min="0" max="360" step="5" value="270" />
+    </label>
+    <span class="sep"></span>
     <label>점성
       <input id="goo-amt" type="range" min="2" max="14" step="1" value="8" />
     </label>
     <label>속도
       <input id="speed" type="range" min="1.8" max="6" step="0.2" value="3.6" />
     </label>
-    <button id="replay">다시</button>
+    <span class="sep"></span>
+    <button id="replay" class="ghost">다시쓰기</button>
+    <button id="copy">📋 코드 복사</button>
   </div>
 
 <script>
-  // morphing.json 스펙의 핵심 파라미터
+  // ===== 조절 가능한 파라미터 =====
   const CONFIG = {
-    text: "Welcome to Galaxy AI",
-    staggerSec: 0.12,
-    durationSec: 3.6
+    text: "Welcome to Galaxy AI",  // 단어 (편집 가능)
+    intensity: 60,                 // 빛 강도 0~100
+    direction: 270,                // 빛 방향 0~360 (deg, 0=오른쪽 / 90=아래 / 270=위)
+    goo: 8,                        // 점성 (SVG 블러)
+    speed: 3.6,                    // 액체 wobble 주기(초)
+    staggerSec: 0.08               // 글자별 써지는 간격
   };
 
+  const root = document.documentElement;
   const morph = document.getElementById("morph");
+  const blurNode = document.querySelector("#goo feGaussianBlur");
 
-  // 텍스트를 단어/글자로 분해. 단어 내부 글자에 stagger를 주어 파도처럼 융합.
-  function build(text) {
+  // 텍스트를 단어/글자로 분해하고 써지는 stagger 부여 → 애니메이션 재시작
+  function build() {
     morph.textContent = "";
+    morph.setAttribute("aria-label", CONFIG.text);
     let idx = 0;
-    text.split(" ").forEach((word, wi) => {
+    CONFIG.text.split(" ").forEach((word) => {
       const w = document.createElement("span");
       w.className = "word";
       [...word].forEach((ch) => {
@@ -154,19 +180,95 @@
       morph.appendChild(w);
     });
   }
-  build(CONFIG.text);
 
-  // 컨트롤: 점성(blur), 속도, 다시재생
-  const blur = document.querySelector("#goo feGaussianBlur");
-  document.getElementById("goo-amt").addEventListener("input", (e) => {
-    blur.setAttribute("stdDeviation", e.target.value);
+  // 빛(글로우): 강도→번짐/밝기, 방향→오프셋 각도
+  function applyLight() {
+    const i = CONFIG.intensity;                 // 0~100
+    const a = Math.PI * CONFIG.direction / 180; // rad
+    const mag = i * 0.16;                        // 방향 오프셋 크기(px)
+    root.style.setProperty("--glow-x", (Math.cos(a) * mag).toFixed(1) + "px");
+    root.style.setProperty("--glow-y", (Math.sin(a) * mag).toFixed(1) + "px");
+    root.style.setProperty("--glow-blur", (i * 0.20).toFixed(1) + "px");
+    root.style.setProperty("--glow-spread", (i * 0.55).toFixed(1) + "px");
+    root.style.setProperty("--glow-a", (i / 100 * 0.95).toFixed(2));
+  }
+  function applyMotion() {
+    blurNode.setAttribute("stdDeviation", CONFIG.goo);
+    root.style.setProperty("--dur", CONFIG.speed + "s");
+  }
+
+  // ===== 컨트롤 바인딩 =====
+  const $ = (id) => document.getElementById(id);
+  $("text").addEventListener("input", (e) => { CONFIG.text = e.target.value || " "; build(); });
+  $("intensity").addEventListener("input", (e) => { CONFIG.intensity = +e.target.value; applyLight(); });
+  $("direction").addEventListener("input", (e) => { CONFIG.direction = +e.target.value; applyLight(); });
+  $("goo-amt").addEventListener("input", (e) => { CONFIG.goo = +e.target.value; applyMotion(); });
+  $("speed").addEventListener("input", (e) => { CONFIG.speed = +e.target.value; applyMotion(); });
+  $("replay").addEventListener("click", build);
+
+  // ===== 코드 복사: 현재 설정이 반영된 단독 실행 HTML 생성 =====
+  function exportHTML() {
+    const c = CONFIG;
+    return `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root{--bg:#0a0a0c;--dur:${c.speed}s;--skew:-10deg;
+--glow-color:255,255,255;--glow-x:0px;--glow-y:0px;--glow-blur:10px;--glow-spread:28px;--glow-a:.85;}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{background:radial-gradient(120% 120% at 50% 40%,#14141a,var(--bg) 70%);color:#fff;
+font-family:"Fredoka",system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+.morph{display:inline-block;text-align:center;line-height:1.18;font-weight:700;font-size:clamp(2.2rem,9vw,8rem);letter-spacing:.04em;
+filter:url(#goo) drop-shadow(var(--glow-x) var(--glow-y) var(--glow-blur) rgba(var(--glow-color),var(--glow-a)))
+drop-shadow(0 0 var(--glow-spread) rgba(var(--glow-color),calc(var(--glow-a)*.7)))}
+.word{display:inline-block;white-space:nowrap;margin:0 .22em}
+.ch{display:inline-block;opacity:0;transform:skewX(var(--skew));transform-origin:50% 60%;
+animation:writeOn .5s cubic-bezier(.22,1,.36,1) forwards var(--d),
+blob var(--dur) cubic-bezier(.45,0,.25,1) infinite alternate calc(var(--d) + .5s)}
+@keyframes writeOn{0%{opacity:0;clip-path:inset(0 100% 0 0)}60%{opacity:1}100%{opacity:1;clip-path:inset(0 0 0 0)}}
+@keyframes blob{0%{transform:skewX(var(--skew)) scale(1) translate(0,0) rotate(0)}
+50%{transform:skewX(var(--skew)) scale(1.18) translate(0,.05em) rotate(-2deg)}
+100%{transform:skewX(var(--skew)) scale(1) translate(0,-.03em) rotate(0)}}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="${c.goo}" result="b"/>
+<feColorMatrix in="b" mode="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 22 -11" result="g"/>
+<feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs></svg>
+<h1 class="morph" id="m"></h1>
+<script>
+var TEXT=${JSON.stringify(c.text)},INTENSITY=${c.intensity},DIRECTION=${c.direction},STAGGER=${c.staggerSec};
+var r=document.documentElement,m=document.getElementById("m"),i=0;
+TEXT.split(" ").forEach(function(w){var e=document.createElement("span");e.className="word";
+[].forEach.call(w,function(ch){var s=document.createElement("span");s.className="ch";s.textContent=ch;
+s.style.setProperty("--d",(i*STAGGER).toFixed(2)+"s");e.appendChild(s);i++});m.appendChild(e)});
+var a=Math.PI*DIRECTION/180,mag=INTENSITY*0.16;
+r.style.setProperty("--glow-x",(Math.cos(a)*mag).toFixed(1)+"px");
+r.style.setProperty("--glow-y",(Math.sin(a)*mag).toFixed(1)+"px");
+r.style.setProperty("--glow-blur",(INTENSITY*0.20).toFixed(1)+"px");
+r.style.setProperty("--glow-spread",(INTENSITY*0.55).toFixed(1)+"px");
+r.style.setProperty("--glow-a",(INTENSITY/100*0.95).toFixed(2));
+<\/script></body></html>`;
+  }
+
+  $("copy").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    try {
+      await navigator.clipboard.writeText(exportHTML());
+      const t = btn.textContent; btn.textContent = "✅ 복사됨!";
+      setTimeout(() => (btn.textContent = t), 1400);
+    } catch (err) {
+      // 클립보드 권한 불가 시 폴백: 새 탭에 코드 표시
+      const w = window.open("");
+      w.document.write("<pre style='white-space:pre-wrap;word-break:break-all'>" +
+        exportHTML().replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</pre>");
+    }
   });
-  document.getElementById("speed").addEventListener("input", (e) => {
-    document.documentElement.style.setProperty("--dur", e.target.value + "s");
-  });
-  document.getElementById("replay").addEventListener("click", () => {
-    build(CONFIG.text);
-  });
+
+  // ===== 초기 실행 =====
+  build();
+  applyLight();
+  applyMotion();
 </script>
 </body>
 </html>
