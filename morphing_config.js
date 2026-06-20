@@ -130,11 +130,12 @@ window.MORPH_CONFIG = {
           [0.50,0.22],[0.74,0.40],[0.72,0.66],[0.50,0.78],[0.28,0.64],[0.28,0.40]
         ], "rotation": -6 }
       },
-      "color": { "type": "mesh", "dominant": "#9A93A0", "points": [
-        { "pos": [0.40,0.34], "color": "#6E8AC0", "radius": 0.42, "weight": 1.0 },
-        { "pos": [0.40,0.60], "color": "#5A78B8", "radius": 0.32, "weight": 0.95 },
-        { "pos": [0.50,0.66], "color": "#E8B85A", "radius": 0.28, "weight": 1.05 },
-        { "pos": [0.60,0.50], "color": "#F0913C", "radius": 0.30, "weight": 1.15 }
+      "color": { "type": "mesh", "dominant": "#9C8C84", "points": [
+        { "pos": [0.44,0.29], "color": "#6E8AC0", "radius": 0.36, "weight": 1.15 },
+        { "pos": [0.67,0.41], "color": "#5B86C8", "radius": 0.24, "weight": 1.05 },
+        { "pos": [0.30,0.54], "color": "#C08896", "radius": 0.22, "weight": 0.95 },
+        { "pos": [0.50,0.70], "color": "#F0C060", "radius": 0.22, "weight": 1.05 },
+        { "pos": [0.52,0.55], "color": "#F0743C", "radius": 0.22, "weight": 1.1 }
       ] },
       "render": { "edgeFeather": 0.008, "glow": { "spread": 0.0, "opacity": 0.0 }, "grain": 0.08 },
       "opacity": 0.95
@@ -185,17 +186,20 @@ window.MORPH_CONFIG = {
       "form": {
         "archetype": "two-lobe-organic", "topology": "closed-blob",
         "description": "비대칭 2엽 유기체 — 좌하 둥근 로브 + 우상 키큰 로브, 아래 가장자리 오목한 목.",
-        "blob": { "points": 10, "concave": true, "controlPoints": [
-          [0.82,0.40],[0.74,0.22],[0.56,0.30],[0.42,0.24],[0.22,0.42],
-          [0.30,0.60],[0.46,0.64],[0.52,0.56],[0.56,0.76],[0.70,0.58]
+        "blob": { "points": 12, "concave": true, "controlPoints": [
+          [0.80,0.44],[0.78,0.28],[0.67,0.25],[0.57,0.31],[0.45,0.23],
+          [0.27,0.33],[0.21,0.52],[0.33,0.63],[0.45,0.65],[0.51,0.77],
+          [0.61,0.64],[0.73,0.55]
         ], "rotation": 2 }
       },
-      "color": { "type": "mesh", "dominant": "#D060B8", "points": [
-        { "pos": [0.28,0.40], "color": "#E84D9B", "radius": 0.26, "weight": 1.05 },
-        { "pos": [0.70,0.30], "color": "#9A56C6", "radius": 0.30, "weight": 1.05 },
-        { "pos": [0.54,0.70], "color": "#5BB8E8", "radius": 0.22, "weight": 1.0 },
-        { "pos": [0.54,0.80], "color": "#3A7AC8", "radius": 0.14, "weight": 0.95 },
-        { "pos": [0.46,0.44], "color": "#F6F1F4", "radius": 0.26, "weight": 1.45 }
+      "color": { "type": "mesh", "dominant": "#C95FB0", "points": [
+        { "pos": [0.25,0.45], "color": "#E8459A", "radius": 0.24, "weight": 1.15 },
+        { "pos": [0.40,0.27], "color": "#F2C2DC", "radius": 0.20, "weight": 1.0 },
+        { "pos": [0.68,0.33], "color": "#9A56C6", "radius": 0.26, "weight": 1.1 },
+        { "pos": [0.74,0.48], "color": "#B14FB0", "radius": 0.20, "weight": 1.0 },
+        { "pos": [0.51,0.70], "color": "#56B6EA", "radius": 0.18, "weight": 1.05 },
+        { "pos": [0.51,0.79], "color": "#3A7AC8", "radius": 0.12, "weight": 0.95 },
+        { "pos": [0.43,0.50], "color": "#FBF4F8", "radius": 0.23, "weight": 1.7 }
       ] },
       "render": { "edgeFeather": 0.003, "glow": { "spread": 0.0, "opacity": 0.0 }, "grain": 0.16 },
       "opacity": 0.96

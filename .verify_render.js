@@ -21,9 +21,10 @@ function meshDefsBody(color, idp, ox, oy, sc) {
   let defs = '', body = '';
   color.points.forEach((pt, j) => {
     const id = `${idp}_${j}`, cx = ox + pt.pos[0] * sc, cy = oy + pt.pos[1] * sc, r = Math.max(4, pt.radius * sc);
+    const o0 = Math.min(0.92, pt.weight * 0.62);
     defs += `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}">`
-      + `<stop offset="0" stop-color="${pt.color}" stop-opacity="${Math.min(1, pt.weight).toFixed(2)}"/>`
-      + `<stop offset="0.55" stop-color="${pt.color}" stop-opacity="${(0.75 * Math.min(1, pt.weight)).toFixed(2)}"/>`
+      + `<stop offset="0" stop-color="${pt.color}" stop-opacity="${o0.toFixed(2)}"/>`
+      + `<stop offset="0.5" stop-color="${pt.color}" stop-opacity="${(0.62 * o0).toFixed(2)}"/>`
       + `<stop offset="1" stop-color="${pt.color}" stop-opacity="0"/></radialGradient>`;
     body += `<rect x="${ox}" y="${oy}" width="${sc}" height="${sc}" fill="url(#${id})"/>`;
   });
@@ -37,14 +38,14 @@ function cellSVG(idx, s, cx, cy, cell) {
   const defs =
     `<filter id="gb${idx}" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="${glowBlur.toFixed(1)}"/></filter>`
     + `<filter id="ff${idx}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="${feather.toFixed(1)}"/></filter>`
-    + `<filter id="gr${idx}"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${idx * 7 + 3}" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${r.grain.toFixed(2)} 0"/></filter>`
+    + `<filter id="gr${idx}"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="${idx * 7 + 3}" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 0 1"/></filter>`
     + `<clipPath id="cp${idx}"><path d="${d}"/></clipPath>` + mesh.defs;
   const body =
     `<path d="${d}" fill="${dom}" filter="url(#gb${idx})" opacity="${r.glow.opacity}"/>`            // (1) glow 헤일로
     + `<g filter="url(#ff${idx})"><g clip-path="url(#cp${idx})">`                                    // (2) form: clip 후 외곽 feather
     + `<rect x="${ox}" y="${oy}" width="${sc}" height="${sc}" fill="${dom}"/>` + mesh.body            //     base + 메시 색점 스택
     + `</g></g>`
-    + `<g clip-path="url(#cp${idx})" style="mix-blend-mode:overlay"><rect x="${ox - sc * 0.2}" y="${oy - sc * 0.2}" width="${sc * 1.4}" height="${sc * 1.4}" filter="url(#gr${idx})"/></g>`; // (3) grain
+    + `<g clip-path="url(#cp${idx})" opacity="${Math.min(0.6, r.grain * 3.2).toFixed(2)}" style="mix-blend-mode:overlay"><rect x="${ox - sc * 0.2}" y="${oy - sc * 0.2}" width="${sc * 1.4}" height="${sc * 1.4}" filter="url(#gr${idx})"/></g>`; // (3) grain (grayscale overlay)
   return { defs, body };
 }
 function render(svg, w, out) { fs.writeFileSync(out, new Resvg(svg, { fitTo: { mode: 'width', value: w }, background: '#0B0E16' }).render().asPng()); }
@@ -63,7 +64,7 @@ function render(svg, w, out) { fs.writeFileSync(out, new Resvg(svg, { fitTo: { m
 })();
 // SHAPES 37 + pebble 대형 클로즈업
 [['08_gradient_shapes_37', 'verify_sample_37.png'], ['05_modern_gradient_shapes_pebble', 'verify_sample_pebble.png']].forEach(([id, file]) => {
-  const idx = SHAPES.findIndex(s => s.cfg.id === id), s = SHAPES[idx], cell = 720;
+  const idx = SHAPES.findIndex(s => s.cfg.id === id), s = SHAPES[idx], cell = 900;
   const c = cellSVG(900 + idx, s, 0, 0, cell);
   render(`<svg xmlns="http://www.w3.org/2000/svg" width="${cell}" height="${cell}" viewBox="0 0 ${cell} ${cell}"><rect width="${cell}" height="${cell}" fill="#0B0E16"/><defs>${c.defs}</defs>${c.body}</svg>`, cell, file);
   console.log('✓ ' + file);

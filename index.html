@@ -82,8 +82,8 @@ function tracePath(c,pts,now){const m=pts.length,P=[],n=CFG.globalMotion.organic
     c.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6,p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6,p2[0],p2[1]);}
   c.closePath();}
 function paintMesh(c,color,alpha){c.save();c.globalAlpha=alpha;c.fillStyle=color.dominant||'#888';c.fillRect(OX,OY,S,S);
-  for(const pt of color.points){const cx=OX+pt.pos[0]*S,cy=OY+pt.pos[1]*S,r=Math.max(4,pt.radius*S),w=Math.min(1,pt.weight);
-    const g=c.createRadialGradient(cx,cy,1,cx,cy,r);g.addColorStop(0,hexA(pt.color,w));g.addColorStop(0.55,hexA(pt.color,0.75*w));g.addColorStop(1,hexA(pt.color,0));
+  for(const pt of color.points){const cx=OX+pt.pos[0]*S,cy=OY+pt.pos[1]*S,r=Math.max(4,pt.radius*S),o0=Math.min(0.92,pt.weight*0.62);
+    const g=c.createRadialGradient(cx,cy,1,cx,cy,r);g.addColorStop(0,hexA(pt.color,o0));g.addColorStop(0.5,hexA(pt.color,0.62*o0));g.addColorStop(1,hexA(pt.color,0));
     c.fillStyle=g;c.fillRect(OX,OY,S,S);}c.restore();}
 let cur=Math.floor(Math.random()*SHAPES.length),next=pickNext(cur),dur=rand(2200,3200),hold=rand(1000,1700),t0=performance.now();
 function pickNext(c){let n;do{n=Math.floor(Math.random()*SHAPES.length);}while(n===c);return n;}

@@ -71,8 +71,8 @@ SHAPES.forEach((s,si)=>{s.cfg.color.points.forEach((pt,j)=>{
   const g=document.createElementNS(SVGNS,'radialGradient'),id=`mg_${si}_${j}`;
   g.setAttribute('id',id);g.setAttribute('gradientUnits','userSpaceOnUse');
   g.setAttribute('cx',pt.pos[0]*1000);g.setAttribute('cy',pt.pos[1]*1000);g.setAttribute('r',Math.max(8,pt.radius*1000));
-  const w=Math.min(1,pt.weight);
-  g.innerHTML=`<stop offset="0" stop-color="${pt.color}" stop-opacity="${w.toFixed(2)}"/><stop offset="0.55" stop-color="${pt.color}" stop-opacity="${(0.75*w).toFixed(2)}"/><stop offset="1" stop-color="${pt.color}" stop-opacity="0"/>`;
+  const o0=Math.min(0.92,pt.weight*0.62);
+  g.innerHTML=`<stop offset="0" stop-color="${pt.color}" stop-opacity="${o0.toFixed(2)}"/><stop offset="0.5" stop-color="${pt.color}" stop-opacity="${(0.62*o0).toFixed(2)}"/><stop offset="1" stop-color="${pt.color}" stop-opacity="0"/>`;
   meshDefs.appendChild(g);});});
 function fillMesh(group,si){group.innerHTML='';SHAPES[si].cfg.color.points.forEach((pt,j)=>{
   const r=document.createElementNS(SVGNS,'rect');r.setAttribute('x',0);r.setAttribute('y',0);r.setAttribute('width',1000);r.setAttribute('height',1000);

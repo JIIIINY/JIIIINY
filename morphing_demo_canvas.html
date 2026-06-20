@@ -51,8 +51,8 @@ function tracePath(c,pts,now){const m=pts.length,P=[],n=CFG.globalMotion.organic
 // 메시 색점 스택 (base dominant + color→transparent 라디얼)
 function paintMesh(c,color,alpha){c.save();c.globalAlpha=alpha;
   c.fillStyle=color.dominant||'#888';c.fillRect(OX,OY,S,S);
-  for(const pt of color.points){const cx=OX+pt.pos[0]*S,cy=OY+pt.pos[1]*S,r=Math.max(4,pt.radius*S),w=Math.min(1,pt.weight);
-    const g=c.createRadialGradient(cx,cy,1,cx,cy,r);g.addColorStop(0,hexA(pt.color,w));g.addColorStop(0.55,hexA(pt.color,0.75*w));g.addColorStop(1,hexA(pt.color,0));
+  for(const pt of color.points){const cx=OX+pt.pos[0]*S,cy=OY+pt.pos[1]*S,r=Math.max(4,pt.radius*S),o0=Math.min(0.92,pt.weight*0.62);
+    const g=c.createRadialGradient(cx,cy,1,cx,cy,r);g.addColorStop(0,hexA(pt.color,o0));g.addColorStop(0.5,hexA(pt.color,0.62*o0));g.addColorStop(1,hexA(pt.color,0));
     c.fillStyle=g;c.fillRect(OX,OY,S,S);}c.restore();}
 
 const lbl=document.getElementById('lbl');
