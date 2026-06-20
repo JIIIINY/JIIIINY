@@ -54,6 +54,8 @@
   .row{ margin-bottom:11px; }
   .row label{ display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:#b9b9c0; margin-bottom:5px; }
   .row label .val{ font-variant-numeric:tabular-nums; color:#f0c45a; font-size:11px; }
+  .row label .num{ width:64px; background:#0f0f12; border:1px solid #2a2a31; color:#f0c45a; border-radius:6px; padding:3px 6px; font-size:11px; text-align:right; font-variant-numeric:tabular-nums; -moz-appearance:textfield; }
+  .row label .num::-webkit-outer-spin-button,.row label .num::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
   input[type=range]{ width:100%; -webkit-appearance:none; appearance:none; height:4px; border-radius:4px; background:#2c2c33; outline:none; }
   input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px;height:16px;border-radius:50%;background:#f0c45a;border:2px solid #141417;cursor:pointer; }
   input[type=range]::-moz-range-thumb{ width:16px;height:16px;border-radius:50%;background:#f0c45a;border:2px solid #141417;cursor:pointer; }
@@ -101,7 +103,7 @@
 
   <!-- 좌: 폰트 패널 -->
   <div class="panel left" id="leftPanel">
-    <div class="phead"><h2>폰트 (One UI Sans)</h2><button class="dd" data-panel="leftPanel">▾</button></div>
+    <div class="phead"><h2>폰트 (Samsung Sharp Sans)</h2><button class="dd" data-panel="leftPanel">▾</button></div>
     <div class="pbody" id="fontBody"></div>
   </div>
 
@@ -156,8 +158,9 @@ const FONTP = { size:{def:26,min:8,max:160,step:1}, alpha:{def:1,min:0,max:1,ste
   x:{def:0.5,min:0,max:1,step:0.005}, y:{def:0.86,min:0,max:1,step:0.005},
   shadowBlur:{def:8,min:0,max:40,step:1}, shadowX:{def:0,min:-30,max:30,step:1}, shadowY:{def:2,min:-30,max:30,step:1}, shadowAlpha:{def:0.5,min:0,max:1,step:0.02} };
 const FONTL = { size:'크기(pt)', alpha:'투명도', x:'X 위치', y:'Y 위치', shadowBlur:'그림자 블러', shadowX:'그림자 X', shadowY:'그림자 Y', shadowAlpha:'그림자 투명도' };
-const FONT = { text:'Galaxy AI', color:'#2a2a2a', align:'center', shadowOn:false };
-Object.keys(FONTP).forEach(k=>FONT[k]=FONTP[k].def);
+/* 페이지(텍스트) 시스템 — 페이지마다 고유 폰트/텍스트 */
+function newPage(text){ const pg={text:text||'',color:'#2a2a2a',align:'center',shadowOn:false}; Object.keys(FONTP).forEach(k=>pg[k]=FONTP[k].def); return pg; }
+let pages=[newPage('Hey!')]; let activePage=0; let FONT=pages[0];
 
 /* ===================== 팔레트 (AI 5색 상시 포함) ===================== */
 function hexToRGB(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255]; }
@@ -260,11 +263,14 @@ let swatchEl, palNameEl, codeBox;
 function fmt(P,v){ const st=P.step; return (+v).toFixed(st<0.01?3:(st<1?2:0)); }
 function mkSlider(parent,key,P,label,getv,setv){
   const row=document.createElement('div'); row.className='row';
-  row.innerHTML=`<label><span>${label}</span><span class="val">–</span></label>`;
+  const lab=document.createElement('label'); const sp=document.createElement('span'); sp.textContent=label;
+  const num=document.createElement('input'); num.type='number'; num.className='num'; num.min=P.min; num.max=P.max; num.step=P.step; num.value=fmt(P,getv());
+  lab.appendChild(sp); lab.appendChild(num); row.appendChild(lab);
   const inp=document.createElement('input'); inp.type='range'; inp.min=P.min; inp.max=P.max; inp.step=P.step; inp.value=getv();
-  const valEl=row.querySelector('.val'); valEl.textContent=fmt(P,getv());
-  inp.addEventListener('input',()=>{ setv(parseFloat(inp.value)); valEl.textContent=fmt(P,inp.value); if(codeReady) refreshCode(); });
-  row.appendChild(inp); parent.appendChild(row); return {inp,valEl,P,getv};
+  inp.addEventListener('input',()=>{ const v=parseFloat(inp.value); setv(v); num.value=fmt(P,v); if(codeReady) refreshCode(); });
+  num.addEventListener('input',()=>{ let v=parseFloat(num.value); if(isNaN(v)) return; v=Math.min(P.max,Math.max(P.min,v)); setv(v); inp.value=v; if(codeReady) refreshCode(); });
+  num.addEventListener('blur',()=>{ num.value=fmt(P,getv()); });
+  row.appendChild(inp); parent.appendChild(row); return {inp,num,P,getv};
 }
 
 // 탭/우측 패널
@@ -337,10 +343,24 @@ function buildCodeBlock(p){ const h=document.createElement('div'); h.className='
 }
 
 /* ===================== 폰트 패널 ===================== */
-const fontInputs={};
+const fontInputs={}; let pageChipsEl;
+function setPage(i){ activePage=Math.max(0,Math.min(pages.length-1,i)); FONT=pages[activePage]; syncFontUI(); if(codeReady) refreshCode(); }
+function rebuildPageChips(){ if(!pageChipsEl) return; pageChipsEl.innerHTML='';
+  pages.forEach((pg,i)=>{ const b=document.createElement('button'); b.className='b'+(i===activePage?' on':''); b.textContent=(i+1)+'. '+((pg.text||'(빈 텍스트)').slice(0,8)); b.onclick=()=>setPage(i); pageChipsEl.appendChild(b); }); }
 (function buildFontUI(){ const p=document.getElementById('fontBody');
-  const t1=document.createElement('div'); t1.className='sec-title'; t1.textContent='텍스트'; p.appendChild(t1);
-  const ta=document.createElement('input'); ta.type='text'; ta.value=FONT.text; ta.placeholder='표시할 텍스트'; ta.oninput=()=>{ FONT.text=ta.value; if(codeReady) refreshCode(); }; p.appendChild(ta);
+  // 페이지
+  const tp=document.createElement('div'); tp.className='sec-title'; tp.textContent='페이지'; p.appendChild(tp);
+  pageChipsEl=document.createElement('div'); pageChipsEl.className='btns'; p.appendChild(pageChipsEl);
+  const addRow=document.createElement('div'); addRow.className='btns';
+  const npt=document.createElement('input'); npt.type='text'; npt.id='newPageText'; npt.placeholder='새 페이지 텍스트'; npt.style.flex='1 1 100%';
+  const addBtn=document.createElement('button'); addBtn.className='b acc'; addBtn.textContent='➕ 페이지 추가';
+  const delBtn=document.createElement('button'); delBtn.className='b'; delBtn.textContent='🗑 삭제';
+  const doAdd=()=>{ const t=npt.value.trim()||('Page '+(pages.length+1)); pages.push(newPage(t)); npt.value=''; setPage(pages.length-1); };
+  addBtn.onclick=doAdd; npt.addEventListener('keydown',e=>{ if(e.key==='Enter') doAdd(); });
+  delBtn.onclick=()=>{ if(pages.length>1){ pages.splice(activePage,1); setPage(Math.min(activePage,pages.length-1)); if(codeReady) refreshCode(); } };
+  addRow.appendChild(npt); addRow.appendChild(addBtn); addRow.appendChild(delBtn); p.appendChild(addRow);
+  const t1=document.createElement('div'); t1.className='sec-title'; t1.textContent='현재 페이지 텍스트'; p.appendChild(t1);
+  const ta=document.createElement('input'); ta.type='text'; ta.id='pageText'; ta.value=FONT.text; ta.placeholder='표시할 텍스트'; ta.oninput=()=>{ FONT.text=ta.value; rebuildPageChips(); if(codeReady) refreshCode(); }; p.appendChild(ta);
   const cw=document.createElement('div'); cw.style.marginTop='8px';
   const cl=document.createElement('label'); cl.style.cssText='font-size:12px;color:#b9b9c0;display:block;margin-bottom:5px'; cl.textContent='글자 색';
   const col=document.createElement('input'); col.type='color'; col.value=FONT.color; col.oninput=()=>{ FONT.color=col.value; if(codeReady) refreshCode(); };
@@ -356,7 +376,7 @@ const fontInputs={};
   ['size','alpha','x','y'].forEach(k=>{ fontInputs[k]=mkSlider(p,k,FONTP[k],FONTL[k],()=>FONT[k],v=>FONT[k]=v); });
   // 그림자
   const t4=document.createElement('div'); t4.className='sec-title'; t4.textContent='그림자'; p.appendChild(t4);
-  const sb=document.createElement('div'); sb.className='btns'; const sh=document.createElement('button'); sh.className='b'+(FONT.shadowOn?' on':''); sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF');
+  const sb=document.createElement('div'); sb.className='btns'; const sh=document.createElement('button'); sh.id='shadowToggle'; sh.className='b'+(FONT.shadowOn?' on':''); sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF');
   sh.onclick=()=>{ FONT.shadowOn=!FONT.shadowOn; sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF'); sh.classList.toggle('on',FONT.shadowOn); if(codeReady) refreshCode(); }; sb.appendChild(sh); p.appendChild(sb);
   ['shadowBlur','shadowX','shadowY','shadowAlpha'].forEach(k=>{ fontInputs[k]=mkSlider(p,k,FONTP[k],FONTL[k],()=>FONT[k],v=>FONT[k]=v); });
   // 버튼
@@ -367,14 +387,18 @@ const fontInputs={};
   nx.onclick=()=>{ if(codeReady){ refreshCode(); flash(nx,'✓ 반영됨'); } };
   bd.appendChild(ap); bd.appendChild(nx); p.appendChild(bd);
 })();
-function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.value=FONT[k]; fontInputs[k].valEl.textContent=fmt(FONTP[k],FONT[k]); });
-  document.querySelectorAll('#fontBody [data-al]').forEach(b=>b.classList.toggle('on',b.dataset.al===FONT.align)); }
+function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.value=FONT[k]; fontInputs[k].num.value=fmt(FONTP[k],FONT[k]); });
+  document.querySelectorAll('#fontBody [data-al]').forEach(b=>b.classList.toggle('on',b.dataset.al===FONT.align));
+  const tin=document.getElementById('pageText'); if(tin) tin.value=FONT.text;
+  const cin=document.querySelector('#fontBody input[type=color]'); if(cin) cin.value=FONT.color;
+  const sh=document.getElementById('shadowToggle'); if(sh){ sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF'); sh.classList.toggle('on',FONT.shadowOn); }
+  rebuildPageChips(); }
 
 /* ===================== 동기화/코드 ===================== */
-function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].inp.value=state[k]; inputs[k].valEl.textContent=fmt(PARAMS[k],state[k]); });
+function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].inp.value=state[k]; inputs[k].num.value=fmt(PARAMS[k],state[k]); });
   document.querySelectorAll('[data-tog]').forEach(b=>b._upd&&b._upd()); refreshPaletteUI(); if(codeReady) refreshCode(); }
 function exportConfig(){ const p={}; Object.keys(PARAMS).forEach(k=>p[k]=state[k]);
-  return JSON.stringify({app:'iridescent-halo-orb',v:6,palette:PALETTES[palIdx].name,ratioIdx,edges:state.genArcs,edgeAOn:state.edgeAOn,edgeBOn:state.edgeBOn,font:FONT,params:p}); }
+  return JSON.stringify({app:'iridescent-halo-orb',v:7,palette:PALETTES[palIdx].name,ratioIdx,edges:state.genArcs,edgeAOn:state.edgeAOn,edgeBOn:state.edgeBOn,pages,activePage,font:FONT,params:p}); }
 function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.value=exportConfig(); }
 function applyConfig(txt){ const o=JSON.parse(txt);
   if(o.params) Object.keys(o.params).forEach(k=>{ if(k in state){ const v=parseFloat(o.params[k]); if(!isNaN(v)) state[k]=v; } });
@@ -382,9 +406,8 @@ function applyConfig(txt){ const o=JSON.parse(txt);
   if(Array.isArray(o.edges)) state.genArcs=o.edges.map(a=>({relC:+a.relC||0,hw:+a.hw||10,on:a.on?1:0}));
   if('edgeAOn' in o) state.edgeAOn=o.edgeAOn?1:0; if('edgeBOn' in o) state.edgeBOn=o.edgeBOn?1:0;
   if(typeof o.ratioIdx==='number'){ ratioIdx=((o.ratioIdx%RATIOS.length)+RATIOS.length)%RATIOS.length; const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':'); }
-  if(o.font) Object.keys(o.font).forEach(k=>{ FONT[k]=o.font[k]; });
-  const tin=document.querySelector('#fontBody input[type=text]'); if(tin) tin.value=FONT.text;
-  const cin=document.querySelector('#fontBody input[type=color]'); if(cin) cin.value=FONT.color;
+  if(Array.isArray(o.pages)&&o.pages.length){ pages=o.pages.map(pg=>Object.assign(newPage(''),pg)); activePage=Math.min(o.activePage||0,pages.length-1); FONT=pages[activePage]; }
+  else if(o.font){ pages=[Object.assign(newPage(''),o.font)]; activePage=0; FONT=pages[0]; }
   syncFontUI(); syncUI(); }
 function flash(b,m){ const o=b.textContent; b.textContent=m; setTimeout(()=>b.textContent=o,1200); }
 
@@ -392,7 +415,7 @@ function flash(b,m){ const o=b.textContent; b.textContent=m; setTimeout(()=>b.te
 let playing=true,startT=performance.now(),pausedT=0;
 const playBtn=document.getElementById('playBtn');
 playBtn.onclick=()=>{ playing=!playing; playBtn.textContent=playing?'⏸':'▶'; if(playing) startT=performance.now()-pausedT; };
-document.getElementById('resetBtn').onclick=()=>{ Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def); state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[]; ratioIdx=0; const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[0].join(':'); applyPalette(0); Object.keys(FONTP).forEach(k=>FONT[k]=FONTP[k].def); FONT.text='Galaxy AI'; FONT.color='#2a2a2a'; FONT.align='center'; FONT.shadowOn=false; const tin=document.querySelector('#fontBody input[type=text]'); if(tin) tin.value=FONT.text; const cin=document.querySelector('#fontBody input[type=color]'); if(cin) cin.value=FONT.color; syncFontUI(); syncUI(); playing=true; playBtn.textContent='⏸'; startT=performance.now(); pausedT=0; const lc=document.getElementById('loopChk'); if(lc) lc.checked=true; };
+document.getElementById('resetBtn').onclick=()=>{ applyConfig(JSON.stringify(INIT)); playing=true; playBtn.textContent='⏸'; startT=performance.now(); pausedT=0; const lc=document.getElementById('loopChk'); if(lc) lc.checked=true; };
 document.getElementById('rndBtn').onclick=()=>{
   state.orbSize=rand(0.30,0.85); state.shapeSides=Math.random()<0.7?0:[3,4,5,6][Math.floor(Math.random()*4)];
   state.blobAmt=rand(0.05,0.26); state.blobLobes=Math.round(rand(2,7)); state.blobSpeed=rand(0.2,1.4);
@@ -422,7 +445,7 @@ document.querySelectorAll('.dd').forEach(b=>b.onclick=()=>{ const pn=document.ge
 /* ===================== 텍스트 렌더 ===================== */
 function hexA(hex,a){ const c=hexToRGB(hex); return `rgba(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)},${a})`; }
 function drawText(){ if(!FONT.text) return; vctx.save(); vctx.globalAlpha=FONT.alpha;
-  const px=FONT.size*2; vctx.font=`${px}px "One UI Sans","Samsung Sans",-apple-system,"Helvetica Neue",Arial,sans-serif`;
+  const px=FONT.size*2; vctx.font=`${px}px "Samsung Sharp Sans","SamsungSharpSans","Samsung Sans","One UI Sans",-apple-system,"Helvetica Neue",Arial,sans-serif`;
   vctx.textAlign=FONT.align; vctx.textBaseline='middle';
   if(FONT.shadowOn){ vctx.shadowColor=hexA('#000000',FONT.shadowAlpha); vctx.shadowBlur=FONT.shadowBlur*2; vctx.shadowOffsetX=FONT.shadowX*2; vctx.shadowOffsetY=FONT.shadowY*2; }
   vctx.fillStyle=FONT.color; const x=FONT.x*view.width, y=FONT.y*view.height, lh=px*1.2; const lines=String(FONT.text).split('\n');
@@ -456,7 +479,8 @@ function frame(now){
   vctx.clearRect(0,0,view.width,view.height); vctx.drawImage(glCanvas,0,0,view.width,view.height); drawText();
   requestAnimationFrame(frame);
 }
-applyPalette(0); codeReady=true; syncFontUI(); syncUI(); requestAnimationFrame(frame);
+const INIT={"app":"iridescent-halo-orb","v":7,"palette":"AI","ratioIdx":0,"edges":[{"relC":90,"hw":84,"on":0},{"relC":240,"hw":54,"on":1},{"relC":330,"hw":24,"on":1}],"edgeAOn":0,"edgeBOn":1,"font":{"text":"Hey!","color":"#2a2a2a","align":"center","shadowOn":false,"size":26,"alpha":1,"x":0.5,"y":0.52,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5},"params":{"orbSize":0.6488339014329767,"blobAmt":0.25797175661427163,"blobLobes":7,"blobSpeed":0.9001635049519672,"shapeRound":0.19416621659372266,"shapeRot":29,"shapeSides":0,"distortAmt":0.01917588084009752,"distortFreq":6,"edgeAC":38,"edgeAW":33,"edgeBC":89,"edgeBW":81,"edgeContrast":0.861551658796128,"blurAmt":0.1443619064296235,"compRot":251,"lightSize":0.20892809856835717,"lightReach":0.28027863793894825,"lightAmt":0.5269839663668476,"lightUneven":0.8519323464240542,"outerSize":0.7852661605982187,"outerAmt":0.1348519947963876,"hue":-5,"haloMix":0.6255286804962303,"intensity":0.9866260577243123,"exposure":0.8987480750462861,"haloOuter":0.7680515922017943,"falloff":2.166673059375716,"rot":5,"breath":0.10622957021842669}};
+applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); requestAnimationFrame(frame);
 </script>
 </body>
 </html>
