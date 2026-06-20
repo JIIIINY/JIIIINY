@@ -149,6 +149,7 @@ const SECTIONS=[
   {tab:'엣지', title:'엣지 구성 (3:2:1 랜덤)', keys:['compRot'], buttons:'edgeComp'},
   {tab:'라이팅', title:'라이팅 (앰비언트)', keys:['lightSize','lightReach','lightAmt','lightUneven','outerSize','outerAmt']},
   {tab:'컬러', special:'palette'},
+  {tab:'컬러', special:'bg'},
   {tab:'컬러', title:'컬러 / 할로', keys:['hue','haloMix','intensity','exposure','haloOuter','falloff','haloWarp','haloWarpFreq','surfWarp','surfFreq']},
   {tab:'모션', title:'모션', keys:['rot','breath'], buttons:'motion'},
   {tab:'코드', special:'code'},
@@ -185,6 +186,7 @@ let palIdx=0;
 /* ===================== 상태 ===================== */
 const state={}; Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def);
 state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[];
+state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
 let codeReady=false;
 const RATIOS=[[3,2,1],[2,1,1],[1,1,1],[4,2,1]]; let ratioIdx=0;
 function generateEdges(){ const ratio=RATIOS[ratioIdx],sum=ratio.reduce((a,b)=>a+b,0); let acc=0; const arcs=[],gap=6;
@@ -211,7 +213,7 @@ uniform vec2 u_edgeA,u_edgeB; uniform float u_edgeAOn,u_edgeBOn; uniform vec3 u_
 uniform float u_sharpFeather,u_blurFeather,u_lightSize,u_lightReach,u_lightAmt,u_lightUneven,u_outerSize,u_outerAmt;
 uniform float u_glowSpread,u_haloInner,u_haloOuter,u_falloff,u_intensity,u_angle,u_hue,u_exposure,u_haloMix,u_t;
 uniform float u_haloWarp,u_haloWarpFreq,u_surfWarp,u_surfFreq;
-uniform vec3 u_bg; uniform vec3 u_stops[12];
+uniform vec3 u_bg1,u_bg2,u_bg3; uniform vec3 u_stops[12];
 const float PI=3.14159265359;
 float adist(float a,float b){ float d=abs(mod(a-b,360.0)); return min(d,360.0-d); }
 vec3 haloColor(float deg){ float a=mod(deg,360.0)/30.0; vec3 col=u_stops[0];
@@ -235,7 +237,14 @@ void main(){
   float edgeness=max(eA,eB);
   for(int i=0;i<4;i++){ if(u_gen[i].z>0.5){ float eg=1.0-smoothstep(u_gen[i].y-SOFT,u_gen[i].y+SOFT,adist(angBase,u_gen[i].x)); edgeness=max(edgeness,eg); } }
   float featPx=mix(u_blurFeather*W,u_sharpFeather*W,edgeness);
-  float bgGrad=1.0-smoothstep(0.0,0.95*W,r); vec3 color=mix(u_bg*0.93,u_bg+vec3(0.03,0.03,0.025),bgGrad);
+  // 배경 = iridescent 앰비언트(듀오톤 대각 그라디언트 + 보색 액센트 + 중앙 라이트)
+  vec2 uv=p/u_res;
+  float gx=clamp(0.5+0.62*((uv.x-0.5)+(uv.y-0.46)),0.0,1.0);
+  vec3 bg=mix(u_bg1,u_bg2,gx);
+  float acc=smoothstep(0.9,0.0,distance(uv,vec2(0.8,0.16)));
+  bg=mix(bg,u_bg3,acc*0.45);
+  float cen=1.0-smoothstep(0.0,0.95,distance(uv,vec2(0.5,0.46)));
+  vec3 color=bg+cen*0.035;
   // 표면 왜곡(wrap): 색 샘플 각도를 휘게 — 반경에 따라 감기듯 변형
   float aWarp=u_surfWarp*70.0*sin(u_surfFreq*th + r*0.013 + u_t*0.6);
   vec3 hc=clamp(hueShift(haloColor(mod(angBase+u_angle+aWarp,360.0)),u_hue),0.0,1.0);
@@ -262,15 +271,17 @@ const aPos=gl.getAttribLocation(prog,'a_pos'); gl.enableVertexAttribArray(aPos);
 const U={};
 ['u_res','u_center','u_radius','u_shapeSides','u_shapeRound','u_shapeAngle','u_blobAmt','u_blobLobes','u_blobSpeed','u_distortAmt','u_distortFreq',
  'u_edgeA','u_edgeB','u_edgeAOn','u_edgeBOn','u_sharpFeather','u_blurFeather','u_lightSize','u_lightReach','u_lightAmt','u_lightUneven','u_outerSize','u_outerAmt',
- 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_haloWarp','u_haloWarpFreq','u_surfWarp','u_surfFreq','u_bg'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+ 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_haloWarp','u_haloWarpFreq','u_surfWarp','u_surfFreq','u_bg1','u_bg2','u_bg3'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 const uStops=gl.getUniformLocation(prog,'u_stops[0]'); const uGen=gl.getUniformLocation(prog,'u_gen[0]');
 const stopsFlat=new Float32Array(36);
 function applyPalette(idx){ palIdx=(idx+PALETTES.length)%PALETTES.length; PALETTES[palIdx].stops.forEach((s,i)=>{ const c=hexToRGB(s); stopsFlat[i*3]=c[0]; stopsFlat[i*3+1]=c[1]; stopsFlat[i*3+2]=c[2]; }); refreshPaletteUI(); }
-const BG=hexToRGB('#E7E9EC');
+function hsl2hex(h,s,l){ h=(((h%360)+360)%360)/360; let r,g,bb; if(s===0){r=g=bb=l;} else { const q=l<0.5?l*(1+s):l+s-l*s, pp=2*l-q; const h2=(p,q,t)=>{ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; }; r=h2(pp,q,h+1/3); g=h2(pp,q,h); bb=h2(pp,q,h-1/3); } return rgbHex([r*255,g*255,bb*255]); }
+function generateBg(){ const H=Math.random()*360, s=0.32+Math.random()*0.23, l=0.74+Math.random()*0.12, d=18+Math.random()*24;
+  state.bg1=hsl2hex(H,s,l); state.bg2=hsl2hex(H+d,s*0.92,Math.min(0.9,l*0.97)); state.bg3=hsl2hex(H+180,s*0.8,Math.min(0.9,l*0.93)); }
 
 /* ===================== UI 빌드 ===================== */
 const inputs={};
-let swatchEl, palNameEl, codeBox;
+let swatchEl, palNameEl, codeBox, bgSwatchEl, bgInputs=null;
 function fmt(P,v){ const st=P.step; return (+v).toFixed(st<0.01?3:(st<1?2:0)); }
 function mkSlider(parent,key,P,label,getv,setv){
   const row=document.createElement('div'); row.className='row';
@@ -294,6 +305,7 @@ function selectTab(t){ TABS.forEach(x=>{ paneOf[x].classList.toggle('on',x===t);
 SECTIONS.forEach(sec=>{
   const pane=paneOf[sec.tab];
   if(sec.special==='palette'){ buildPaletteBlock(pane); return; }
+  if(sec.special==='bg'){ buildBgBlock(pane); return; }
   if(sec.special==='code'){ buildCodeBlock(pane); return; }
   const h=document.createElement('div'); h.className='sec-title'; h.textContent=sec.title; pane.appendChild(h);
   (sec.keys||[]).forEach(k=>{ inputs[k]=mkSlider(pane,k,PARAMS[k],LABELS[k],()=>state[k],v=>state[k]=v); });
@@ -346,6 +358,22 @@ function buildPaletteBlock(p){ const h=document.createElement('div'); h.classNam
 }
 function refreshPaletteUI(){ if(!swatchEl) return; const pal=PALETTES[palIdx]; palNameEl.textContent='팔레트: '+pal.name;
   swatchEl.innerHTML=''; [0,2,4,6,8,10].forEach(i=>{ const s=document.createElement('i'); s.style.background=pal.stops[i]; swatchEl.appendChild(s); }); }
+// 배경(앰비언트): 듀오톤 2색 + 보색 1색
+function buildBgBlock(p){ const h=document.createElement('div'); h.className='sec-title'; h.textContent='배경 (앰비언트 · 듀오톤+보색)'; p.appendChild(h);
+  const labels=['듀오톤 A','듀오톤 B','보색']; bgInputs=[];
+  ['bg1','bg2','bg3'].forEach((k,i)=>{ const w=document.createElement('div'); w.style.marginBottom='6px';
+    const l=document.createElement('label'); l.style.cssText='font-size:12px;color:#b9b9c0;display:block;margin-bottom:4px'; l.textContent=labels[i];
+    const ci=document.createElement('input'); ci.type='color'; ci.value=state[k]; ci.oninput=()=>{ state[k]=ci.value; refreshBgUI(); if(codeReady) refreshCode(); };
+    w.appendChild(l); w.appendChild(ci); p.appendChild(w); bgInputs.push(ci); });
+  bgSwatchEl=document.createElement('div'); bgSwatchEl.className='swatches'; p.appendChild(bgSwatchEl);
+  const bd=document.createElement('div'); bd.className='btns';
+  const rnd=document.createElement('button'); rnd.className='b acc2'; rnd.textContent='🎲 배경 색상 랜덤';
+  rnd.onclick=()=>{ generateBg(); refreshBgUI(); if(codeReady) refreshCode(); };
+  bd.appendChild(rnd); p.appendChild(bd);
+  const note=document.createElement('div'); note.className='note'; note.textContent='듀오톤 2색 + 보색 1색으로 iridescent 앰비언트 배경 구성'; p.appendChild(note);
+  refreshBgUI(); }
+function refreshBgUI(){ if(!bgInputs) return; const v=[state.bg1,state.bg2,state.bg3]; bgInputs.forEach((ci,i)=>ci.value=v[i]);
+  if(bgSwatchEl){ bgSwatchEl.innerHTML=''; v.forEach(c=>{ const s=document.createElement('i'); s.style.background=c; bgSwatchEl.appendChild(s); }); } }
 
 // 코드 블록
 function buildCodeBlock(p){ const h=document.createElement('div'); h.className='sec-title'; h.textContent='코드 (저장 / 불러오기)'; p.appendChild(h);
@@ -364,15 +392,17 @@ function buildCodeBlock(p){ const h=document.createElement('div'); h.className='
 const fontInputs={}; let pageChipsEl;
 /* 페이지 = 장면 스냅샷(모든 파라미터+팔레트+엣지+폰트) */
 function captureScene(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]);
-  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, font:Object.assign({},FONT) }; }
+  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], font:Object.assign({},FONT) }; }
 function normScene(o){ o=o||{}; const params={}; Object.keys(PARAMS).forEach(k=> params[k]=(o.params&&k in o.params)?+o.params[k]:PARAMS[k].def);
   const arcsrc = Array.isArray(o.genArcs)?o.genArcs : (Array.isArray(o.edges)?o.edges:[]);
+  const bg = Array.isArray(o.bg)&&o.bg.length>=3 ? o.bg.slice(0,3) : ['#E9E4F5','#E2EEF6','#F7E8E2'];
   return { params, palette:o.palette||'AI', ratioIdx:(typeof o.ratioIdx==='number')?o.ratioIdx:0,
     genArcs:arcsrc.map(a=>({relC:+a.relC||0,hw:+a.hw||10,on:a.on?1:0})),
-    edgeAOn:('edgeAOn'in o)?(o.edgeAOn?1:0):1, edgeBOn:('edgeBOn'in o)?(o.edgeBOn?1:0):1,
+    edgeAOn:('edgeAOn'in o)?(o.edgeAOn?1:0):1, edgeBOn:('edgeBOn'in o)?(o.edgeBOn?1:0):1, bg,
     font:Object.assign(newFont(''), o.font||{}) }; }
 function applyScene(sc){ Object.keys(PARAMS).forEach(k=>state[k]=sc.params[k]);
   state.genArcs=sc.genArcs.map(a=>({...a})); state.edgeAOn=sc.edgeAOn; state.edgeBOn=sc.edgeBOn; ratioIdx=sc.ratioIdx;
+  if(Array.isArray(sc.bg)){ state.bg1=sc.bg[0]; state.bg2=sc.bg[1]; state.bg3=sc.bg[2]; }
   const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':');
   const pi=PALETTES.findIndex(x=>x.name===sc.palette); applyPalette(pi>=0?pi:0);
   FONT=Object.assign(newFont(''), sc.font); syncFontUI(); syncUI(); }
@@ -437,7 +467,7 @@ function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.va
 
 /* ===================== 동기화/코드 ===================== */
 function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].inp.value=state[k]; inputs[k].num.value=fmt(PARAMS[k],state[k]); });
-  document.querySelectorAll('[data-tog]').forEach(b=>b._upd&&b._upd()); refreshPaletteUI(); if(codeReady) refreshCode(); }
+  document.querySelectorAll('[data-tog]').forEach(b=>b._upd&&b._upd()); refreshPaletteUI(); refreshBgUI(); if(codeReady) refreshCode(); }
 // 전체 프로젝트(모든 페이지 + 시퀀스) 내보내기
 function exportConfig(){ savePage(); return JSON.stringify({app:'iridescent-halo-orb',v:8,activePage,seq:{trans:seqTrans,hold:seqHold},pages:pages.map(normScene)}); }
 function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.value=exportConfig(); }
@@ -470,6 +500,7 @@ document.getElementById('rndBtn').onclick=()=>{
   state.hue=Math.round(rand(-180,180)); state.haloMix=rand(0.5,1.0); state.intensity=rand(0.6,1.2);
   state.exposure=rand(0.82,1.04); state.haloOuter=rand(0.52,0.80); state.falloff=rand(1.2,3.0); state.rot=Math.round(rand(4,36)); state.breath=rand(0.02,0.12);
   state.haloWarp=rand(0,0.4); state.haloWarpFreq=Math.round(rand(2,7)); state.surfWarp=rand(0,0.6); state.surfFreq=Math.round(rand(2,7));
+  generateBg();
   state.compRot=Math.round(rand(0,360)); ratioIdx=Math.floor(rand(0,RATIOS.length)); const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':'); generateEdges();
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
@@ -511,8 +542,9 @@ function paletteStops(name){ const p=PALETTES.find(x=>x.name===name)||PALETTES[0
 function lerpStopsInto(arr,nameA,nameB,f){ const A=paletteStops(nameA),B=paletteStops(nameB);
   for(let i=0;i<12;i++){ const ca=hexToRGB(A[i]),cb=hexToRGB(B[i]); for(let k=0;k<3;k++) arr[i*3+k]=ca[k]+(cb[k]-ca[k])*f; } }
 let _seqBk=null;
-function seqBackup(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]); _seqBk={params,genArcs:state.genArcs,edgeAOn:state.edgeAOn,edgeBOn:state.edgeBOn,ratioIdx,stops:stopsFlat.slice()}; }
-function seqRestore(){ if(!_seqBk) return; Object.keys(PARAMS).forEach(k=>state[k]=_seqBk.params[k]); state.genArcs=_seqBk.genArcs; state.edgeAOn=_seqBk.edgeAOn; state.edgeBOn=_seqBk.edgeBOn; ratioIdx=_seqBk.ratioIdx; stopsFlat.set(_seqBk.stops); _seqBk=null; }
+function lerpHex(a,b,f){ const ca=hexToRGB(a),cb=hexToRGB(b); return rgbHex([(ca[0]+(cb[0]-ca[0])*f)*255,(ca[1]+(cb[1]-ca[1])*f)*255,(ca[2]+(cb[2]-ca[2])*f)*255]); }
+function seqBackup(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]); _seqBk={params,genArcs:state.genArcs,edgeAOn:state.edgeAOn,edgeBOn:state.edgeBOn,ratioIdx,stops:stopsFlat.slice(),bg:[state.bg1,state.bg2,state.bg3]}; }
+function seqRestore(){ if(!_seqBk) return; Object.keys(PARAMS).forEach(k=>state[k]=_seqBk.params[k]); state.genArcs=_seqBk.genArcs; state.edgeAOn=_seqBk.edgeAOn; state.edgeBOn=_seqBk.edgeBOn; ratioIdx=_seqBk.ratioIdx; stopsFlat.set(_seqBk.stops); state.bg1=_seqBk.bg[0]; state.bg2=_seqBk.bg[1]; state.bg3=_seqBk.bg[2]; _seqBk=null; }
 
 /* ===================== 렌더 루프 ===================== */
 function frame(now){
@@ -525,7 +557,9 @@ function frame(now){
     const f= local<seqHold ? 0 : (-(Math.cos(Math.PI*Math.min(1,(local-seqHold)/Math.max(seqTrans,0.001)))-1)/2);
     Object.keys(PARAMS).forEach(k=>state[k]=A.params[k]+(B.params[k]-A.params[k])*f);
     const src=(f<0.5)?A:B; state.genArcs=src.genArcs.map(a=>({...a})); state.edgeAOn=src.edgeAOn; state.edgeBOn=src.edgeBOn; ratioIdx=src.ratioIdx;
-    lerpStopsInto(stopsFlat,A.palette,B.palette,f); seqText={A:A.font,B:B.font,f, typedA:typedLinear(A.font, local), typedB:typedLinear(B.font, 0)};
+    lerpStopsInto(stopsFlat,A.palette,B.palette,f);
+    const ab=A.bg||['#E9E4F5','#E2EEF6','#F7E8E2'], bb=B.bg||ab; state.bg1=lerpHex(ab[0],bb[0],f); state.bg2=lerpHex(ab[1],bb[1],f); state.bg3=lerpHex(ab[2],bb[2],f);
+    seqText={A:A.font,B:B.font,f, typedA:typedLinear(A.font, local), typedB:typedLinear(B.font, 0)};
   }
   const lc=document.getElementById('loopChk'); const motion=(lc&&lc.checked)?1.0:0.0;
   const m=0.5-0.5*Math.cos(tSec*Math.PI/3); const scale=1.0+state.breath*motion*m;
@@ -547,7 +581,9 @@ function frame(now){
   gl.uniform1f(U.u_falloff,state.falloff); gl.uniform1f(U.u_intensity,intPulse); gl.uniform1f(U.u_angle,haloAngle);
   gl.uniform1f(U.u_hue,state.hue); gl.uniform1f(U.u_exposure,state.exposure); gl.uniform1f(U.u_haloMix,state.haloMix); gl.uniform1f(U.u_t,motion?tSec:0.0);
   gl.uniform1f(U.u_haloWarp,state.haloWarp); gl.uniform1f(U.u_haloWarpFreq,state.haloWarpFreq); gl.uniform1f(U.u_surfWarp,state.surfWarp); gl.uniform1f(U.u_surfFreq,state.surfFreq);
-  gl.uniform3f(U.u_bg,BG[0],BG[1],BG[2]); gl.uniform3fv(uStops,stopsFlat); uploadGen(); gl.uniform3fv(uGen,genFlatU);
+  const b1=hexToRGB(state.bg1),b2=hexToRGB(state.bg2),b3=hexToRGB(state.bg3);
+  gl.uniform3f(U.u_bg1,b1[0],b1[1],b1[2]); gl.uniform3f(U.u_bg2,b2[0],b2[1],b2[2]); gl.uniform3f(U.u_bg3,b3[0],b3[1],b3[2]);
+  gl.uniform3fv(uStops,stopsFlat); uploadGen(); gl.uniform3fv(uGen,genFlatU);
   gl.drawArrays(gl.TRIANGLES,0,3);
   // 2D 합성: orb + 텍스트
   vctx.clearRect(0,0,view.width,view.height); vctx.drawImage(glCanvas,0,0,view.width,view.height);
