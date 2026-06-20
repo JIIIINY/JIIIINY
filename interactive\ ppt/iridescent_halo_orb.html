@@ -77,11 +77,10 @@
     </div>
     <p class="pal-name" id="palName">팔레트: Iridescent</p>
 
-    <div class="sec-title">중앙 도형</div>
+    <div class="sec-title">형태</div>
     <div class="btns" id="shapeBtns">
-      <button data-sides="0">○ 원</button>
-      <button data-sides="3">△ 세모</button>
-      <button data-sides="4">□ 네모</button>
+      <button id="shapeSuggestBtn" class="rnd">🎲 형태 제안</button>
+      <button id="shapeCircleBtn">○ 기본형</button>
     </div>
 
     <div id="sliders"></div>
@@ -98,11 +97,14 @@
 <script>
 /* ========================= 파라미터 ========================= */
 const PARAMS = {
-  // 중앙 도형
+  // 중앙 형태 (유기형)
   orbSize:      { def:0.30, min:0.12, max:0.46, step:0.005 },
-  shapeSides:   { def:0,    min:0,    max:6,    step:1 },     // 0=원, 3=세모, 4=네모...
-  shapeRound:   { def:0.10, min:0,    max:1,    step:0.02 },  // 모서리 둥글기
-  shapeRot:     { def:24,   min:0,    max:180,  step:1 },     // 도형 360° 회전 속도(°/s)
+  blobAmt:      { def:0.10, min:0,    max:0.35, step:0.01 },   // 형태 자유도(유기 변형)
+  blobLobes:    { def:3,    min:2,    max:8,    step:1 },      // 형태 복잡도(돌출 수)
+  blobSpeed:    { def:0.5,  min:0,    max:3,    step:0.05 },   // 형태 변화 속도
+  shapeRound:   { def:0.10, min:0,    max:1,    step:0.02 },   // 모서리 둥글기(다각형 시)
+  shapeRot:     { def:24,   min:0,    max:180,  step:1 },      // 형태 회전 속도(°/s)
+  shapeSides:   { def:0,    min:0,    max:6,    step:1 },      // 다각형(0=유기형)
   // 외곽 왜곡
   distortAmt:   { def:0.00, min:0,    max:0.45, step:0.01 },  // 왜곡 세기
   distortFreq:  { def:5,    min:1,    max:12,   step:1 },     // 왜곡 빈도
@@ -119,6 +121,8 @@ const PARAMS = {
   lightReach:   { def:0.30, min:0.05, max:1.20, step:0.01 },  // 빛 길이(외곽 번짐)
   lightAmt:     { def:0.55, min:0,    max:1.6,  step:0.01 },  // 빛 세기
   lightUneven:  { def:0.65, min:0,    max:1,    step:0.02 },  // 불균등 정도
+  outerSize:    { def:0.55, min:0.2,  max:1.3,  step:0.01 },  // 외곽 빛 크기
+  outerAmt:     { def:0.25, min:0,    max:1.0,  step:0.01 },  // 외곽 빛 세기
   // 컬러/할로
   hue:          { def:0,    min:-180, max:180,  step:1 },
   haloMix:      { def:0.72, min:0,    max:1,    step:0.02 },
@@ -131,19 +135,19 @@ const PARAMS = {
   breath:       { def:0.05, min:0,    max:0.20, step:0.005 },
 };
 const LABELS = {
-  orbSize:'도형 크기', shapeSides:'형태(0원/3세모/4네모)', shapeRound:'모서리 둥글기', shapeRot:'도형 회전(°/s)',
+  orbSize:'형태 크기', blobAmt:'형태 자유도', blobLobes:'형태 복잡도', blobSpeed:'형태 변화 속도', shapeRound:'모서리 둥글기', shapeRot:'형태 회전(°/s)', shapeSides:'다각형(0=유기형)',
   distortAmt:'외곽 왜곡 세기', distortFreq:'왜곡 빈도',
   edgeAC:'엣지A 위치(°)', edgeAW:'엣지A 폭(±°)', edgeBC:'엣지B 위치(°)', edgeBW:'엣지B 폭(±°)', edgeContrast:'엣지 대비', blurAmt:'블러 세기', compRot:'구성 회전(°)',
-  lightSize:'빛 코어 크기', lightReach:'빛 길이(번짐)', lightAmt:'빛 세기', lightUneven:'빛 불균등',
+  lightSize:'빛 코어 크기', lightReach:'빛 길이(번짐)', lightAmt:'빛 세기', lightUneven:'빛 불균등', outerSize:'외곽 빛 크기', outerAmt:'외곽 빛 세기',
   hue:'색조(hue °)', haloMix:'색 선명도', intensity:'할로 강도', exposure:'밝기', haloOuter:'할로 크기', falloff:'할로 폴오프',
   rot:'할로 회전(°/s)', breath:'호흡'
 };
 const SECTIONS = [
-  { title:'중앙 도형', keys:['orbSize','shapeSides','shapeRound','shapeRot'] },
+  { title:'중앙 형태 (유기형)', keys:['orbSize','blobAmt','blobLobes','blobSpeed','shapeRound','shapeRot','shapeSides'] },
   { title:'외곽 왜곡', keys:['distortAmt','distortFreq'] },
-  { title:'엣지 / 블러 위치', keys:['edgeAC','edgeAW','edgeBC','edgeBW','edgeContrast','blurAmt'] },
+  { title:'엣지 / 블러 위치', keys:['edgeAC','edgeAW','edgeBC','edgeBW','edgeContrast','blurAmt'], buttons:'edgeToggles' },
   { title:'엣지 구성 (3:2:1 랜덤)', keys:['compRot'], buttons:'edgeComp' },
-  { title:'라이팅 (앰비언트)', keys:['lightSize','lightReach','lightAmt','lightUneven'] },
+  { title:'라이팅 (앰비언트)', keys:['lightSize','lightReach','lightAmt','lightUneven','outerSize','outerAmt'] },
   { title:'컬러 / 할로', keys:['hue','haloMix','intensity','exposure','haloOuter','falloff'] },
   { title:'모션', keys:['rot','breath'] },
 ];
@@ -158,6 +162,7 @@ const PALETTES = [
 let palIdx=0;
 
 const state={}; Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def);
+state.edgeAOn=1; state.edgeBOn=1;   // 수동 엣지 A/B 온오프 토글
 let codeReady=false;
 
 /* 엣지 구성: 원을 비율(예 3:2:1)로 나눠 각 구간 엣지 ON/OFF 랜덤 */
@@ -198,10 +203,15 @@ uniform float u_radius;
 uniform float u_shapeSides;
 uniform float u_shapeRound;
 uniform float u_shapeAngle;   // rad
+uniform float u_blobAmt;
+uniform float u_blobLobes;
+uniform float u_blobSpeed;
 uniform float u_distortAmt;
 uniform float u_distortFreq;
 uniform vec2  u_edgeA;
 uniform vec2  u_edgeB;
+uniform float u_edgeAOn;
+uniform float u_edgeBOn;
 uniform vec3  u_gen[4];       // (centerDeg, halfWidthDeg, on) 3:2:1 구성 아크
 uniform float u_sharpFeather;
 uniform float u_blurFeather;
@@ -209,6 +219,8 @@ uniform float u_lightSize;
 uniform float u_lightReach;
 uniform float u_lightAmt;
 uniform float u_lightUneven;
+uniform float u_outerSize;
+uniform float u_outerAmt;
 uniform float u_glowSpread;
 uniform float u_haloInner;
 uniform float u_haloOuter;
@@ -239,19 +251,26 @@ vec3 hueShift(vec3 c,float deg){
   float I2=I*ca-Q*sa, Q2=I*sa+Q*ca;
   return vec3(Y+0.956*I2+0.621*Q2, Y-0.272*I2-0.647*Q2, Y-1.106*I2+1.703*Q2);
 }
-// 중앙 도형 경계 반경(픽셀) — th(rad) 방향
+// 중앙 형태 경계 반경(픽셀) — th(rad) 방향. 회전된 좌표 thr 사용.
 float shapeBoundary(float th, float R){
+  float thr = th - u_shapeAngle;
   float br;
   if(u_shapeSides < 2.5){ br=R; }
   else {
     float ang=2.0*PI/u_shapeSides;
-    float tt=mod(th - u_shapeAngle, ang) - ang*0.5;
+    float tt=mod(thr, ang) - ang*0.5;
     br=R*cos(PI/u_shapeSides)/cos(tt);
     br=mix(br, R, u_shapeRound);
   }
-  // 외곽 왜곡(불규칙)
-  float dphi=u_distortAmt*(0.62*sin(u_distortFreq*th + u_t*0.8) + 0.38*sin(2.0*u_distortFreq*th*0.7 - u_t*0.6 + 1.7));
-  return br*(1.0+dphi);
+  // 유기적 형태(둘레 주기 저주파 합성) — 천천히 자연스럽게 변형
+  float ts=u_t*u_blobSpeed;
+  float blob=u_blobAmt*( 0.55*sin(u_blobLobes*thr + ts)
+                       + 0.30*sin((u_blobLobes+2.0)*thr - ts*0.8 + 1.3)
+                       + 0.15*sin((u_blobLobes+5.0)*thr + ts*0.55 + 4.2) );
+  // 외곽 디테일 왜곡 — 위상이 천천히 흔들려 자연스러운 움직임(선형 드리프트 X)
+  float dphi=u_distortAmt*( 0.6*sin(u_distortFreq*thr + 1.6*sin(u_t*0.5))
+                          + 0.4*sin((u_distortFreq+3.0)*thr + 1.2*sin(u_t*0.37+2.0)) );
+  return br*(1.0 + blob + dphi);
 }
 
 void main(){
@@ -272,8 +291,8 @@ void main(){
 
   // 각도별 엣지/블러 feather
   const float SOFT=14.0;
-  float eA=1.0-smoothstep(u_edgeA.y-SOFT,u_edgeA.y+SOFT,adist(angBase,u_edgeA.x));
-  float eB=1.0-smoothstep(u_edgeB.y-SOFT,u_edgeB.y+SOFT,adist(angBase,u_edgeB.x));
+  float eA=(1.0-smoothstep(u_edgeA.y-SOFT,u_edgeA.y+SOFT,adist(angBase,u_edgeA.x)))*u_edgeAOn;
+  float eB=(1.0-smoothstep(u_edgeB.y-SOFT,u_edgeB.y+SOFT,adist(angBase,u_edgeB.x)))*u_edgeBOn;
   float edgeness=max(eA,eB);
   for(int i=0;i<4;i++){
     if(u_gen[i].z > 0.5){
@@ -301,6 +320,11 @@ void main(){
   float uneven=mix(1.0, (0.5*a1+0.3*a2+0.2*a3), u_lightUneven);
   vec3 lightTint=mix(vec3(1.0,0.985,0.95), hc, 0.28);
   color += lightTint * lightFall * uneven * u_lightAmt;
+
+  // ===== 외곽 빛 — 더 넓고 은은한 추가 광(크기 별도) =====
+  float oPx=max(u_outerSize*W, 1.0);
+  float outerFall=exp(-(r*r)/(2.0*oPx*oPx));
+  color += mix(vec3(1.0,0.97,0.92), hc, 0.4) * outerFall * uneven * u_outerAmt;
 
   // ===== 할로 =====
   float t=clamp((r-innerPx)/max(outerPx-innerPx,1.0),0.0,1.0);
@@ -343,8 +367,8 @@ const aPos=gl.getAttribLocation(prog,'a_pos'); gl.enableVertexAttribArray(aPos);
 gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 
 const U={};
-['u_res','u_center','u_radius','u_shapeSides','u_shapeRound','u_shapeAngle','u_distortAmt','u_distortFreq',
- 'u_edgeA','u_edgeB','u_sharpFeather','u_blurFeather','u_lightSize','u_lightReach','u_lightAmt','u_lightUneven',
+['u_res','u_center','u_radius','u_shapeSides','u_shapeRound','u_shapeAngle','u_blobAmt','u_blobLobes','u_blobSpeed','u_distortAmt','u_distortFreq',
+ 'u_edgeA','u_edgeB','u_edgeAOn','u_edgeBOn','u_sharpFeather','u_blurFeather','u_lightSize','u_lightReach','u_lightAmt','u_lightUneven','u_outerSize','u_outerAmt',
  'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_bg']
  .forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 const uStops=gl.getUniformLocation(prog,'u_stops[0]');
@@ -367,6 +391,15 @@ SECTIONS.forEach(sec=>{
     const inp=document.createElement('input'); inp.type='range'; inp.min=P.min; inp.max=P.max; inp.step=P.step; inp.value=state[k];
     inp.addEventListener('input',()=>{ state[k]=parseFloat(inp.value); updateVal(k); refreshShapeBtns(); if(codeReady) refreshCode(); });
     row.appendChild(inp); slidersEl.appendChild(row); inputs[k]=inp; });
+  if(sec.buttons==='edgeToggles'){
+    const bd=document.createElement('div'); bd.className='btns';
+    const mk=(id,key,name)=>{ const b=document.createElement('button'); b.id=id;
+      const upd=()=>{ b.textContent=name+': '+(state[key]?'ON':'OFF'); b.classList.toggle('on', !!state[key]); };
+      b.addEventListener('click',()=>{ state[key]=state[key]?0:1; upd(); if(codeReady) refreshCode(); });
+      upd(); return b; };
+    bd.appendChild(mk('edgeAToggle','edgeAOn','엣지A')); bd.appendChild(mk('edgeBToggle','edgeBOn','엣지B'));
+    slidersEl.appendChild(bd);
+  }
   if(sec.buttons==='edgeComp'){
     const bd=document.createElement('div'); bd.className='btns';
     const bGen=document.createElement('button'); bGen.id='edgeGenBtn'; bGen.textContent='🎲 엣지 구성';
@@ -385,31 +418,41 @@ const loopChk=loopRow.querySelector('#loopChk');
 
 function fmt(k){ const st=PARAMS[k].step; return state[k].toFixed(st<0.01?3:(st<1?2:0)); }
 function updateVal(k){ const e=document.querySelector(`[data-val="${k}"]`); if(e) e.textContent=fmt(k); }
-function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].value=state[k]; updateVal(k); }); refreshShapeBtns(); if(codeReady) refreshCode(); }
+function refreshToggles(){ [['edgeAToggle','edgeAOn','엣지A'],['edgeBToggle','edgeBOn','엣지B']].forEach(t=>{ const b=document.getElementById(t[0]); if(b){ b.textContent=t[2]+': '+(state[t[1]]?'ON':'OFF'); b.classList.toggle('on', !!state[t[1]]); } }); }
+function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].value=state[k]; updateVal(k); }); refreshShapeBtns(); refreshToggles(); if(codeReady) refreshCode(); }
 
-// 도형 버튼
-const shapeBtns=document.querySelectorAll('#shapeBtns button');
-shapeBtns.forEach(b=>b.addEventListener('click',()=>{ state.shapeSides=parseInt(b.dataset.sides); syncUI(); }));
-function refreshShapeBtns(){ shapeBtns.forEach(b=>b.classList.toggle('on', parseInt(b.dataset.sides)===Math.round(state.shapeSides))); }
+// 형태 버튼 — 고정 형태 대신 자유로운 유기형 제안
+function suggestForm(){
+  state.shapeSides = Math.random()<0.72 ? 0 : [3,4,5,6][Math.floor(Math.random()*4)]; // 대개 유기형
+  state.blobAmt=rand(0.07,0.24); state.blobLobes=Math.round(rand(2,7)); state.blobSpeed=rand(0.2,1.3);
+  state.shapeRound=rand(0.05,0.5); state.distortAmt=rand(0.02,0.16); state.distortFreq=Math.round(rand(3,9));
+  state.shapeRot=Math.round(rand(0,60));
+}
+document.getElementById('shapeSuggestBtn').addEventListener('click',()=>{ suggestForm(); syncUI(); });
+document.getElementById('shapeCircleBtn').addEventListener('click',()=>{ state.shapeSides=0; state.blobAmt=0; state.distortAmt=0; state.shapeRound=0.1; syncUI(); });
+function refreshShapeBtns(){}
 syncUI();
 
 /* ========================= 버튼 ========================= */
 let playing=true, startT=performance.now(), pausedT=0;
 const playBtn=document.getElementById('playBtn');
 playBtn.addEventListener('click',()=>{ playing=!playing; playBtn.textContent=playing?'⏸ 일시정지':'▶ 재생'; if(playing) startT=performance.now()-pausedT; });
-document.getElementById('resetBtn').addEventListener('click',()=>{ Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def); applyPalette(0); state.genArcs=[]; ratioIdx=0; const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[0].join(':'); syncUI(); playing=true; playBtn.textContent='⏸ 일시정지'; startT=performance.now(); pausedT=0; loopChk.checked=true; });
+document.getElementById('resetBtn').addEventListener('click',()=>{ Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def); state.edgeAOn=1; state.edgeBOn=1; applyPalette(0); state.genArcs=[]; ratioIdx=0; const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[0].join(':'); syncUI(); playing=true; playBtn.textContent='⏸ 일시정지'; startT=performance.now(); pausedT=0; loopChk.checked=true; });
 document.getElementById('palBtn').addEventListener('click',()=>{ applyPalette(palIdx+1); if(codeReady) refreshCode(); });
 
 function rand(a,b){ return a+Math.random()*(b-a); }
 document.getElementById('rndBtn').addEventListener('click',()=>{
   state.orbSize=rand(0.18,0.40);
-  state.shapeSides=[0,3,4,5,6][Math.floor(rand(0,5))];
+  state.shapeSides=Math.random()<0.7?0:[3,4,5,6][Math.floor(Math.random()*4)];
+  state.blobAmt=rand(0.05,0.26); state.blobLobes=Math.round(rand(2,7)); state.blobSpeed=rand(0.2,1.4);
   state.shapeRound=rand(0,0.6); state.shapeRot=Math.round(rand(0,90));
-  state.distortAmt=rand(0,0.30); state.distortFreq=Math.round(rand(2,10));
+  state.distortAmt=rand(0,0.22); state.distortFreq=Math.round(rand(2,10));
   state.edgeAC=Math.round(rand(0,360)); state.edgeAW=Math.round(rand(20,90));
   state.edgeBC=Math.round(rand(0,360)); state.edgeBW=Math.round(rand(20,90));
+  state.edgeAOn=Math.random()<0.7?1:0; state.edgeBOn=Math.random()<0.7?1:0;
   state.edgeContrast=rand(0.55,1.0); state.blurAmt=rand(0.06,0.22);
   state.lightSize=rand(0.16,0.46); state.lightReach=rand(0.15,0.8); state.lightAmt=rand(0.2,0.7); state.lightUneven=rand(0.3,1.0);
+  state.outerSize=rand(0.3,1.0); state.outerAmt=rand(0.1,0.5);
   state.hue=Math.round(rand(-180,180)); state.haloMix=rand(0.5,1.0); state.intensity=rand(0.6,1.2);
   state.exposure=rand(0.82,1.04); state.haloOuter=rand(0.52,0.80); state.falloff=rand(1.2,3.0);
   state.rot=Math.round(rand(4,36)); state.breath=rand(0.02,0.12);
@@ -435,12 +478,14 @@ document.getElementById('toggle').addEventListener('click',()=>document.body.cla
 /* 코드 복사 / 반영 (설정 저장·불러오기 — 다음 버전에서도 그대로 재현) */
 const codeBox=document.getElementById('codeBox');
 function exportConfig(){ const p={}; Object.keys(PARAMS).forEach(k=>p[k]=state[k]);
-  return JSON.stringify({ app:'iridescent-halo-orb', v:4, palette:PALETTES[palIdx].name, ratioIdx:ratioIdx, edges:state.genArcs, params:p }); }
+  return JSON.stringify({ app:'iridescent-halo-orb', v:5, palette:PALETTES[palIdx].name, ratioIdx:ratioIdx, edges:state.genArcs, edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, params:p }); }
 function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.value=exportConfig(); }
 function applyConfig(txt){ const o=JSON.parse(txt);
   if(o.params) Object.keys(o.params).forEach(k=>{ if(k in state){ const v=parseFloat(o.params[k]); if(!isNaN(v)) state[k]=v; } });
   if(o.palette){ const i=PALETTES.findIndex(x=>x.name===o.palette); if(i>=0) applyPalette(i); }
   if(Array.isArray(o.edges)) state.genArcs=o.edges.map(a=>({relC:+a.relC||0, hw:+a.hw||10, on:a.on?1:0}));
+  if('edgeAOn' in o) state.edgeAOn=o.edgeAOn?1:0;
+  if('edgeBOn' in o) state.edgeBOn=o.edgeBOn?1:0;
   if(typeof o.ratioIdx==='number'){ ratioIdx=((o.ratioIdx%RATIOS.length)+RATIOS.length)%RATIOS.length; const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':'); }
   syncUI(); }
 function flash(btn,msg){ const o=btn.textContent; btn.textContent=msg; setTimeout(()=>btn.textContent=o,1200); }
@@ -472,16 +517,23 @@ function frame(now){
   gl.uniform1f(U.u_shapeSides,state.shapeSides);
   gl.uniform1f(U.u_shapeRound,state.shapeRound);
   gl.uniform1f(U.u_shapeAngle,shapeAngle);
+  gl.uniform1f(U.u_blobAmt,state.blobAmt);
+  gl.uniform1f(U.u_blobLobes,state.blobLobes);
+  gl.uniform1f(U.u_blobSpeed,state.blobSpeed);
   gl.uniform1f(U.u_distortAmt,state.distortAmt);
   gl.uniform1f(U.u_distortFreq,state.distortFreq);
   gl.uniform2f(U.u_edgeA,state.edgeAC,state.edgeAW);
   gl.uniform2f(U.u_edgeB,state.edgeBC,state.edgeBW);
+  gl.uniform1f(U.u_edgeAOn,state.edgeAOn);
+  gl.uniform1f(U.u_edgeBOn,state.edgeBOn);
   gl.uniform1f(U.u_sharpFeather,sharpF);
   gl.uniform1f(U.u_blurFeather,state.blurAmt);
   gl.uniform1f(U.u_lightSize,state.lightSize);
   gl.uniform1f(U.u_lightReach,state.lightReach);
   gl.uniform1f(U.u_lightAmt,state.lightAmt);
   gl.uniform1f(U.u_lightUneven,state.lightUneven);
+  gl.uniform1f(U.u_outerSize,state.outerSize);
+  gl.uniform1f(U.u_outerAmt,state.outerAmt);
   gl.uniform1f(U.u_glowSpread,0.08);
   gl.uniform1f(U.u_haloInner,0.30);
   gl.uniform1f(U.u_haloOuter,state.haloOuter);
