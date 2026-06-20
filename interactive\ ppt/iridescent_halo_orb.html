@@ -42,6 +42,7 @@
   .pageind{ display:flex; align-items:center; gap:8px; }
   .pageind .dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.28); cursor:pointer; transition:all .2s; }
   .pageind .dot.on{ width:22px; border-radius:4px; background:#fff; }
+  .screenlabel{ margin-top:-6px; font-size:12px; letter-spacing:2px; color:#9a9aa2; }
 
   /* 패널 공통 */
   .panel{ position:fixed; top:52px; bottom:0; width:300px; background:#141417; z-index:30; overflow-y:auto; padding:0 0 40px;
@@ -112,6 +113,7 @@
         <div class="pageind" id="pageind"></div>
         <button class="nav navR" id="navR">›</button>
       </div>
+      <div class="screenlabel" id="screenLabel">#1</div>
     </div>
   </div>
 
@@ -433,9 +435,12 @@ function loadScreen(sc){ pages=(sc.pages&&sc.pages.length?sc.pages:[{}]).map(nor
   if(sc.seq){ seqTrans=+sc.seq.trans||seqTrans; seqHold=(sc.seq.hold!=null?+sc.seq.hold:seqHold); }
   applyScene(pages[activePage]);
   if(seqInputs){ seqInputs.trans.inp.value=seqTrans; seqInputs.trans.num.value=fmt(SEQP.trans,seqTrans); seqInputs.hold.inp.value=seqHold; seqInputs.hold.num.value=fmt(SEQP.hold,seqHold); }
+  // 서브페이지가 여러 개면 자동으로 연달아 재생(루핑)
+  seqPlaying = pages.length>1; startT=performance.now();
+  const sb=document.getElementById('seqBtn'); if(sb){ sb.textContent=seqPlaying?'⏹ 모션 정지':'▶ 페이지 모션 재생'; sb.classList.toggle('on',seqPlaying); }
   refreshScreenUI(); }
 function gotoScreen(i){ if(!screens.length) return; screens[activeScreen]=captureScreen(); activeScreen=((i%screens.length)+screens.length)%screens.length; loadScreen(screens[activeScreen]); if(codeReady) refreshCode(); }
-function refreshScreenUI(){ const el=document.getElementById('pageind'); if(!el) return; el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='화면 '+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); }
+function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){ el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='#'+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); } const lb=document.getElementById('screenLabel'); if(lb) lb.textContent='#'+(activeScreen+1); }
 (function buildFontUI(){ const p=document.getElementById('fontBody');
   // 페이지
   const tp=document.createElement('div'); tp.className='sec-title'; tp.textContent='페이지'; p.appendChild(tp);
@@ -624,7 +629,11 @@ function frame(now){
 const BASE_PARAMS={"orbSize":0.3,"blobAmt":0.03,"blobLobes":4,"blobSpeed":1.75,"shapeRound":0.32,"shapeRot":28,"shapeSides":0,"distortAmt":0.12,"distortFreq":6,"edgeAC":333,"edgeAW":44,"edgeBC":311,"edgeBW":72,"edgeContrast":0.8976409358121893,"blurAmt":0.2160497942528363,"compRot":174,"lightSize":0.31679788692989297,"lightReach":0.46403068311630735,"lightAmt":0.6199343326942247,"lightUneven":0.6884091139295905,"outerSize":0.583584651867469,"outerAmt":0.377827780017696,"hue":-56,"haloMix":0.6234209818681674,"intensity":1.0501813650087461,"exposure":0.8466470341818711,"haloOuter":0.6081097540726703,"falloff":1.2956208888084728,"rot":20,"breath":0.04901997767776069};
 function _pg(t){ return {params:BASE_PARAMS,palette:"Aurora",ratioIdx:2,genArcs:[{relC:60,hw:54,on:0},{relC:180,hw:54,on:0},{relC:300,hw:54,on:1}],edgeAOn:1,edgeBOn:0,font:{text:t,x:0.5,y:0.52}}; }
 const P1={palette:"AI",ratioIdx:0,genArcs:[{relC:90,hw:84,on:0},{relC:240,hw:54,on:1},{relC:330,hw:24,on:1}],edgeAOn:1,edgeBOn:0,font:{text:"Hey!",x:0.5,y:0.45},params:{"orbSize":0.12,"blobAmt":0.21481615785637828,"blobLobes":5,"blobSpeed":1.65,"shapeRound":0.32020601926006004,"shapeRot":26,"shapeSides":0,"distortAmt":0.0787147651042138,"distortFreq":2,"edgeAC":109,"edgeAW":80,"edgeBC":178,"edgeBW":52,"edgeContrast":0.83,"blurAmt":0.035,"compRot":176,"lightSize":0.14,"lightReach":0.58,"lightAmt":0.32,"lightUneven":1,"outerSize":0.4,"outerAmt":0,"hue":-121,"haloMix":0.72,"intensity":1.07,"exposure":0.86,"haloOuter":0.95,"falloff":1.5,"rot":12,"breath":0.2}};
-const SCREEN1={pages:[P1,_pg("Welcome to"),_pg("Galaxy AI")],activePage:0,seq:{trans:0.8,hold:1.8}};
+const SCREEN1={pages:[
+  Object.assign({},P1,{bg:['#E9E4F5','#E2EEF6','#F7E8E2']}),
+  Object.assign({},_pg("Welcome to"),{bg:['#E2EEF6','#E0F2EE','#F7ECE2']}),
+  Object.assign({},_pg("Galaxy AI"),{bg:['#FCEAE2','#F7E8F2','#E6EEF7']})
+],activePage:0,seq:{trans:0.9,hold:1.6}};
 const SCREEN2={pages:[{palette:"Ocean",ratioIdx:0,genArcs:[],edgeAOn:0,edgeBOn:0,font:{text:"",x:0.5,y:0.5},params:{orbSize:0.5,blobAmt:0.12,blobLobes:3,shapeSides:4,shapeRound:0.4,hue:0,haloOuter:0.8,lightAmt:0.5}}],activePage:0,seq:{trans:0.8,hold:1.8}};
 const SCREEN3={pages:[{palette:"Sunset",ratioIdx:0,genArcs:[],edgeAOn:1,edgeBOn:1,font:{text:"",x:0.5,y:0.5},params:{orbSize:0.4,blobAmt:0.2,blobLobes:6,shapeSides:0,hue:0,haloOuter:1.0,lightAmt:0.6}}],activePage:0,seq:{trans:0.8,hold:1.8}};
 const INIT={app:"iridescent-halo-orb",v:9,activeScreen:0,screens:[SCREEN1,SCREEN2,SCREEN3]};
