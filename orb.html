@@ -632,9 +632,10 @@ const P1={palette:"AI",ratioIdx:0,genArcs:[{relC:90,hw:84,on:0},{relC:240,hw:54,
 const _A={palette:"Aurora",ratioIdx:2,genArcs:[{relC:60,hw:54,on:0},{relC:180,hw:54,on:0},{relC:300,hw:54,on:1}],edgeAOn:1,edgeBOn:0};
 function _aur(t,orb,la,bg){ return Object.assign({},_A,{params:Object.assign({},BASE_PARAMS,{orbSize:orb,lightAmt:la}),font:{text:t,x:0.5,y:0.5},bg}); }
 const SCREEN1={pages:[
-  Object.assign({},P1,{bg:['#E9E4F5','#E2EEF6','#F7E8E2']}),                 // Hey! — 작은 형태(텍스트 먼저)
-  _aur("Welcome to",0.46,0.55,['#E2EEF6','#E0F2EE','#F7ECE2']),             // 중간 — 형태가 자라남
-  _aur("Galaxy AI",0.78,0.7,['#FCEAE2','#F7E8F2','#E6EEF7'])               // 마무리 — 형태 자리잡음
+  Object.assign({},P1,{params:Object.assign({},P1.params,{orbSize:0.08,lightAmt:0.22}),bg:['#E9E4F5','#E2EEF6','#F7E8E2']}), // 1) Hey! — 텍스트 먼저(형태 거의 없음)
+  _aur("",0.72,0.72,['#E2EEF6','#E0F2EE','#F7ECE2']),                 // 2) 중앙 패턴 형태 등장(텍스트 없음)
+  _aur("Welcome to",0.42,0.55,['#E0F2EE','#EAF3DF','#F2E2EE']),       // 3) 중간 — Welcome to
+  _aur("Galaxy AI",0.6,0.62,['#FCEAE2','#F7E8F2','#E6EEF7'])          // 4) 마무리 — Galaxy AI
 ],activePage:0,seq:{trans:2.0,hold:1.6}};
 const SCREEN2={pages:[{palette:"Ocean",ratioIdx:0,genArcs:[],edgeAOn:0,edgeBOn:0,font:{text:"",x:0.5,y:0.5},params:{orbSize:0.5,blobAmt:0.12,blobLobes:3,shapeSides:4,shapeRound:0.4,hue:0,haloOuter:0.8,lightAmt:0.5}}],activePage:0,seq:{trans:0.8,hold:1.8}};
 const SCREEN3={pages:[{palette:"Sunset",ratioIdx:0,genArcs:[],edgeAOn:1,edgeBOn:1,font:{text:"",x:0.5,y:0.5},params:{orbSize:0.4,blobAmt:0.2,blobLobes:6,shapeSides:0,hue:0,haloOuter:1.0,lightAmt:0.6}}],activePage:0,seq:{trans:0.8,hold:1.8}};
