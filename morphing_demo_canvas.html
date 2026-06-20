@@ -6,7 +6,7 @@
 <title>Organic Gradient Morphing — Canvas</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100%;background:#0B0E14;color:#cdd6e4;overflow:hidden;
+  html,body{height:100%;background:#0B0E16;color:#cdd6e4;overflow:hidden;
     font-family:-apple-system,"Helvetica Neue","Segoe UI",system-ui,sans-serif;}
   #c{position:fixed;inset:0;width:100%;height:100%;display:block;}
   .hud{position:fixed;left:22px;bottom:20px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;opacity:.7;pointer-events:none;}
@@ -22,59 +22,38 @@
 <div class="hud">CANVAS MORPH · <b id="lbl">—</b></div>
 <div class="ctrl"><button id="pp">Pause</button><button id="nx">Next ›</button></div>
 
+<script src="morphing_geometry.js"></script>
 <script src="morphing_config.js"></script>
 <script>
-const CFG=window.MORPH_CONFIG,N=128,TAU=Math.PI*2;
-const centroid=p=>{let x=0,y=0;for(const q of p){x+=q[0];y+=q[1];}return[x/p.length,y/p.length];};
-function sampleClosed(ctrl){const m=ctrl.length,dense=[],steps=24;
-  for(let i=0;i<m;i++){const p0=ctrl[(i-1+m)%m],p1=ctrl[i],p2=ctrl[(i+1)%m],p3=ctrl[(i+2)%m];
-    for(let s=0;s<steps;s++){const t=s/steps,t2=t*t,t3=t2*t;dense.push([
-      0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
-      0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)]);}}
-  return resample(dense);}
-function resample(poly){const acc=[0];let total=0;for(let i=1;i<poly.length;i++){total+=Math.hypot(poly[i][0]-poly[i-1][0],poly[i][1]-poly[i-1][1]);acc.push(total);}
-  const out=[];for(let i=0;i<N;i++){const d=(i/N)*total;let k=1;while(k<acc.length&&acc[k]<d)k++;
-    const a=acc[k-1],b=acc[k]||total,t=(b-a)?(d-a)/(b-a):0,p0=poly[k-1],p1=poly[k%poly.length];
-    out.push([p0[0]+(p1[0]-p0[0])*t,p0[1]+(p1[1]-p0[1])*t]);}return out;}
-function sampleStar(star){const c=[0.5,0.5],out=[];for(let i=0;i<N;i++){const a=(i/N)*TAU,k=Math.abs(Math.cos(2*a)),spike=Math.pow(k,1+star.spikeSharpness*8);
-  const r=star.innerRadius+(star.outerRadius-star.innerRadius)*spike;out.push([c[0]+Math.cos(a)*r,c[1]+Math.sin(a)*r]);}return out;}
-function sampleMetaballs(balls){let cx=0,cy=0;for(const b of balls){cx+=b.center[0];cy+=b.center[1];}cx/=balls.length;cy/=balls.length;
-  const out=[];for(let i=0;i<N;i++){const a=(i/N)*TAU,dx=Math.cos(a),dy=Math.sin(a);let rmax=0;
-    for(const b of balls){const ox=b.center[0]-cx,oy=b.center[1]-cy,proj=ox*dx+oy*dy,perp2=(ox*ox+oy*oy)-proj*proj;
-      if(perp2<=b.radius*b.radius){const reach=proj+Math.sqrt(b.radius*b.radius-perp2);if(reach>rmax)rmax=reach;}}
-    rmax*=1.12;out.push([cx+dx*rmax,cy+dy*rmax]);}return out;}
-function signedArea(p){let a=0;for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length];a+=p[i][0]*q[1]-q[0]*p[i][1];}return a/2;}
-function stabilize(pts){if(signedArea(pts)<0)pts=pts.slice().reverse();let best=0,bx=-1e9;for(let i=0;i<pts.length;i++)if(pts[i][0]>bx){bx=pts[i][0];best=i;}return pts.slice(best).concat(pts.slice(0,best));}
-function shapeToPoints(s){const f=s.form;let pts;if(f.star)pts=sampleStar(f.star);else if(f.metaballs)pts=sampleMetaballs(f.metaballs);else pts=sampleClosed(f.blob.controlPoints);return stabilize(pts);}
-function boostColor(hex,k){let h=hex.replace('#','');let r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
-  const L=(Math.max(r,g,b)+Math.min(r,g,b))/2,cl=v=>Math.max(0,Math.min(255,L+(v-L)*k)),hx=v=>Math.round(v).toString(16).padStart(2,'0');
-  return '#'+hx(cl(r))+hx(cl(g))+hx(cl(b));}
-
-const SHAPES=CFG.shapes.map(s=>({cfg:s,pts:shapeToPoints(s)}));
+const CFG=window.MORPH_CONFIG,G=window.MorphGeo,N=128,TAU=Math.PI*2;
+const SHAPES=CFG.shapes.map(s=>({cfg:s,pts:G.shapeToPoints(s,N)}));
 const ORDER=CFG.morphSequence.order.map(id=>SHAPES.findIndex(s=>s.cfg.id===id));
 const noiseSeed=Array.from({length:N},(_,i)=>[Math.sin(i*12.9898)*43758.5453%1,Math.cos(i*78.233)*12543.21%1]);
-const lerpPts=(a,b,t)=>a.map((p,i)=>[p[0]+(b[i][0]-p[0])*t,p[1]+(b[i][1]-p[1])*t]);
-const ease=u=>u<0.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2,lerp=(a,b,t)=>a+(b-a)*t;
+const {lerpPts,ease,lerp,centroid}=G;
+function hexA(hex,a){const h=hex.replace('#','');return`rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;}
 
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const off=document.createElement('canvas'),octx=off.getContext('2d');
 let W,H,S,OX,OY,DPR,grain;
-function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=cv.width=off.width=innerWidth*DPR;H=cv.height=off.height=innerHeight*DPR;
   cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';S=Math.min(W,H)*0.86;OX=(W-S)/2;OY=(H-S)/2;buildGrain();}
 addEventListener('resize',resize);
 function buildGrain(){const g=document.createElement('canvas');g.width=g.height=256;const gx=g.getContext('2d'),id=gx.createImageData(256,256),d=id.data;
   for(let i=0;i<d.length;i+=4){const v=Math.random()*255;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255;}gx.putImageData(id,0,0);grain=g;}
 
-function tracePath(pts,now){const m=pts.length,P=[],n=CFG.globalMotion.organicNoise,ph=now*0.001*n.speed*TAU;
+function tracePath(c,pts,now){const m=pts.length,P=[],n=CFG.globalMotion.organicNoise,ph=now*0.001*n.speed*TAU;
   for(let i=0;i<m;i++){const nx=Math.sin(ph+noiseSeed[i][0]*TAU)*n.amplitude*0.18,ny=Math.cos(ph*1.3+noiseSeed[i][1]*TAU)*n.amplitude*0.18;
     P.push([OX+(pts[i][0]+nx)*S,OY+(pts[i][1]+ny)*S]);}
-  ctx.beginPath();ctx.moveTo(P[0][0],P[0][1]);
+  c.beginPath();c.moveTo(P[0][0],P[0][1]);
   for(let i=0;i<m;i++){const p0=P[(i-1+m)%m],p1=P[i],p2=P[(i+1)%m],p3=P[(i+2)%m];
-    ctx.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6,p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6,p2[0],p2[1]);}
-  ctx.closePath();}
-function makeGradient(color,contrast){let g;
-  if(color.type==='radial-gradient'){const c=color.center||[0.5,0.5];g=ctx.createRadialGradient(OX+c[0]*S,OY+c[1]*S,S*0.02,OX+c[0]*S,OY+c[1]*S,S*0.6);}
-  else{const a=(color.angle||0)*Math.PI/180,R=S*0.55,cx=OX+S/2,cy=OY+S/2;g=ctx.createLinearGradient(cx-Math.cos(a)*R,cy-Math.sin(a)*R,cx+Math.cos(a)*R,cy+Math.sin(a)*R);}
-  for(const s of color.stops)g.addColorStop(Math.max(0,Math.min(1,s.offset)),boostColor(s.color,contrast));return g;}
+    c.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6,p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6,p2[0],p2[1]);}
+  c.closePath();}
+// 메시 색점 스택 (base dominant + color→transparent 라디얼)
+function paintMesh(c,color,alpha){c.save();c.globalAlpha=alpha;
+  c.fillStyle=color.dominant||'#888';c.fillRect(OX,OY,S,S);
+  for(const pt of color.points){const cx=OX+pt.pos[0]*S,cy=OY+pt.pos[1]*S,r=Math.max(4,pt.radius*S),w=Math.min(1,pt.weight);
+    const g=c.createRadialGradient(cx,cy,1,cx,cy,r);g.addColorStop(0,hexA(pt.color,w));g.addColorStop(0.55,hexA(pt.color,0.75*w));g.addColorStop(1,hexA(pt.color,0));
+    c.fillStyle=g;c.fillRect(OX,OY,S,S);}c.restore();}
 
 const lbl=document.getElementById('lbl');
 let seqIdx=0,t0=performance.now(),playing=true,manualNext=false,raf;
@@ -85,32 +64,33 @@ function frame(now){
   let elapsed=now-t0;if(manualNext){elapsed=total;manualNext=false;}
   const te=ease(Math.min(elapsed/dur,1)),A=SHAPES[leg(seqIdx)],B=SHAPES[leg(seqIdx+1)];
   const geom=lerpPts(A.pts,B.pts,te),ra=A.cfg.render,rb=B.cfg.render;
-  const feather=lerp(ra.edgeFeather,rb.edgeFeather,te)*S, glowSpread=lerp(ra.glow.spread,rb.glow.spread,te)*S;
-  const contrast=lerp(ra.interiorContrast,rb.interiorContrast,te), grainAmt=lerp(ra.grain,rb.grain,te);
+  const feather=lerp(ra.edgeFeather,rb.edgeFeather,te)*S,glowSpread=lerp(ra.glow.spread,rb.glow.spread,te)*S;
+  const grainAmt=lerp(ra.grain,rb.grain,te);
 
-  ctx.globalCompositeOperation='source-over';ctx.fillStyle='#0B0E14';ctx.fillRect(0,0,W,H);
-
+  ctx.globalCompositeOperation='source-over';ctx.fillStyle='#0B0E16';ctx.fillRect(0,0,W,H);
   const bm=CFG.globalMotion.breathing,bt=(now/bm.periodMs)*TAU;
   const sc=1+(bm.scaleRange[1]-bm.scaleRange[0])*0.5*Math.sin(bt),rot=bm.rotationRange[1]*Math.sin(bt*0.7)*Math.PI/180;
   ctx.save();ctx.translate(OX+S/2,OY+S/2);ctx.scale(sc,sc);ctx.rotate(rot);ctx.translate(-(OX+S/2),-(OY+S/2));
-  ctx.globalCompositeOperation='screen';
 
-  // (1) 글로우 헤일로 — dominant 컬러, 큰 블러, 낮은 alpha
-  ctx.filter=`blur(${glowSpread.toFixed(1)}px)`;
-  tracePath(geom,now);ctx.globalAlpha=ra.glow.opacity*(1-te);ctx.fillStyle=A.cfg.color.dominant||'#fff';ctx.fill();
-  tracePath(geom,now);ctx.globalAlpha=rb.glow.opacity*te;ctx.fillStyle=B.cfg.color.dominant||'#fff';ctx.fill();
+  // (1) glow 헤일로 — dominant, 큰 블러
+  ctx.globalCompositeOperation='screen';ctx.filter=`blur(${glowSpread.toFixed(1)}px)`;
+  tracePath(ctx,geom,now);ctx.globalAlpha=ra.glow.opacity*(1-te);ctx.fillStyle=A.cfg.color.dominant;ctx.fill();
+  tracePath(ctx,geom,now);ctx.globalAlpha=rb.glow.opacity*te;ctx.fillStyle=B.cfg.color.dominant;ctx.fill();
+  ctx.globalAlpha=1;
 
-  // (2) 선명한 폼 — 채도 그라디언트, 얇은 페더
-  ctx.filter=`blur(${Math.max(1.5,feather).toFixed(1)}px)`;
-  tracePath(geom,now);ctx.globalAlpha=A.cfg.opacity*(1-te);ctx.fillStyle=makeGradient(A.cfg.color,contrast);ctx.fill();
-  tracePath(geom,now);ctx.globalAlpha=B.cfg.opacity*te;ctx.fillStyle=makeGradient(B.cfg.color,contrast);ctx.fill();
+  // (2) form — 오프스크린에 메시 스택(클립) → feather 블러로 합성
+  octx.setTransform(1,0,0,1,0,0);octx.clearRect(0,0,W,H);
+  octx.save();tracePath(octx,geom,now);octx.clip();
+  paintMesh(octx,A.cfg.color,A.cfg.opacity*(1-te));
+  paintMesh(octx,B.cfg.color,B.cfg.opacity*te);
+  octx.restore();
+  ctx.filter=`blur(${Math.max(1,feather).toFixed(1)}px)`;ctx.globalCompositeOperation='screen';ctx.drawImage(off,0,0);
 
-  // (3) 그레인 — 폼 내부에만 (clip)
-  ctx.filter='none';tracePath(geom,now);ctx.save();ctx.clip();
+  // (3) grain — 폼 내부
+  ctx.filter='none';tracePath(ctx,geom,now);ctx.save();ctx.clip();
   ctx.globalAlpha=grainAmt;ctx.globalCompositeOperation='overlay';
   for(let y=0;y<H;y+=256)for(let x=0;x<W;x+=256)ctx.drawImage(grain,x,y);
-  ctx.restore();
-  ctx.filter='none';ctx.globalAlpha=1;ctx.restore();
+  ctx.restore();ctx.globalAlpha=1;ctx.restore();
 
   // 비네팅
   ctx.globalCompositeOperation='source-over';

@@ -6,7 +6,7 @@
 <title>Organic Gradient Morphing — SVG</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100%;background:#0B0E14;color:#cdd6e4;overflow:hidden;
+  html,body{height:100%;background:#0B0E16;color:#cdd6e4;overflow:hidden;
     font-family:-apple-system,"Helvetica Neue","Segoe UI",system-ui,sans-serif;}
   #stage{position:fixed;inset:0;display:grid;place-items:center;}
   svg{width:min(86vmin,760px);height:min(86vmin,760px);display:block;}
@@ -23,81 +23,41 @@
 <div id="stage">
   <svg id="svg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
     <defs>
-      <!-- 글로우(블러 영역) — 형태와 분리된 부드러운 헤일로 -->
-      <filter id="glowF" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur id="glowB" stdDeviation="70"/></filter>
-      <!-- 폼 — 얇은 실루엣 페더만 -->
-      <filter id="formF" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur id="formB" stdDeviation="10"/></filter>
-      <!-- 그레인 -->
-      <filter id="grainF" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" stitchTiles="stitch" result="n"/>
-        <feColorMatrix id="grainM" in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.07 0"/>
-      </filter>
-      <linearGradient id="gA" gradientUnits="userSpaceOnUse"></linearGradient>
-      <linearGradient id="gB" gradientUnits="userSpaceOnUse"></linearGradient>
-      <radialGradient id="gAr" gradientUnits="userSpaceOnUse"></radialGradient>
-      <radialGradient id="gBr" gradientUnits="userSpaceOnUse"></radialGradient>
-      <clipPath id="grainClip"><path id="grainClipP"/></clipPath>
+      <filter id="glowF" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur id="glowB" stdDeviation="80"/></filter>
+      <filter id="featherF" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur id="featherB" stdDeviation="10"/></filter>
+      <filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" stitchTiles="stitch" result="n"/>
+        <feColorMatrix id="grainM" in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.08 0"/></filter>
+      <clipPath id="clipP"><path id="clipPath"/></clipPath>
+      <g id="meshDefs"></g>
     </defs>
     <g id="scene" style="mix-blend-mode:screen;">
-      <path id="glowA" filter="url(#glowF)"/>
+      <path id="glowA"  filter="url(#glowF)"/>
       <path id="glowB2" filter="url(#glowF)"/>
-      <path id="formA" filter="url(#formF)"/>
-      <path id="formB" filter="url(#formF)"/>
+      <g filter="url(#featherF)"><g clip-path="url(#clipP)">
+        <rect id="baseA" x="0" y="0" width="1000" height="1000"/>
+        <g id="meshA"></g>
+        <rect id="baseB" x="0" y="0" width="1000" height="1000"/>
+        <g id="meshB"></g>
+      </g></g>
     </g>
-    <g clip-path="url(#grainClip)" style="mix-blend-mode:overlay;">
-      <rect id="grainRect" x="0" y="0" width="1000" height="1000" filter="url(#grainF)"/>
-    </g>
+    <g clip-path="url(#clipP)" style="mix-blend-mode:overlay;"><rect x="-200" y="-200" width="1400" height="1400" filter="url(#grainF)"/></g>
   </svg>
 </div>
 <div class="vignette"></div>
 <div class="hud">SVG MORPH · <b id="lbl">—</b></div>
 <div class="ctrl"><button id="pp">Pause</button><button id="nx">Next ›</button></div>
 
+<script src="morphing_geometry.js"></script>
 <script src="morphing_config.js"></script>
 <script>
-const CFG=window.MORPH_CONFIG, N=128, TAU=Math.PI*2;
-const centroid=p=>{let x=0,y=0;for(const q of p){x+=q[0];y+=q[1];}return[x/p.length,y/p.length];};
-function sampleClosed(ctrl){const m=ctrl.length,dense=[],steps=24;
-  for(let i=0;i<m;i++){const p0=ctrl[(i-1+m)%m],p1=ctrl[i],p2=ctrl[(i+1)%m],p3=ctrl[(i+2)%m];
-    for(let s=0;s<steps;s++){const t=s/steps,t2=t*t,t3=t2*t;
-      dense.push([0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
-        0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)]);}}
-  return resample(dense);}
-function resample(poly){const acc=[0];let total=0;
-  for(let i=1;i<poly.length;i++){total+=Math.hypot(poly[i][0]-poly[i-1][0],poly[i][1]-poly[i-1][1]);acc.push(total);}
-  const out=[];for(let i=0;i<N;i++){const d=(i/N)*total;let k=1;while(k<acc.length&&acc[k]<d)k++;
-    const a=acc[k-1],b=acc[k]||total,t=(b-a)?(d-a)/(b-a):0,p0=poly[k-1],p1=poly[k%poly.length];
-    out.push([p0[0]+(p1[0]-p0[0])*t,p0[1]+(p1[1]-p0[1])*t]);}return out;}
-function sampleStar(star){const c=[0.5,0.5],out=[];for(let i=0;i<N;i++){const a=(i/N)*TAU,k=Math.abs(Math.cos(2*a)),spike=Math.pow(k,1+star.spikeSharpness*8);
-  const r=star.innerRadius+(star.outerRadius-star.innerRadius)*spike;out.push([c[0]+Math.cos(a)*r,c[1]+Math.sin(a)*r]);}return out;}
-function sampleMetaballs(balls){let cx=0,cy=0;for(const b of balls){cx+=b.center[0];cy+=b.center[1];}cx/=balls.length;cy/=balls.length;
-  const out=[];for(let i=0;i<N;i++){const a=(i/N)*TAU,dx=Math.cos(a),dy=Math.sin(a);let rmax=0;
-    for(const b of balls){const ox=b.center[0]-cx,oy=b.center[1]-cy,proj=ox*dx+oy*dy,perp2=(ox*ox+oy*oy)-proj*proj;
-      if(perp2<=b.radius*b.radius){const reach=proj+Math.sqrt(b.radius*b.radius-perp2);if(reach>rmax)rmax=reach;}}
-    rmax*=1.12;out.push([cx+dx*rmax,cy+dy*rmax]);}return out;}
-// 오목 형태 보존: 각도정렬 없이 와인딩 통일 + 최우측 시작
-function signedArea(p){let a=0;for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length];a+=p[i][0]*q[1]-q[0]*p[i][1];}return a/2;}
-function stabilize(pts){if(signedArea(pts)<0)pts=pts.slice().reverse();
-  let best=0,bx=-1e9;for(let i=0;i<pts.length;i++)if(pts[i][0]>bx){bx=pts[i][0];best=i;}
-  return pts.slice(best).concat(pts.slice(0,best));}
-function shapeToPoints(s){const f=s.form;let pts;
-  if(f.star)pts=sampleStar(f.star);else if(f.metaballs)pts=sampleMetaballs(f.metaballs);else pts=sampleClosed(f.blob.controlPoints);
-  return stabilize(pts);}
-
-// 채도/대비 부스트 — 내부 그라디언트가 회색으로 죽지 않게
-function boostColor(hex,k){let h=hex.replace('#','');let r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
-  const L=(Math.max(r,g,b)+Math.min(r,g,b))/2;const cl=v=>Math.max(0,Math.min(255,L+(v-L)*k));
-  const hx=v=>Math.round(v).toString(16).padStart(2,'0');return '#'+hx(cl(r))+hx(cl(g))+hx(cl(b));}
-
-const SHAPES=CFG.shapes.map(s=>({cfg:s,pts:shapeToPoints(s)}));
+const CFG=window.MORPH_CONFIG,G=window.MorphGeo,N=128,TAU=Math.PI*2,SVGNS='http://www.w3.org/2000/svg';
+const SHAPES=CFG.shapes.map(s=>({cfg:s,pts:G.shapeToPoints(s,N)}));
 const ORDER=CFG.morphSequence.order.map(id=>SHAPES.findIndex(s=>s.cfg.id===id));
 const noiseSeed=Array.from({length:N},(_,i)=>[Math.sin(i*12.9898)*43758.5453%1,Math.cos(i*78.233)*12543.21%1]);
-function lerpPts(a,b,t){return a.map((p,i)=>[p[0]+(b[i][0]-p[0])*t,p[1]+(b[i][1]-p[1])*t]);}
-function ease(u){return u<0.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
-const lerp=(a,b,t)=>a+(b-a)*t;
+const {lerpPts,ease,lerp}=G;
+const $=id=>document.getElementById(id);
 
-function buildPath(pts,now){
-  const m=pts.length,P=[],n=CFG.globalMotion.organicNoise,ph=now*0.001*n.speed*TAU;
+function buildPath(pts,now){const m=pts.length,P=[],n=CFG.globalMotion.organicNoise,ph=now*0.001*n.speed*TAU;
   for(let i=0;i<m;i++){const nx=Math.sin(ph+noiseSeed[i][0]*TAU)*n.amplitude*0.18,ny=Math.cos(ph*1.3+noiseSeed[i][1]*TAU)*n.amplitude*0.18;
     P.push([(pts[i][0]+nx)*1000,(pts[i][1]+ny)*1000]);}
   let d=`M ${P[0][0].toFixed(2)} ${P[0][1].toFixed(2)} `;
@@ -105,65 +65,56 @@ function buildPath(pts,now){
     d+=`C ${(p1[0]+(p2[0]-p0[0])/6).toFixed(2)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(2)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(2)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(2)} ${p2[0].toFixed(2)} ${p2[1].toFixed(2)} `;}
   return d+'Z';}
 
-function setGradient(linId,radId,color,contrast,target){
-  const stops=color.stops.map(s=>`<stop offset="${s.offset}" stop-color="${boostColor(s.color,contrast)}"/>`).join('');
-  if(color.type==='radial-gradient'){const g=document.getElementById(radId);g.innerHTML=stops;
-    const c=color.center||[0.5,0.5];g.setAttribute('cx',c[0]*1000);g.setAttribute('cy',c[1]*1000);g.setAttribute('r',600);
-    g.setAttribute('fx',c[0]*1000);g.setAttribute('fy',c[1]*1000);target.setAttribute('fill',`url(#${radId})`);
-  }else{const g=document.getElementById(linId);g.innerHTML=stops;const a=(color.angle||0)*Math.PI/180,cx=500,cy=500,R=550;
-    g.setAttribute('x1',cx-Math.cos(a)*R);g.setAttribute('y1',cy-Math.sin(a)*R);g.setAttribute('x2',cx+Math.cos(a)*R);g.setAttribute('y2',cy+Math.sin(a)*R);
-    target.setAttribute('fill',`url(#${linId})`);}}
+// 형태별 메시 radialGradient defs를 1회 생성
+const meshDefs=$('meshDefs');
+SHAPES.forEach((s,si)=>{s.cfg.color.points.forEach((pt,j)=>{
+  const g=document.createElementNS(SVGNS,'radialGradient'),id=`mg_${si}_${j}`;
+  g.setAttribute('id',id);g.setAttribute('gradientUnits','userSpaceOnUse');
+  g.setAttribute('cx',pt.pos[0]*1000);g.setAttribute('cy',pt.pos[1]*1000);g.setAttribute('r',Math.max(8,pt.radius*1000));
+  const w=Math.min(1,pt.weight);
+  g.innerHTML=`<stop offset="0" stop-color="${pt.color}" stop-opacity="${w.toFixed(2)}"/><stop offset="0.55" stop-color="${pt.color}" stop-opacity="${(0.75*w).toFixed(2)}"/><stop offset="1" stop-color="${pt.color}" stop-opacity="0"/>`;
+  meshDefs.appendChild(g);});});
+function fillMesh(group,si){group.innerHTML='';SHAPES[si].cfg.color.points.forEach((pt,j)=>{
+  const r=document.createElementNS(SVGNS,'rect');r.setAttribute('x',0);r.setAttribute('y',0);r.setAttribute('width',1000);r.setAttribute('height',1000);
+  r.setAttribute('fill',`url(#mg_${si}_${j})`);group.appendChild(r);});}
 
-const $=id=>document.getElementById(id);
-const glowA=$('glowA'),glowB2=$('glowB2'),formA=$('formA'),formB=$('formB');
-const glowB=$('glowB'),formB_=$('formB'),glowBlur=$('glowB'),formBlur=$('formB'),grainM=$('grainM'),grainClipP=$('grainClipP');
 const lbl=$('lbl');
-let seqIdx=0,t0=performance.now(),playing=true,manualNext=false;
+let seqIdx=0,t0=performance.now(),playing=true,manualNext=false,lastA=-1,lastB=-1,lastNow=t0;
 const leg=i=>ORDER[i%ORDER.length],transOf=i=>CFG.morphSequence.transitions[i%CFG.morphSequence.transitions.length];
 
 function frame(now){
+  if(!playing){t0+=now-lastNow;}lastNow=now;  // 일시정지: elapsed 동결
   const tr=transOf(seqIdx),dur=tr.durationMs,hold=CFG.globalMotion.holdDurationMs,total=dur+hold;
   let elapsed=now-t0;if(manualNext){elapsed=total;manualNext=false;}
-  const te=ease(Math.min(elapsed/dur,1));
-  const A=SHAPES[leg(seqIdx)],B=SHAPES[leg(seqIdx+1)];
-  const geom=lerpPts(A.pts,B.pts,te),d=buildPath(geom,now);
-  const ra=A.cfg.render,rb=B.cfg.render;
+  const te=ease(Math.min(elapsed/dur,1)),ia=leg(seqIdx),ib=leg(seqIdx+1),A=SHAPES[ia],B=SHAPES[ib];
+  const geom=lerpPts(A.pts,B.pts,te),d=buildPath(geom,now),ra=A.cfg.render,rb=B.cfg.render;
 
-  // 보간된 렌더 파라미터
-  const feather=lerp(ra.edgeFeather,rb.edgeFeather,te)*1000;
-  const glowSpread=lerp(ra.glow.spread,rb.glow.spread,te)*1000;
-  const contrast=lerp(ra.interiorContrast,rb.interiorContrast,te);
-  const grain=lerp(ra.grain,rb.grain,te);
-  document.getElementById('glowB').setAttribute('stdDeviation',glowSpread.toFixed(1));
-  document.getElementById('formB').setAttribute('stdDeviation',Math.max(2,feather).toFixed(1));
-  grainM.setAttribute('values',`0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${grain.toFixed(3)} 0`);
-  grainClipP.setAttribute('d',d);
+  if(ia!==lastA){fillMesh($('meshA'),ia);$('baseA').setAttribute('fill',A.cfg.color.dominant);lastA=ia;}
+  if(ib!==lastB){fillMesh($('meshB'),ib);$('baseB').setAttribute('fill',B.cfg.color.dominant);lastB=ib;}
 
-  // 글로우 헤일로 (dominant 컬러, 크로스페이드)
-  glowA.setAttribute('d',d);glowB2.setAttribute('d',d);
-  glowA.setAttribute('fill',A.cfg.color.dominant||'#fff');glowB2.setAttribute('fill',B.cfg.color.dominant||'#fff');
-  glowA.setAttribute('opacity',(ra.glow.opacity*(1-te)).toFixed(3));
-  glowB2.setAttribute('opacity',(rb.glow.opacity*te).toFixed(3));
+  $('clipPath').setAttribute('d',d);
+  $('glowA').setAttribute('d',d);$('glowB2').setAttribute('d',d);
+  $('glowA').setAttribute('fill',A.cfg.color.dominant);$('glowB2').setAttribute('fill',B.cfg.color.dominant);
+  $('glowA').setAttribute('opacity',(ra.glow.opacity*(1-te)).toFixed(3));$('glowB2').setAttribute('opacity',(rb.glow.opacity*te).toFixed(3));
+  $('baseA').parentNode.setAttribute('opacity','1');
+  $('meshA').setAttribute('opacity',(A.cfg.opacity*(1-te)).toFixed(3));$('baseA').setAttribute('opacity',(A.cfg.opacity*(1-te)).toFixed(3));
+  $('meshB').setAttribute('opacity',(B.cfg.opacity*te).toFixed(3));$('baseB').setAttribute('opacity',(B.cfg.opacity*te).toFixed(3));
 
-  // 선명한 폼 + 채도 그라디언트 (크로스페이드)
-  formA.setAttribute('d',d);formB.setAttribute('d',d);
-  setGradient('gA','gAr',A.cfg.color,contrast,formA);
-  setGradient('gB','gBr',B.cfg.color,contrast,formB);
-  formA.setAttribute('opacity',(A.cfg.opacity*(1-te)).toFixed(3));
-  formB.setAttribute('opacity',(B.cfg.opacity*te).toFixed(3));
+  $('glowB').setAttribute('stdDeviation',(lerp(ra.glow.spread,rb.glow.spread,te)*1000).toFixed(1));
+  $('featherB').setAttribute('stdDeviation',Math.max(2,lerp(ra.edgeFeather,rb.edgeFeather,te)*1000).toFixed(1));
+  $('grainM').setAttribute('values',`0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${lerp(ra.grain,rb.grain,te).toFixed(3)} 0`);
 
-  // breathing
   const bm=CFG.globalMotion.breathing,bt=(now/bm.periodMs)*TAU;
-  const sc=1+(bm.scaleRange[1]-bm.scaleRange[0])*0.5*Math.sin(bt),rot=bm.rotationRange[1]*Math.sin(bt*0.7);
-  $('scene').setAttribute('transform',`translate(500,500) scale(${sc.toFixed(3)}) rotate(${rot.toFixed(2)}) translate(-500,-500)`);
+  const scl=1+(bm.scaleRange[1]-bm.scaleRange[0])*0.5*Math.sin(bt),rot=bm.rotationRange[1]*Math.sin(bt*0.7);
+  $('scene').setAttribute('transform',`translate(500,500) scale(${scl.toFixed(3)}) rotate(${rot.toFixed(2)}) translate(-500,-500)`);
 
   lbl.textContent=`${A.cfg.label}  →  ${B.cfg.label}`;
   if(elapsed>=total){seqIdx=(seqIdx+1)%ORDER.length;t0=now;}
-  if(playing||manualNext)requestAnimationFrame(frame);else requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-$('pp').onclick=function(){playing=!playing;this.textContent=playing?'Pause':'Play';if(playing){t0=performance.now();requestAnimationFrame(frame);}};
-$('nx').onclick=()=>{manualNext=true;if(!playing)requestAnimationFrame(frame);};
+$('pp').onclick=function(){playing=!playing;this.textContent=playing?'Pause':'Play';};
+$('nx').onclick=()=>{manualNext=true;};
 </script>
 </body>
 </html>

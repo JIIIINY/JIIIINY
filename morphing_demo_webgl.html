@@ -6,7 +6,7 @@
 <title>Organic Gradient Morphing — WebGL</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100%;background:#0B0E14;color:#cdd6e4;overflow:hidden;
+  html,body{height:100%;background:#0B0E16;color:#cdd6e4;overflow:hidden;
     font-family:-apple-system,"Helvetica Neue","Segoe UI",system-ui,sans-serif;}
   #c{position:fixed;inset:0;width:100%;height:100%;display:block;}
   .hud{position:fixed;left:22px;bottom:20px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;opacity:.7;pointer-events:none;}
@@ -23,6 +23,7 @@
 <div class="hud">WEBGL MORPH · <b id="lbl">—</b></div>
 <div class="ctrl"><button id="pp">Pause</button><button id="nx">Next ›</button></div>
 
+<script src="morphing_geometry.js"></script>
 <script src="morphing_config.js"></script>
 <script id="vs" type="x-shader/x-vertex">
 attribute vec2 aPos; void main(){ gl_Position=vec4(aPos,0.0,1.0); }
@@ -30,122 +31,76 @@ attribute vec2 aPos; void main(){ gl_Position=vec4(aPos,0.0,1.0); }
 <script id="fs" type="x-shader/x-fragment">
 precision highp float;
 #define NG 64
+#define MAXP 5
 uniform vec2  uRes;
 uniform float uTime;
-uniform sampler2D uPts;    // 64 x 1 — 현재 모핑된 경계점(16bit 인코딩)
-uniform sampler2D uGrad;   // 256 x 9 — 베이크 그라디언트
-uniform float uRowA, uRowB, uTe;
-uniform float uFeather, uGlowSpread, uGlowOpA, uGlowOpB, uGrain;
-uniform vec2  uCen;
-uniform float uTypeA, uTypeB, uAngA, uAngB;
+uniform sampler2D uPts;     // NG x 1 — 모핑된 경계점(16bit)
+uniform float uTe;
+uniform float uFeather, uGlowSpread, uGlowOpA, uGlowOpB, uGrain, uK;
 uniform vec3  uDomA, uDomB;
 uniform float uOpA, uOpB;
 uniform float uBScale, uBRot;
+uniform vec4  uPtsA[MAXP];   // xy=pos, z=radius, w=weight
+uniform vec3  uColA[MAXP];
+uniform vec4  uPtsB[MAXP];
+uniform vec3  uColB[MAXP];
+uniform int   uNA, uNB;
 
-const float TAU=6.28318530718;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-
-vec2 getPt(float i){
-  vec4 t=texture2D(uPts, vec2((i+0.5)/float(NG), 0.5));
-  return vec2((t.r*65280.0+t.g*255.0)/65535.0, (t.b*65280.0+t.a*255.0)/65535.0);
-}
-// 오목 형태 지원 폴리곤 SDF (Inigo Quilez). 음수=내부.
-float sdPoly(vec2 p){
-  vec2 vj=getPt(float(NG-1));
-  float d=dot(p-vj,p-vj), s=1.0;
-  for(int i=0;i<NG;i++){
-    vec2 vi=getPt(float(i));
-    vec2 e=vj-vi, w=p-vi;
-    vec2 b=w-e*clamp(dot(w,e)/dot(e,e),0.0,1.0);
-    d=min(d,dot(b,b));
-    bvec3 c=bvec3(p.y>=vi.y, p.y<vj.y, e.x*w.y>e.y*w.x);
-    if(all(c)||all(not(c))) s=-s;
-    vj=vi;
-  }
-  return s*sqrt(d);
-}
-vec3 gradCol(float row, float t){ return texture2D(uGrad, vec2(clamp(t,0.0,1.0), row)).rgb; }
-float gradT(vec2 d, float dist, float gtype, float gang){
-  return (gtype>0.5) ? clamp(dist/0.5,0.0,1.0)
-                     : dot(d, vec2(cos(gang),sin(gang)))/0.9 + 0.5;
-}
+vec2 getPt(float i){vec4 t=texture2D(uPts,vec2((i+0.5)/float(NG),0.5));
+  return vec2((t.r*65280.0+t.g*255.0)/65535.0,(t.b*65280.0+t.a*255.0)/65535.0);}
+float sdPoly(vec2 p){           // 오목 형태 지원 폴리곤 SDF
+  vec2 vj=getPt(float(NG-1));float d=dot(p-vj,p-vj),s=1.0;
+  for(int i=0;i<NG;i++){vec2 vi=getPt(float(i));vec2 e=vj-vi,w=p-vi;
+    vec2 b=w-e*clamp(dot(w,e)/dot(e,e),0.0,1.0);d=min(d,dot(b,b));
+    bvec3 c=bvec3(p.y>=vi.y,p.y<vj.y,e.x*w.y>e.y*w.x);if(all(c)||all(not(c)))s=-s;vj=vi;}
+  return s*sqrt(d);}
+vec3 meshColor(vec2 uv, vec4 pts[MAXP], vec3 cols[MAXP], int n, vec3 dom){
+  vec3 acc=dom*0.16;float wsum=0.16;     // base = dominant(소량) → 빈틈 보정
+  for(int i=0;i<MAXP;i++){ if(i>=n) break;
+    vec2 d=uv-pts[i].xy;float r=max(pts[i].z,1e-3);
+    float w=pts[i].w*exp(-uK*dot(d,d)/(r*r));
+    acc+=cols[i]*w;wsum+=w;}
+  return acc/wsum;}
 
 void main(){
   vec2 q=(gl_FragCoord.xy-0.5*uRes)/min(uRes.x,uRes.y);
-  float cs=cos(uBRot), sn=sin(uBRot);
-  q=mat2(cs,-sn,sn,cs)*(q/uBScale);
+  float cs=cos(uBRot),sn=sin(uBRot);q=mat2(cs,-sn,sn,cs)*(q/uBScale);
   vec2 uv=q/0.86+0.5;
 
   float sd=sdPoly(uv);
-  vec2 d=uv-uCen; float dist=length(d);
-
-  // (2) 선명한 폼: 얇은 페더 엣지 + 채도 그라디언트(A/B 크로스페이드)
   float fe=uFeather;
-  float formCov=smoothstep(fe, -fe, sd);
-  vec3 colA=gradCol(uRowA, gradT(d,dist,uTypeA,uAngA));
-  vec3 colB=gradCol(uRowB, gradT(d,dist,uTypeB,uAngB));
+  float formCov=smoothstep(fe,-fe,sd);
+  vec3 colA=meshColor(uv,uPtsA,uColA,uNA,uDomA);
+  vec3 colB=meshColor(uv,uPtsB,uColB,uNB,uDomB);
   vec3 formCol=mix(colA,colB,uTe);
 
-  // (1) 글로우 헤일로: 형태 바깥으로 부드럽게 falloff (form과 분리)
   float glow=exp(-max(sd,0.0)/uGlowSpread);
   float glowOp=mix(uGlowOpA,uGlowOpB,uTe);
   vec3 glowCol=mix(uDomA,uDomB,uTe);
 
   float op=mix(uOpA,uOpB,uTe);
-  vec3 acc = glowCol*glow*glowOp + formCol*formCov*op;
-
-  vec3 bg=vec3(0.043,0.055,0.078);
-  vec3 outc=1.0-(1.0-bg)*(1.0-acc);              // screen
-
-  // (3) 그레인 — 폼 내부에 한정
-  float gnz=(hash(gl_FragCoord.xy+fract(uTime))-0.5);
-  outc += gnz*uGrain*smoothstep(fe,-fe,sd);
-
-  float vig=smoothstep(1.05,0.35,length(q));     // 비네팅
-  outc*=mix(0.5,1.0,vig);
+  vec3 acc=glowCol*glow*glowOp + formCol*formCov*op;
+  vec3 bg=vec3(0.043,0.055,0.086);
+  vec3 outc=1.0-(1.0-bg)*(1.0-acc);
+  outc += (hash(gl_FragCoord.xy+fract(uTime))-0.5)*uGrain*smoothstep(fe,-fe,sd);
+  float vig=smoothstep(1.05,0.35,length(q));outc*=mix(0.5,1.0,vig);
   gl_FragColor=vec4(outc,1.0);
 }
 </script>
 <script>
-const CFG=window.MORPH_CONFIG, N=128, NG=64, ANG=256, TAU=Math.PI*2;
-const centroid=p=>{let x=0,y=0;for(const q of p){x+=q[0];y+=q[1];}return[x/p.length,y/p.length];};
-function sampleClosed(ctrl){const m=ctrl.length,dense=[],steps=24;
-  for(let i=0;i<m;i++){const p0=ctrl[(i-1+m)%m],p1=ctrl[i],p2=ctrl[(i+1)%m],p3=ctrl[(i+2)%m];
-    for(let s=0;s<steps;s++){const t=s/steps,t2=t*t,t3=t2*t;dense.push([
-      0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
-      0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)]);}}
-  return resample(dense,NG);}
-function resample(poly,n){const acc=[0];let total=0;for(let i=1;i<poly.length;i++){total+=Math.hypot(poly[i][0]-poly[i-1][0],poly[i][1]-poly[i-1][1]);acc.push(total);}
-  const out=[];for(let i=0;i<n;i++){const d=(i/n)*total;let k=1;while(k<acc.length&&acc[k]<d)k++;
-    const a=acc[k-1],b=acc[k]||total,t=(b-a)?(d-a)/(b-a):0,p0=poly[k-1],p1=poly[k%poly.length];
-    out.push([p0[0]+(p1[0]-p0[0])*t,p0[1]+(p1[1]-p0[1])*t]);}return out;}
-function sampleStar(star){const c=[0.5,0.5],out=[];for(let i=0;i<NG;i++){const a=(i/NG)*TAU,k=Math.abs(Math.cos(2*a)),spike=Math.pow(k,1+star.spikeSharpness*8);
-  const r=star.innerRadius+(star.outerRadius-star.innerRadius)*spike;out.push([c[0]+Math.cos(a)*r,c[1]+Math.sin(a)*r]);}return out;}
-function sampleMetaballs(balls){let cx=0,cy=0;for(const b of balls){cx+=b.center[0];cy+=b.center[1];}cx/=balls.length;cy/=balls.length;
-  const out=[];for(let i=0;i<NG;i++){const a=(i/NG)*TAU,dx=Math.cos(a),dy=Math.sin(a);let rmax=0;
-    for(const b of balls){const ox=b.center[0]-cx,oy=b.center[1]-cy,proj=ox*dx+oy*dy,perp2=(ox*ox+oy*oy)-proj*proj;
-      if(perp2<=b.radius*b.radius){const reach=proj+Math.sqrt(b.radius*b.radius-perp2);if(reach>rmax)rmax=reach;}}
-    rmax*=1.12;out.push([cx+dx*rmax,cy+dy*rmax]);}return out;}
-function signedArea(p){let a=0;for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length];a+=p[i][0]*q[1]-q[0]*p[i][1];}return a/2;}
-function stabilize(pts){if(signedArea(pts)<0)pts=pts.slice().reverse();let best=0,bx=-1e9;for(let i=0;i<pts.length;i++)if(pts[i][0]>bx){bx=pts[i][0];best=i;}return pts.slice(best).concat(pts.slice(0,best));}
-function shapeToPoints(s){const f=s.form;let pts;if(f.star)pts=sampleStar(f.star);else if(f.metaballs)pts=sampleMetaballs(f.metaballs);else pts=sampleClosed(f.blob.controlPoints);return stabilize(pts);}
-function hexToRgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
-function boostColor(rgb,k){const L=(Math.max(...rgb)+Math.min(...rgb))/2;return rgb.map(v=>Math.max(0,Math.min(255,L+(v-L)*k)));}
-function bakeGradient(color,contrast){const out=new Uint8Array(ANG*3),stops=color.stops;
-  for(let i=0;i<ANG;i++){const t=i/(ANG-1);let a=stops[0],b=stops[stops.length-1];
-    for(let k=0;k<stops.length-1;k++){if(t>=stops[k].offset&&t<=stops[k+1].offset){a=stops[k];b=stops[k+1];break;}}
-    const span=(b.offset-a.offset)||1,lt=Math.max(0,Math.min(1,(t-a.offset)/span));
-    const ca=boostColor(hexToRgb(a.color),contrast),cb=boostColor(hexToRgb(b.color),contrast);
-    out[i*3]=ca[0]+(cb[0]-ca[0])*lt;out[i*3+1]=ca[1]+(cb[1]-ca[1])*lt;out[i*3+2]=ca[2]+(cb[2]-ca[2])*lt;}
-  return out;}
-
-const SHAPES=CFG.shapes.map(s=>({cfg:s,pts:shapeToPoints(s),
-  type:s.color.type==='radial-gradient'?1:0, ang:(s.color.angle||0)*Math.PI/180,
-  dom:hexToRgb(s.color.dominant||'#ffffff').map(v=>v/255)}));
+const CFG=window.MORPH_CONFIG,G=window.MorphGeo,NG=64,MAXP=5,TAU=Math.PI*2;
+const {lerpPts,ease,lerp,centroid}=G;
+function hexRgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255];}
+const SHAPES=CFG.shapes.map(s=>{
+  const pts=G.shapeToPoints(s,NG);
+  const cp=s.color.points,n=cp.length;
+  const ptsArr=new Float32Array(MAXP*4),colArr=new Float32Array(MAXP*3);
+  for(let i=0;i<n;i++){ptsArr[i*4]=cp[i].pos[0];ptsArr[i*4+1]=cp[i].pos[1];ptsArr[i*4+2]=cp[i].radius;ptsArr[i*4+3]=cp[i].weight;
+    const c=hexRgb(cp[i].color);colArr[i*3]=c[0];colArr[i*3+1]=c[1];colArr[i*3+2]=c[2];}
+  return {cfg:s,pts,ptsArr,colArr,n,dom:hexRgb(s.color.dominant||'#888')};});
 const ORDER=CFG.morphSequence.order.map(id=>SHAPES.findIndex(s=>s.cfg.id===id));
 const noiseSeed=Array.from({length:NG},(_,i)=>[Math.sin(i*12.9898)*43758.5453%1,Math.cos(i*78.233)*12543.21%1]);
-const lerpPts=(a,b,t)=>a.map((p,i)=>[p[0]+(b[i][0]-p[0])*t,p[1]+(b[i][1]-p[1])*t]);
-const ease=u=>u<0.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2,lerp=(a,b,t)=>a+(b-a)*t;
 
 const cv=document.getElementById('c');
 const gl=cv.getContext('webgl')||cv.getContext('experimental-webgl');
@@ -160,77 +115,61 @@ gl.useProgram(prog);
 const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 const aPos=gl.getAttribLocation(prog,'aPos');gl.enableVertexAttribArray(aPos);gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
 
-// 그라디언트 텍스처 (256 x 9, 대비 부스트 베이크)
-const gradData=new Uint8Array(ANG*SHAPES.length*3);
-SHAPES.forEach((s,i)=>gradData.set(bakeGradient(s.cfg.color,s.cfg.render.interiorContrast), i*ANG*3));
-const gradTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,gradTex);
-gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,ANG,SHAPES.length,0,gl.RGB,gl.UNSIGNED_BYTE,gradData);
-gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-
-// 경계점 텍스처 (NG x 1, 매 프레임 갱신, 16bit 인코딩)
-const ptData=new Uint8Array(NG*4);
-const ptTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,ptTex);
-gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,NG,1,0,gl.RGBA,gl.UNSIGNED_BYTE,ptData);
+const ptData=new Uint8Array(NG*4),ptTex=gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D,ptTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,NG,1,0,gl.RGBA,gl.UNSIGNED_BYTE,ptData);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 function enc16(v){v=Math.max(0,Math.min(1,v));const u=Math.round(v*65535);return[(u>>8)&255,u&255];}
 function uploadPts(pts){for(let i=0;i<NG;i++){const x=enc16(pts[i][0]),y=enc16(pts[i][1]);ptData[i*4]=x[0];ptData[i*4+1]=x[1];ptData[i*4+2]=y[0];ptData[i*4+3]=y[1];}
-  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,ptTex);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,NG,1,gl.RGBA,gl.UNSIGNED_BYTE,ptData);}
-
+  gl.bindTexture(gl.TEXTURE_2D,ptTex);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,NG,1,gl.RGBA,gl.UNSIGNED_BYTE,ptData);}
 gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,ptTex);
-gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,gradTex);
+
 const U=n=>gl.getUniformLocation(prog,n),u={};
-['uRes','uTime','uPts','uGrad','uRowA','uRowB','uTe','uFeather','uGlowSpread','uGlowOpA','uGlowOpB','uGrain','uCen','uTypeA','uTypeB','uAngA','uAngB','uDomA','uDomB','uOpA','uOpB','uBScale','uBRot'].forEach(n=>u[n]=U(n));
-gl.uniform1i(u.uPts,0);gl.uniform1i(u.uGrad,1);
+['uRes','uTime','uPts','uTe','uFeather','uGlowSpread','uGlowOpA','uGlowOpB','uGrain','uK','uDomA','uDomB','uOpA','uOpB','uBScale','uBRot','uPtsA','uColA','uPtsB','uColB','uNA','uNB'].forEach(n=>u[n]=U(n));
+gl.uniform1i(u.uPts,0);gl.uniform1f(u.uK,CFG.canvas.colorModel.k||2.6);
 
 let DPR;function resize(){DPR=Math.min(window.devicePixelRatio||1,2);cv.width=innerWidth*DPR;cv.height=innerHeight*DPR;
   cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';gl.viewport(0,0,cv.width,cv.height);}
 addEventListener('resize',resize);resize();
 
 const lbl=document.getElementById('lbl');
-let seqIdx=0,t0=performance.now(),playing=true,manualNext=false;
+let seqIdx=0,t0=performance.now(),playing=true,manualNext=false,lastNow=t0;
 const leg=i=>ORDER[i%ORDER.length],transOf=i=>CFG.morphSequence.transitions[i%CFG.morphSequence.transitions.length];
 
 function frame(now){
+  if(!playing){t0+=now-lastNow;}lastNow=now;
   const tr=transOf(seqIdx),dur=tr.durationMs,hold=CFG.globalMotion.holdDurationMs,total=dur+hold;
   let elapsed=now-t0;if(manualNext){elapsed=total;manualNext=false;}
   const te=ease(Math.min(elapsed/dur,1)),A=SHAPES[leg(seqIdx)],B=SHAPES[leg(seqIdx+1)];
   const ra=A.cfg.render,rb=B.cfg.render;
-
-  // 모핑된 경계점 + 유기적 노이즈 → 업로드
   const n=CFG.globalMotion.organicNoise,ph=now*0.001*n.speed*TAU;
   const geom=lerpPts(A.pts,B.pts,te).map((p,i)=>[
     p[0]+Math.sin(ph+noiseSeed[i][0]*TAU)*n.amplitude*0.16,
     p[1]+Math.cos(ph*1.3+noiseSeed[i][1]*TAU)*n.amplitude*0.16]);
   uploadPts(geom);
-  const cen=centroid(geom);
 
   const bm=CFG.globalMotion.breathing,bt=(now/bm.periodMs)*TAU;
   const sc=1+(bm.scaleRange[1]-bm.scaleRange[0])*0.5*Math.sin(bt),rot=bm.rotationRange[1]*Math.sin(bt*0.7)*Math.PI/180;
 
-  gl.uniform2f(u.uRes,cv.width,cv.height);gl.uniform1f(u.uTime,now*0.001);
-  gl.uniform1f(u.uRowA,(leg(seqIdx)+0.5)/SHAPES.length);gl.uniform1f(u.uRowB,(leg(seqIdx+1)+0.5)/SHAPES.length);
-  gl.uniform1f(u.uTe,te);
+  gl.uniform2f(u.uRes,cv.width,cv.height);gl.uniform1f(u.uTime,now*0.001);gl.uniform1f(u.uTe,te);
   gl.uniform1f(u.uFeather,lerp(ra.edgeFeather,rb.edgeFeather,te));
   gl.uniform1f(u.uGlowSpread,lerp(ra.glow.spread,rb.glow.spread,te));
   gl.uniform1f(u.uGlowOpA,ra.glow.opacity);gl.uniform1f(u.uGlowOpB,rb.glow.opacity);
   gl.uniform1f(u.uGrain,lerp(ra.grain,rb.grain,te));
-  gl.uniform2f(u.uCen,cen[0],cen[1]);
-  gl.uniform1f(u.uTypeA,A.type);gl.uniform1f(u.uTypeB,B.type);
-  gl.uniform1f(u.uAngA,A.ang);gl.uniform1f(u.uAngB,B.ang);
-  gl.uniform3f(u.uDomA,A.dom[0],A.dom[1],A.dom[2]);gl.uniform3f(u.uDomB,B.dom[0],B.dom[1],B.dom[2]);
+  gl.uniform3fv(u.uDomA,A.dom);gl.uniform3fv(u.uDomB,B.dom);
   gl.uniform1f(u.uOpA,A.cfg.opacity);gl.uniform1f(u.uOpB,B.cfg.opacity);
   gl.uniform1f(u.uBScale,sc);gl.uniform1f(u.uBRot,rot);
+  gl.uniform4fv(u.uPtsA,A.ptsArr);gl.uniform3fv(u.uColA,A.colArr);gl.uniform1i(u.uNA,A.n);
+  gl.uniform4fv(u.uPtsB,B.ptsArr);gl.uniform3fv(u.uColB,B.colArr);gl.uniform1i(u.uNB,B.n);
 
   gl.drawArrays(gl.TRIANGLES,0,3);
   lbl.textContent=`${A.cfg.label}  →  ${B.cfg.label}`;
   if(elapsed>=total){seqIdx=(seqIdx+1)%ORDER.length;t0=now;}
-  if(playing)requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-document.getElementById('pp').onclick=function(){playing=!playing;this.textContent=playing?'Pause':'Play';if(playing){t0=performance.now();requestAnimationFrame(frame);}};
-document.getElementById('nx').onclick=()=>{manualNext=true;if(!playing){playing=true;document.getElementById('pp').textContent='Pause';requestAnimationFrame(frame);}};
+document.getElementById('pp').onclick=function(){playing=!playing;this.textContent=playing?'Pause':'Play';};
+document.getElementById('nx').onclick=()=>{manualNext=true;};
 </script>
 </body>
 </html>

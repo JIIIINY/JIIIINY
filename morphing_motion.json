@@ -1,72 +1,40 @@
 {
-  "$schema": "morphing-motion/v1",
+  "$schema": "morphing-motion/v2",
   "meta": {
     "name": "Organic Gradient Morphing Motion",
-    "description": "AI agent 모션 시스템 — 9개의 그라디언트 형태를 유기적으로 끊김 없이 몰핑(morph)하며 순환. 형태(form), 컬러(color), 컨트라스트(contrast)를 각 상태별로 정의하고, 부드러운 베지어/노이즈 기반 전이로 살아 움직이는 듯한 인상을 만든다.",
-    "source": "IMG_9912.jpeg (9-grid gradient shape reference)",
+    "description": "9개 그라디언트 형태를 유기적으로 몰핑하는 AI agent 모션. 고해상도 레퍼런스 재분석 기반 — 색은 1D 스톱이 아니라 형태 내부에 위치를 가진 색점들의 메시(mesh) 그라디언트로 정의한다. 형태별로 엣지 선명도/블러 영역/그레인이 다르다.",
+    "source": "IMG_9912 (9-grid) + IMG_9915/9916/9917/9920 (closeups)",
     "author": "@danielsmile (reference) / generated config",
     "created": "2026-06-20",
-    "units": { "space": "normalized 0..1 (viewbox)", "time": "ms", "angle": "deg" }
+    "units": { "space": "normalized 0..1 (shape-local)", "time": "ms", "angle": "deg" }
   },
 
   "canvas": {
     "viewBox": [0, 0, 1000, 1000],
     "aspectRatio": "1:1",
-    "background": {
-      "type": "solid",
-      "color": "#0B0E14",
-      "vignette": { "enabled": true, "color": "#05070B", "strength": 0.45, "radius": 0.85 }
-    },
+    "background": { "type": "solid", "color": "#0B0E16",
+      "vignette": { "enabled": true, "color": "#05070B", "strength": 0.45, "radius": 0.85 } },
     "renderHints": {
-      "colorSpace": "display-p3",
-      "blendMode": "screen",
-      "filmGrain": { "enabled": true, "opacity": 0.09, "scale": 1.4 },
-      "globalBlur": { "min": 8, "max": 60, "unit": "px" }
+      "colorSpace": "display-p3", "blendMode": "screen",
+      "filmGrain": { "enabled": true, "opacity": 0.10, "scale": 1.4 }
+    },
+    "colorModel": {
+      "type": "mesh-rbf",
+      "comment": "픽셀 색 = Σ wᵢ·cᵢ / Σ wᵢ,  wᵢ = weightᵢ·exp(-k·(d/radiusᵢ)²). 색점을 형태 안 2D 위치에 배치해 화이트 코어+다방향 색(예: SHAPES 37)을 재현. SVG/Canvas는 색점을 color→transparent 소프트 라디얼로 edge→core 순서로 스택하여 근사.",
+      "k": 2.6, "pointOrder": "edge-first → core-last (밝은 코어가 위에 쌓이도록)"
     },
     "renderModel": {
-      "comment": "핵심: 단일 가우시안 블러를 형태 전체에 먹이지 말 것. 세 영역을 분리한다.",
-      "layers": [
-        { "name": "glow",  "role": "형태 뒤로 깔리는 부드러운 헤일로(블러 영역). dominant 컬러, 큰 spread, 낮은 opacity. 형태와 분리됨." },
-        { "name": "form",  "role": "선명한 실루엣 + 채도 높은 내부 그라디언트. 얇은 edgeFeather만 적용해 형태가 또렷이 읽혀야 함. 내부 색은 블러로 뭉개지지 않음." },
-        { "name": "grain", "role": "표면 노이즈 텍스처. 그라디언트 위에 overlay로 얹어 디테일/질감 부여." }
-      ],
-      "params": {
-        "edgeFeather": "실루엣 경계 부드러움(뷰박스 비율 0..1). 작을수록 또렷. SHAPES 37처럼 형태가 선명한 것은 0.01 근처, 구름 군집은 0.045.",
-        "interiorContrast": "내부 그라디언트 채도/대비 배율(>1 강조). 색이 회색으로 죽지 않게.",
-        "glow": "{ spread(헤일로 반경 0..1), opacity }. form과 독립적인 블러 영역.",
-        "grain": "노이즈 강도 0..1"
-      }
+      "comment": "세 영역 분리: (1)glow 헤일로(블러 영역, 형태와 독립) (2)form(선명 실루엣+메시 색, 얇은 페더) (3)grain 표면 노이즈.",
+      "params": "edgeFeather(실루엣 부드러움 0..1), glow{spread,opacity}, grain(0..1)"
     }
   },
 
   "globalMotion": {
-    "loop": true,
-    "direction": "forward",
-    "playbackRate": 1.0,
-    "morphDurationMs": 2600,
-    "holdDurationMs": 1400,
+    "loop": true, "playbackRate": 1.0, "morphDurationMs": 2600, "holdDurationMs": 1400,
     "easing": "cubic-bezier(0.65, 0.0, 0.35, 1.0)",
-    "organicNoise": {
-      "enabled": true,
-      "type": "simplex",
-      "amplitude": 0.06,
-      "frequency": 0.45,
-      "speed": 0.12,
-      "seed": 9912,
-      "comment": "정점(control point)을 미세하게 흔들어 액체/연기 같은 유기적 흐름 부여"
-    },
-    "breathing": {
-      "enabled": true,
-      "scaleRange": [0.96, 1.05],
-      "rotationRange": [-6, 6],
-      "periodMs": 5200
-    },
-    "colorDrift": {
-      "enabled": true,
-      "hueShiftRange": [-12, 12],
-      "periodMs": 8000,
-      "comment": "전이 중간에도 색상이 천천히 흘러 정적이지 않게 함"
-    }
+    "organicNoise": { "enabled": true, "type": "simplex", "amplitude": 0.05, "speed": 0.12, "seed": 9912,
+      "comment": "정점을 미세하게 흔들어 액체/연기 같은 흐름" },
+    "breathing": { "enabled": true, "scaleRange": [0.96, 1.05], "rotationRange": [-6, 6], "periodMs": 5200 }
   },
 
   "shapes": [
@@ -74,82 +42,38 @@
       "id": "01_gradient_blur",
       "label": "GRADIENT BLUR",
       "form": {
-        "archetype": "swoosh-crescent",
-        "topology": "open-stroke",
-        "description": "초승달처럼 휘어진 붓터치/날개. 좌하단에서 우상단으로 쓸어 올린 곡선, 끝이 가늘어짐.",
-        "blob": {
-          "points": 6,
-          "controlPoints": [
-            [0.18, 0.62], [0.30, 0.40], [0.52, 0.30],
-            [0.70, 0.34], [0.55, 0.50], [0.32, 0.66]
-          ],
-          "tension": 0.85,
-          "elongation": 1.6,
-          "rotation": -18
-        }
+        "archetype": "swoosh-crescent", "topology": "open-stroke",
+        "description": "위로 쓸어올린 붓터치/날개. 방향성 모션블러.",
+        "blob": { "points": 6, "controlPoints": [
+          [0.18,0.62],[0.30,0.40],[0.52,0.30],[0.70,0.34],[0.55,0.50],[0.32,0.66]
+        ], "rotation": -18 }
       },
-      "color": {
-        "type": "linear-gradient",
-        "angle": 35,
-        "stops": [
-          { "offset": 0.00, "color": "#2A0E3A" },
-          { "offset": 0.35, "color": "#7A1E6E" },
-          { "offset": 0.65, "color": "#D6489A" },
-          { "offset": 0.88, "color": "#FBC8D8" },
-          { "offset": 1.00, "color": "#FFFFFF" }
-        ],
-        "dominant": "#B0327F"
-      },
-      "contrast": {
-        "level": "high",
-        "ratio": 0.82,
-        "highlight": "#FFFFFF",
-        "shadow": "#1A0824",
-        "edgeGlow": { "color": "#FFD9EC", "intensity": 0.7 }
-      },
-      "blur": 22,
-      "render": { "edgeFeather": 0.018, "interiorContrast": 1.20, "glow": { "spread": 0.08, "opacity": 0.55 }, "grain": 0.05 },
-      "opacity": 0.95
+      "color": { "type": "mesh", "dominant": "#B0327F", "points": [
+        { "pos": [0.30,0.62], "color": "#3A1A66", "radius": 0.46, "weight": 1.0 },
+        { "pos": [0.45,0.46], "color": "#C84D9E", "radius": 0.34, "weight": 1.1 },
+        { "pos": [0.60,0.37], "color": "#FBD0E0", "radius": 0.28, "weight": 1.2 },
+        { "pos": [0.66,0.32], "color": "#FFFFFF", "radius": 0.15, "weight": 1.4 }
+      ] },
+      "render": { "edgeFeather": 0.024, "glow": { "spread": 0.09, "opacity": 0.55 }, "grain": 0.06 },
+      "opacity": 0.96
     },
 
     {
       "id": "02_modern_gradient_blob",
       "label": "MODERN GRADIENT BLOB",
       "form": {
-        "archetype": "soft-orb",
-        "topology": "closed-blob",
-        "description": "둥근 유기체 방울. 약간 비대칭이며 상단이 더 채워진 형태.",
-        "blob": {
-          "points": 7,
-          "controlPoints": [
-            [0.50, 0.18], [0.74, 0.28], [0.80, 0.52],
-            [0.70, 0.74], [0.46, 0.80], [0.26, 0.66], [0.24, 0.38]
-          ],
-          "tension": 0.92,
-          "elongation": 1.05,
-          "rotation": 4
-        }
+        "archetype": "soft-orb", "topology": "closed-blob",
+        "description": "둥근 감자형 블롭, 약간 비대칭.",
+        "blob": { "points": 7, "controlPoints": [
+          [0.50,0.18],[0.74,0.28],[0.80,0.52],[0.70,0.74],[0.46,0.80],[0.26,0.66],[0.24,0.38]
+        ], "rotation": 4 }
       },
-      "color": {
-        "type": "radial-gradient",
-        "center": [0.58, 0.34],
-        "stops": [
-          { "offset": 0.00, "color": "#FF6A2C" },
-          { "offset": 0.42, "color": "#F4823C" },
-          { "offset": 0.75, "color": "#E9A878" },
-          { "offset": 1.00, "color": "#D9C2A8" }
-        ],
-        "dominant": "#F1813A"
-      },
-      "contrast": {
-        "level": "medium",
-        "ratio": 0.48,
-        "highlight": "#FFB07A",
-        "shadow": "#8A3A14",
-        "edgeGlow": { "color": "#FFC79A", "intensity": 0.4 }
-      },
-      "blur": 30,
-      "render": { "edgeFeather": 0.022, "interiorContrast": 1.15, "glow": { "spread": 0.10, "opacity": 0.42 }, "grain": 0.05 },
+      "color": { "type": "mesh", "dominant": "#F1813A", "points": [
+        { "pos": [0.40,0.70], "color": "#D99A6E", "radius": 0.45, "weight": 0.9 },
+        { "pos": [0.50,0.52], "color": "#E8612C", "radius": 0.45, "weight": 1.05 },
+        { "pos": [0.55,0.38], "color": "#F0512A", "radius": 0.40, "weight": 1.15 }
+      ] },
+      "render": { "edgeFeather": 0.032, "glow": { "spread": 0.10, "opacity": 0.42 }, "grain": 0.06 },
       "opacity": 0.97
     },
 
@@ -157,80 +81,42 @@
       "id": "03_modern_gradient_shapes_cloud",
       "label": "MODERN GRADIENT SHAPES",
       "form": {
-        "archetype": "metaball-cluster",
-        "topology": "multi-blob",
-        "description": "구름처럼 뭉친 부드러운 덩어리들. 3~4개의 원이 metaball로 연결된 클러스터.",
+        "archetype": "metaball-cluster", "topology": "multi-blob",
+        "description": "회전된 S/figure-8 구름 군집 + 우측 분리된 작은 퍼프.",
         "metaballs": [
-          { "center": [0.42, 0.30], "radius": 0.20 },
-          { "center": [0.60, 0.42], "radius": 0.18 },
-          { "center": [0.46, 0.58], "radius": 0.22 },
-          { "center": [0.64, 0.68], "radius": 0.16 }
-        ],
-        "fieldThreshold": 0.55,
-        "rotation": 0
-      },
-      "color": {
-        "type": "radial-gradient",
-        "center": [0.50, 0.45],
-        "stops": [
-          { "offset": 0.00, "color": "#9FB4D8" },
-          { "offset": 0.40, "color": "#6E84A8" },
-          { "offset": 0.70, "color": "#D89BB8" },
-          { "offset": 1.00, "color": "#3E4A66" }
-        ],
-        "dominant": "#7C8FB2"
-      },
-      "contrast": {
-        "level": "low",
-        "ratio": 0.30,
-        "highlight": "#C9D6EC",
-        "shadow": "#2A3247",
-        "edgeGlow": { "color": "#E6C2D6", "intensity": 0.25 }
-      },
-      "blur": 46,
-      "render": { "edgeFeather": 0.045, "interiorContrast": 1.10, "glow": { "spread": 0.13, "opacity": 0.45 }, "grain": 0.04 },
-      "opacity": 0.9
+          { "center": [0.42,0.30], "radius": 0.20 },
+          { "center": [0.58,0.40], "radius": 0.17 },
+          { "center": [0.50,0.58], "radius": 0.22 },
+          { "center": [0.66,0.66], "radius": 0.15 }
+        ], "fieldThreshold": 0.55 }
+      ,
+      "color": { "type": "mesh", "dominant": "#7C8FB2", "points": [
+        { "pos": [0.42,0.30], "color": "#6E86B8", "radius": 0.40, "weight": 1.0 },
+        { "pos": [0.55,0.62], "color": "#8AA0C8", "radius": 0.42, "weight": 1.0 },
+        { "pos": [0.48,0.46], "color": "#DE96AC", "radius": 0.22, "weight": 1.05 },
+        { "pos": [0.74,0.36], "color": "#9CC8C0", "radius": 0.16, "weight": 0.95 }
+      ] },
+      "render": { "edgeFeather": 0.060, "glow": { "spread": 0.13, "opacity": 0.40 }, "grain": 0.04 },
+      "opacity": 0.90
     },
 
     {
       "id": "04_gradient_shapes_15",
       "label": "GRADIENT SHAPES 15",
       "form": {
-        "archetype": "comma-hook",
-        "topology": "closed-blob",
-        "description": "쉼표/갈고리 형태. 좌상단이 두껍고 우하단으로 가늘게 휘어 내려가는 꼬리.",
-        "blob": {
-          "points": 6,
-          "controlPoints": [
-            [0.28, 0.28], [0.46, 0.34], [0.50, 0.54],
-            [0.62, 0.72], [0.40, 0.70], [0.24, 0.50]
-          ],
-          "tension": 0.8,
-          "elongation": 1.35,
-          "rotation": 12
-        }
+        "archetype": "comma-hook", "topology": "closed-blob",
+        "description": "두꺼운 초승달/캐슈 — 좌상 머리에서 우하 꼬리로.",
+        "blob": { "points": 6, "controlPoints": [
+          [0.28,0.28],[0.46,0.34],[0.50,0.54],[0.62,0.72],[0.40,0.70],[0.24,0.50]
+        ], "rotation": 12 }
       },
-      "color": {
-        "type": "linear-gradient",
-        "angle": 120,
-        "stops": [
-          { "offset": 0.00, "color": "#E8338C" },
-          { "offset": 0.30, "color": "#C04AB4" },
-          { "offset": 0.55, "color": "#F2B6C8" },
-          { "offset": 0.80, "color": "#6A4EC8" },
-          { "offset": 1.00, "color": "#2A36C0" }
-        ],
-        "dominant": "#C23FA0"
-      },
-      "contrast": {
-        "level": "high",
-        "ratio": 0.78,
-        "highlight": "#FBD3E2",
-        "shadow": "#1E1A55",
-        "edgeGlow": { "color": "#FF9ECF", "intensity": 0.6 }
-      },
-      "blur": 26,
-      "render": { "edgeFeather": 0.016, "interiorContrast": 1.20, "glow": { "spread": 0.08, "opacity": 0.50 }, "grain": 0.05 },
+      "color": { "type": "mesh", "dominant": "#C23FA0", "points": [
+        { "pos": [0.58,0.66], "color": "#3A40B0", "radius": 0.40, "weight": 1.0 },
+        { "pos": [0.50,0.56], "color": "#5A52C8", "radius": 0.30, "weight": 1.0 },
+        { "pos": [0.42,0.46], "color": "#F0C0D8", "radius": 0.24, "weight": 1.1 },
+        { "pos": [0.34,0.34], "color": "#E2479A", "radius": 0.30, "weight": 1.15 }
+      ] },
+      "render": { "edgeFeather": 0.030, "glow": { "spread": 0.09, "opacity": 0.50 }, "grain": 0.06 },
       "opacity": 0.96
     },
 
@@ -238,40 +124,19 @@
       "id": "05_modern_gradient_shapes_pebble",
       "label": "MODERN GRADIENT SHAPES",
       "form": {
-        "archetype": "rounded-triangle",
-        "topology": "closed-blob",
-        "description": "모서리가 둥근 삼각형/조약돌. 부피감 있는 넓은 형태.",
-        "blob": {
-          "points": 6,
-          "controlPoints": [
-            [0.50, 0.22], [0.74, 0.40], [0.72, 0.66],
-            [0.50, 0.78], [0.28, 0.64], [0.28, 0.40]
-          ],
-          "tension": 0.9,
-          "elongation": 1.1,
-          "rotation": -6
-        }
+        "archetype": "rounded-triangle", "topology": "closed-blob",
+        "description": "넓은 둥근 삼각/조약돌.",
+        "blob": { "points": 6, "controlPoints": [
+          [0.50,0.22],[0.74,0.40],[0.72,0.66],[0.50,0.78],[0.28,0.64],[0.28,0.40]
+        ], "rotation": -6 }
       },
-      "color": {
-        "type": "radial-gradient",
-        "center": [0.58, 0.50],
-        "stops": [
-          { "offset": 0.00, "color": "#F79A3C" },
-          { "offset": 0.35, "color": "#F0C06A" },
-          { "offset": 0.65, "color": "#7FA0C8" },
-          { "offset": 1.00, "color": "#4A6AA8" }
-        ],
-        "dominant": "#9A93A0"
-      },
-      "contrast": {
-        "level": "medium",
-        "ratio": 0.55,
-        "highlight": "#FFD08A",
-        "shadow": "#2E4068",
-        "edgeGlow": { "color": "#FFC474", "intensity": 0.45 }
-      },
-      "blur": 38,
-      "render": { "edgeFeather": 0.030, "interiorContrast": 1.25, "glow": { "spread": 0.11, "opacity": 0.42 }, "grain": 0.05 },
+      "color": { "type": "mesh", "dominant": "#9A93A0", "points": [
+        { "pos": [0.40,0.34], "color": "#6E8AC0", "radius": 0.42, "weight": 1.0 },
+        { "pos": [0.40,0.60], "color": "#5A78B8", "radius": 0.32, "weight": 0.95 },
+        { "pos": [0.50,0.66], "color": "#E8B85A", "radius": 0.28, "weight": 1.05 },
+        { "pos": [0.60,0.50], "color": "#F0913C", "radius": 0.30, "weight": 1.15 }
+      ] },
+      "render": { "edgeFeather": 0.036, "glow": { "spread": 0.10, "opacity": 0.42 }, "grain": 0.06 },
       "opacity": 0.95
     },
 
@@ -279,81 +144,38 @@
       "id": "06_modern_gradient_shapes_wisp",
       "label": "MODERN GRADIENT SHAPES",
       "form": {
-        "archetype": "flowing-ribbon",
-        "topology": "open-stroke",
-        "description": "수평으로 흐르는 가는 물결 리본/연기. 우상단 끝(오렌지)이 솟고, 가운데가 잘록한 S자 흐름.",
-        "blob": {
-          "points": 10,
-          "concave": true,
-          "controlPoints": [
-            [0.84, 0.38], [0.70, 0.33], [0.55, 0.45], [0.40, 0.42],
-            [0.26, 0.51], [0.16, 0.58], [0.28, 0.63], [0.44, 0.55],
-            [0.60, 0.60], [0.74, 0.47]
-          ],
-          "tension": 0.7,
-          "elongation": 2.1,
-          "rotation": -6
-        }
+        "archetype": "flowing-ribbon", "topology": "open-stroke",
+        "description": "길게 누운 S자 물결 리본. 좌측 통통, 우상단 끝 솟음.",
+        "blob": { "points": 10, "concave": true, "controlPoints": [
+          [0.84,0.38],[0.70,0.33],[0.55,0.45],[0.40,0.42],[0.26,0.51],
+          [0.16,0.58],[0.28,0.63],[0.44,0.55],[0.60,0.60],[0.74,0.47]
+        ], "rotation": -6 }
       },
-      "color": {
-        "type": "linear-gradient",
-        "angle": 10,
-        "stops": [
-          { "offset": 0.00, "color": "#3A4EA0" },
-          { "offset": 0.45, "color": "#5C78C8" },
-          { "offset": 0.78, "color": "#9AB0E0" },
-          { "offset": 0.92, "color": "#F0A24A" },
-          { "offset": 1.00, "color": "#FFC36A" }
-        ],
-        "dominant": "#5670BE"
-      },
-      "contrast": {
-        "level": "medium-high",
-        "ratio": 0.62,
-        "highlight": "#FFD08A",
-        "shadow": "#1E2A5C",
-        "edgeGlow": { "color": "#B6C8F0", "intensity": 0.5 }
-      },
-      "blur": 28,
-      "render": { "edgeFeather": 0.020, "interiorContrast": 1.20, "glow": { "spread": 0.09, "opacity": 0.42 }, "grain": 0.05 },
-      "opacity": 0.92
+      "color": { "type": "mesh", "dominant": "#5670BE", "points": [
+        { "pos": [0.30,0.56], "color": "#2E5BC0", "radius": 0.38, "weight": 1.0 },
+        { "pos": [0.50,0.50], "color": "#3D6FD6", "radius": 0.34, "weight": 1.05 },
+        { "pos": [0.66,0.46], "color": "#5B8FD6", "radius": 0.22, "weight": 1.0 },
+        { "pos": [0.80,0.40], "color": "#F0A348", "radius": 0.16, "weight": 1.2 }
+      ] },
+      "render": { "edgeFeather": 0.036, "glow": { "spread": 0.10, "opacity": 0.40 }, "grain": 0.05 },
+      "opacity": 0.93
     },
 
     {
       "id": "07_smart_gradient_sparkle",
       "label": "SMART GRADIENT SPARKLE",
       "form": {
-        "archetype": "four-point-star",
-        "topology": "radial-burst",
-        "description": "4갈래 반짝임/별. 중심에서 상하좌우로 뻗는 빛살, 중앙이 가장 밝음.",
-        "star": {
-          "points": 4,
-          "innerRadius": 0.06,
-          "outerRadius": 0.40,
-          "spikeSharpness": 0.92,
-          "rotation": 0
-        }
+        "archetype": "four-point-star", "topology": "radial-burst",
+        "description": "4갈래 반짝임/별, 오목한 변.",
+        "star": { "points": 4, "innerRadius": 0.06, "outerRadius": 0.40, "spikeSharpness": 0.92, "rotation": 0 }
       },
-      "color": {
-        "type": "radial-gradient",
-        "center": [0.50, 0.50],
-        "stops": [
-          { "offset": 0.00, "color": "#FFE9B0" },
-          { "offset": 0.22, "color": "#FFB048" },
-          { "offset": 0.55, "color": "#C85A6E" },
-          { "offset": 1.00, "color": "#2A1640" }
-        ],
-        "dominant": "#FFB048"
-      },
-      "contrast": {
-        "level": "very-high",
-        "ratio": 0.9,
-        "highlight": "#FFF4D0",
-        "shadow": "#160A26",
-        "edgeGlow": { "color": "#FFD27A", "intensity": 0.85 }
-      },
-      "blur": 18,
-      "render": { "edgeFeather": 0.008, "interiorContrast": 1.30, "glow": { "spread": 0.14, "opacity": 0.60 }, "grain": 0.04 },
+      "color": { "type": "mesh", "dominant": "#FFB048", "points": [
+        { "pos": [0.50,0.50], "color": "#2A1230", "radius": 0.52, "weight": 0.9 },
+        { "pos": [0.50,0.50], "color": "#C85A3E", "radius": 0.34, "weight": 1.0 },
+        { "pos": [0.50,0.50], "color": "#FFC24A", "radius": 0.20, "weight": 1.2 },
+        { "pos": [0.50,0.50], "color": "#FFF1C8", "radius": 0.10, "weight": 1.5 }
+      ] },
+      "render": { "edgeFeather": 0.010, "glow": { "spread": 0.15, "opacity": 0.60 }, "grain": 0.04 },
       "opacity": 1.0
     },
 
@@ -361,124 +183,75 @@
       "id": "08_gradient_shapes_37",
       "label": "GRADIENT SHAPES 37",
       "form": {
-        "archetype": "rounded-triangle-soft",
-        "topology": "closed-blob",
-        "description": "뼈/T 자형 유기체. 상단에 두 개의 둥근 로브(목 부분이 오목하게 들어감)와 하단으로 뻗는 꼬리.",
-        "blob": {
-          "points": 10,
-          "concave": true,
-          "controlPoints": [
-            [0.82, 0.40], [0.74, 0.22], [0.60, 0.30], [0.46, 0.20],
-            [0.26, 0.40], [0.34, 0.58], [0.50, 0.62], [0.52, 0.82],
-            [0.66, 0.60], [0.76, 0.50]
-          ],
-          "tension": 0.86,
-          "elongation": 1.15,
-          "rotation": 4
-        }
+        "archetype": "two-lobe-organic", "topology": "closed-blob",
+        "description": "비대칭 2엽 유기체 — 좌하 둥근 로브 + 우상 키큰 로브, 아래 가장자리 오목한 목.",
+        "blob": { "points": 10, "concave": true, "controlPoints": [
+          [0.82,0.40],[0.74,0.22],[0.56,0.30],[0.42,0.24],[0.22,0.42],
+          [0.30,0.60],[0.46,0.64],[0.52,0.56],[0.56,0.76],[0.70,0.58]
+        ], "rotation": 2 }
       },
-      "color": {
-        "type": "radial-gradient",
-        "center": [0.48, 0.40],
-        "stops": [
-          { "offset": 0.00, "color": "#F4D7E6" },
-          { "offset": 0.30, "color": "#E85FA8" },
-          { "offset": 0.58, "color": "#B86AD0" },
-          { "offset": 0.82, "color": "#6A7AD8" },
-          { "offset": 1.00, "color": "#3A4AB8" }
-        ],
-        "dominant": "#D060B8"
-      },
-      "contrast": {
-        "level": "medium",
-        "ratio": 0.58,
-        "highlight": "#FFF0F8",
-        "shadow": "#26308C",
-        "edgeGlow": { "color": "#F2A8D8", "intensity": 0.55 }
-      },
-      "blur": 34,
-      "render": { "edgeFeather": 0.012, "interiorContrast": 1.30, "glow": { "spread": 0.07, "opacity": 0.32 }, "grain": 0.08 },
-      "opacity": 0.95
+      "color": { "type": "mesh", "dominant": "#D060B8", "points": [
+        { "pos": [0.28,0.40], "color": "#E84D9B", "radius": 0.26, "weight": 1.05 },
+        { "pos": [0.70,0.30], "color": "#9A56C6", "radius": 0.30, "weight": 1.05 },
+        { "pos": [0.54,0.70], "color": "#5BB8E8", "radius": 0.22, "weight": 1.0 },
+        { "pos": [0.54,0.80], "color": "#3A7AC8", "radius": 0.14, "weight": 0.95 },
+        { "pos": [0.46,0.44], "color": "#F6F1F4", "radius": 0.26, "weight": 1.45 }
+      ] },
+      "render": { "edgeFeather": 0.010, "glow": { "spread": 0.07, "opacity": 0.30 }, "grain": 0.12 },
+      "opacity": 0.96
     },
 
     {
       "id": "09_glowly_gradient_abstract",
       "label": "GLOWLY GRADIENT ABSTRACT",
       "form": {
-        "archetype": "diagonal-flare",
-        "topology": "open-stroke",
-        "description": "대각선 추상 광채/불꽃. 좌하단에서 우상단으로 솟구치며 흩어지는 빛.",
-        "blob": {
-          "points": 6,
-          "controlPoints": [
-            [0.30, 0.72], [0.46, 0.54], [0.62, 0.40],
-            [0.74, 0.26], [0.58, 0.48], [0.40, 0.64]
-          ],
-          "tension": 0.7,
-          "elongation": 1.7,
-          "rotation": -34
-        }
+        "archetype": "diagonal-flare", "topology": "open-stroke",
+        "description": "대각선 추상 플레어(좌하→우상), 매우 흐릿.",
+        "blob": { "points": 6, "controlPoints": [
+          [0.30,0.72],[0.46,0.54],[0.62,0.40],[0.74,0.26],[0.58,0.48],[0.40,0.64]
+        ], "rotation": -34 }
       },
-      "color": {
-        "type": "linear-gradient",
-        "angle": 55,
-        "stops": [
-          { "offset": 0.00, "color": "#4A5AB0" },
-          { "offset": 0.35, "color": "#C98AA8" },
-          { "offset": 0.62, "color": "#F4B486" },
-          { "offset": 0.85, "color": "#F58A4A" },
-          { "offset": 1.00, "color": "#FFD9A0" }
-        ],
-        "dominant": "#E59A78"
-      },
-      "contrast": {
-        "level": "medium-high",
-        "ratio": 0.65,
-        "highlight": "#FFE6C2",
-        "shadow": "#222C66",
-        "edgeGlow": { "color": "#FFC79A", "intensity": 0.6 }
-      },
-      "blur": 40,
-      "render": { "edgeFeather": 0.028, "interiorContrast": 1.15, "glow": { "spread": 0.12, "opacity": 0.50 }, "grain": 0.05 },
+      "color": { "type": "mesh", "dominant": "#E59A78", "points": [
+        { "pos": [0.40,0.60], "color": "#5A6AB0", "radius": 0.34, "weight": 0.95 },
+        { "pos": [0.46,0.52], "color": "#C898B8", "radius": 0.26, "weight": 1.0 },
+        { "pos": [0.58,0.42], "color": "#E89A50", "radius": 0.30, "weight": 1.1 },
+        { "pos": [0.64,0.34], "color": "#F0B070", "radius": 0.20, "weight": 1.15 }
+      ] },
+      "render": { "edgeFeather": 0.050, "glow": { "spread": 0.13, "opacity": 0.50 }, "grain": 0.05 },
       "opacity": 0.93
     }
   ],
 
   "morphSequence": {
-    "comment": "형태 간 전이 순서. 인접한 아키타입끼리 자연스럽게 변형되도록 정렬(스트로크↔블롭↔클러스터). 컬러도 웜↔쿨이 번갈아 흐르게 배치.",
+    "comment": "인접 아키타입끼리 자연스럽게 변형되도록 정렬.",
     "order": [
-      "01_gradient_blur",
-      "04_gradient_shapes_15",
-      "08_gradient_shapes_37",
-      "05_modern_gradient_shapes_pebble",
-      "02_modern_gradient_blob",
-      "03_modern_gradient_shapes_cloud",
-      "06_modern_gradient_shapes_wisp",
-      "09_glowly_gradient_abstract",
-      "07_smart_gradient_sparkle"
+      "01_gradient_blur", "04_gradient_shapes_15", "08_gradient_shapes_37",
+      "05_modern_gradient_shapes_pebble", "02_modern_gradient_blob",
+      "03_modern_gradient_shapes_cloud", "06_modern_gradient_shapes_wisp",
+      "09_glowly_gradient_abstract", "07_smart_gradient_sparkle"
     ],
     "transitions": [
-      { "from": "01_gradient_blur",        "to": "04_gradient_shapes_15",          "morphType": "elastic-flow",   "durationMs": 2600, "colorCrossfade": true,  "easing": "cubic-bezier(0.65,0,0.35,1)" },
-      { "from": "04_gradient_shapes_15",   "to": "08_gradient_shapes_37",          "morphType": "blob-merge",     "durationMs": 2400, "colorCrossfade": true,  "easing": "ease-in-out" },
-      { "from": "08_gradient_shapes_37",   "to": "05_modern_gradient_shapes_pebble","morphType": "vertex-lerp",   "durationMs": 2200, "colorCrossfade": true,  "easing": "ease-in-out" },
-      { "from": "05_modern_gradient_shapes_pebble","to": "02_modern_gradient_blob","morphType": "vertex-lerp",    "durationMs": 2400, "colorCrossfade": true,  "easing": "ease-in-out" },
-      { "from": "02_modern_gradient_blob", "to": "03_modern_gradient_shapes_cloud","morphType": "blob-split",     "durationMs": 2800, "colorCrossfade": true,  "easing": "cubic-bezier(0.5,0,0.2,1)" },
-      { "from": "03_modern_gradient_shapes_cloud","to": "06_modern_gradient_shapes_wisp","morphType": "metaball-stretch","durationMs": 2800,"colorCrossfade": true,"easing": "ease-in-out" },
-      { "from": "06_modern_gradient_shapes_wisp","to": "09_glowly_gradient_abstract","morphType": "elastic-flow", "durationMs": 2600, "colorCrossfade": true,  "easing": "cubic-bezier(0.65,0,0.35,1)" },
-      { "from": "09_glowly_gradient_abstract","to": "07_smart_gradient_sparkle",    "morphType": "burst-converge", "durationMs": 2400, "colorCrossfade": true,  "easing": "cubic-bezier(0.3,0,0.1,1)" },
-      { "from": "07_smart_gradient_sparkle","to": "01_gradient_blur",               "morphType": "burst-disperse", "durationMs": 2800, "colorCrossfade": true,  "easing": "cubic-bezier(0.6,0,0.4,1)", "loopback": true }
+      { "from": "01_gradient_blur", "to": "04_gradient_shapes_15", "morphType": "elastic-flow", "durationMs": 2600 },
+      { "from": "04_gradient_shapes_15", "to": "08_gradient_shapes_37", "morphType": "blob-merge", "durationMs": 2400 },
+      { "from": "08_gradient_shapes_37", "to": "05_modern_gradient_shapes_pebble", "morphType": "vertex-lerp", "durationMs": 2200 },
+      { "from": "05_modern_gradient_shapes_pebble", "to": "02_modern_gradient_blob", "morphType": "vertex-lerp", "durationMs": 2400 },
+      { "from": "02_modern_gradient_blob", "to": "03_modern_gradient_shapes_cloud", "morphType": "blob-split", "durationMs": 2800 },
+      { "from": "03_modern_gradient_shapes_cloud", "to": "06_modern_gradient_shapes_wisp", "morphType": "metaball-stretch", "durationMs": 2800 },
+      { "from": "06_modern_gradient_shapes_wisp", "to": "09_glowly_gradient_abstract", "morphType": "elastic-flow", "durationMs": 2600 },
+      { "from": "09_glowly_gradient_abstract", "to": "07_smart_gradient_sparkle", "morphType": "burst-converge", "durationMs": 2400 },
+      { "from": "07_smart_gradient_sparkle", "to": "01_gradient_blur", "morphType": "burst-disperse", "durationMs": 2800, "loopback": true }
     ]
   },
 
   "agentBindings": {
-    "comment": "AI agent 상태를 형태에 매핑 — 에이전트의 행동에 따라 모션이 반응하도록.",
+    "comment": "AI agent 상태 → 형태 매핑.",
     "states": {
-      "idle":      { "shape": "02_modern_gradient_blob",        "playbackRate": 0.6, "breathing": true },
-      "listening": { "shape": "03_modern_gradient_shapes_cloud","playbackRate": 0.8, "breathing": true },
-      "thinking":  { "shape": "06_modern_gradient_shapes_wisp", "playbackRate": 1.2, "morphLoop": true },
-      "responding":{ "shape": "01_gradient_blur",               "playbackRate": 1.4, "morphLoop": true },
-      "success":   { "shape": "07_smart_gradient_sparkle",      "playbackRate": 1.0, "oneShot": true },
-      "error":     { "shape": "04_gradient_shapes_15",          "playbackRate": 1.0, "hueShift": -30 }
+      "idle":       { "shape": "02_modern_gradient_blob", "playbackRate": 0.6, "breathing": true },
+      "listening":  { "shape": "03_modern_gradient_shapes_cloud", "playbackRate": 0.8, "breathing": true },
+      "thinking":   { "shape": "06_modern_gradient_shapes_wisp", "playbackRate": 1.2, "morphLoop": true },
+      "responding": { "shape": "01_gradient_blur", "playbackRate": 1.4, "morphLoop": true },
+      "success":    { "shape": "07_smart_gradient_sparkle", "playbackRate": 1.0, "oneShot": true },
+      "error":      { "shape": "04_gradient_shapes_15", "playbackRate": 1.0, "hueShift": -30 }
     },
     "transitionOnStateChangeMs": 700
   }
