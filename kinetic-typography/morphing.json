@@ -1,0 +1,68 @@
+{
+  "name": "Liquid Gooey Morphing Typography",
+  "version": "1.0.0",
+  "description": "원본 영상 분석 결과. 흰색 두꺼운 둥근 이탤릭 글자들이 검은 배경 위에서 액체(메타볼)처럼 서로 융합했다가 표면장력을 유지하며 다시 분리되어 읽히는 키네틱 타이포그래피. 글자 사이 음(陰)의 공간이 끈적하게 메워지는 'gooey filter' 효과가 핵심이다.",
+  "source": {
+    "media": "0127f887-ScreenRecording_06162026_184708_1.mov",
+    "duration_sec": 10.58,
+    "fps": 60,
+    "resolution": "1206x958",
+    "observed_text": "lab"
+  },
+  "stage": {
+    "background": "#0d0d0d",
+    "textColor": "#ffffff",
+    "align": "center",
+    "vignette": false
+  },
+  "typography": {
+    "fontFamily": "Fredoka, Baloo 2, Nunito, system-ui, sans-serif",
+    "fontWeight": 700,
+    "style": "italic",
+    "italicSkewDeg": -10,
+    "fontSizeVw": 14,
+    "letterSpacingEm": -0.02,
+    "rounded": true,
+    "comment": "둥근 끝(round cap)을 가진 헤비 산세리프. 이탤릭 기울기 약 10도."
+  },
+  "effect": {
+    "type": "gooey-metaball-morph",
+    "technique": "SVG filter(feGaussianBlur + feColorMatrix alpha threshold)로 인접 글자를 융합시키고, 각 글자를 개별적으로 wobble(스케일+이동) 애니메이션하여 주기적으로 합쳐졌다 분리시킨다.",
+    "gooFilter": {
+      "feGaussianBlur": { "stdDeviation": 12 },
+      "feColorMatrix": {
+        "type": "matrix",
+        "alphaMultiplier": 22,
+        "alphaOffset": -11,
+        "values": "1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -11"
+      },
+      "feComposite": { "operator": "atop" },
+      "comment": "stdDeviation가 클수록 글자가 멀리서도 융합. alphaMultiplier/Offset로 끈적한 가장자리 임계값 조절."
+    }
+  },
+  "animation": {
+    "loop": true,
+    "durationSec": 3.6,
+    "easing": "cubic-bezier(0.45, 0, 0.25, 1)",
+    "direction": "alternate",
+    "perLetter": {
+      "staggerSec": 0.12,
+      "scale": { "from": 1.0, "to": 1.35 },
+      "translateYemRange": [-0.06, 0.1],
+      "translateXemRange": [-0.04, 0.04],
+      "rotateDegRange": [-4, 4],
+      "comment": "글자마다 위상차(stagger)를 두어 파도처럼 차례로 부풀고 이웃 글자와 합쳐졌다 떨어진다."
+    },
+    "phases": [
+      { "t": 0.0, "state": "readable", "desc": "각 글자가 또렷이 분리되어 읽힘" },
+      { "t": 0.45, "state": "merging", "desc": "글자들이 부풀며 사이 공간이 끈적하게 메워짐(블롭화)" },
+      { "t": 0.6, "state": "blob", "desc": "이웃 글자가 하나의 액체 덩어리로 융합" },
+      { "t": 1.0, "state": "readable", "desc": "표면장력이 풀리며 다시 또렷한 글자로 복원" }
+    ]
+  },
+  "apply": {
+    "text": "Welcome to Galaxy AI",
+    "splitBy": "char",
+    "preserveSpaces": true
+  }
+}
