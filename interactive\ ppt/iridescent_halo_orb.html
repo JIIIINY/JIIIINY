@@ -157,8 +157,9 @@ const LABELS = {
   lightSize:'빛 코어 크기', lightReach:'빛 길이(번짐)', lightAmt:'빛 세기', lightUneven:'빛 불균등', outerSize:'외곽 빛 크기', outerAmt:'외곽 빛 세기',
   hue:'색조(hue °)', haloMix:'색 선명도', intensity:'할로 강도', exposure:'밝기', haloOuter:'할로 크기', falloff:'할로 폴오프', haloWarp:'할로 왜곡', haloWarpFreq:'할로 왜곡 빈도', surfWarp:'표면 왜곡(wrap)', surfFreq:'표면 왜곡 빈도', rot:'할로 회전(°/s)', breath:'호흡'
 };
-const TABS=['형태','엣지','라이팅','컬러','모션','코드'];
+const TABS=['시퀀스','형태','엣지','라이팅','컬러','모션','코드'];
 const SECTIONS=[
+  {tab:'시퀀스', special:'seq'},
   {tab:'형태', title:'중앙 형태 (유기형)', keys:['orbSize','centerX','centerY','blobAmt','blobLobes','blobSpeed','shapeRound','shapeRot','shapeSides'], buttons:'form'},
   {tab:'형태', title:'외곽 왜곡', keys:['distortAmt','distortFreq']},
   {tab:'엣지', title:'엣지 / 블러 위치', keys:['edgeAC','edgeAW','edgeBC','edgeBW','edgeContrast','blurAmt'], buttons:'edgeToggles'},
@@ -300,6 +301,7 @@ function generateBg(){ const H=Math.random()*360, s=0.32+Math.random()*0.23, l=0
 /* ===================== UI 빌드 ===================== */
 const inputs={};
 let swatchEl, palNameEl, codeBox, bgSwatchEl, bgInputs=null;
+let seqChipsEl, seqTabArr=null;
 function fmt(P,v){ const st=P.step; return (+v).toFixed(st<0.01?3:(st<1?2:0)); }
 function mkSlider(parent,key,P,label,getv,setv){
   const row=document.createElement('div'); row.className='row';
@@ -322,6 +324,7 @@ function selectTab(t){ TABS.forEach(x=>{ paneOf[x].classList.toggle('on',x===t);
 
 SECTIONS.forEach(sec=>{
   const pane=paneOf[sec.tab];
+  if(sec.special==='seq'){ buildSeqTab(pane); return; }
   if(sec.special==='palette'){ buildPaletteBlock(pane); return; }
   if(sec.special==='bg'){ buildBgBlock(pane); return; }
   if(sec.special==='code'){ buildCodeBlock(pane); return; }
@@ -356,7 +359,7 @@ function buildMotion(p){ const row=document.createElement('div'); row.className=
   seqInputs={ hold:mkSlider(p,'hold',SEQP.hold,'이 페이지 유지(s)',()=>state.hold,v=>state.hold=v), trans:mkSlider(p,'trans',SEQP.trans,'다음으로 전환(s)',()=>state.trans,v=>state.trans=v) };
   const bd=document.createElement('div'); bd.className='btns';
   const pb=document.createElement('button'); pb.className='b acc2'; pb.id='seqBtn'; pb.textContent='▶ 시퀀스 재생';
-  pb.onclick=()=>{ if(pages.length<2){ alert('이 화면에 페이지를 2개 이상 추가하세요.'); return; } seqPlaying=!seqPlaying; if(seqPlaying){ savePage(); startT=performance.now(); } pb.textContent=seqPlaying?'⏹ 시퀀스 정지':'▶ 시퀀스 재생'; pb.classList.toggle('on',seqPlaying); };
+  pb.onclick=()=>toggleSeq();
   bd.appendChild(pb); p.appendChild(bd);
   const note=document.createElement('div'); note.className='note'; note.textContent='페이지마다 유지/전환 시간을 따로 설정. 텍스트 등장 속도는 폰트 패널의 「타이핑 속도」.'; p.appendChild(note); }
 
@@ -408,6 +411,37 @@ function buildCodeBlock(p){ const h=document.createElement('div'); h.className='
 
 /* ===================== 폰트 패널 ===================== */
 const fontInputs={}; let pageChipsEl;
+function secTitle(t){ const d=document.createElement('div'); d.className='sec-title'; d.textContent=t; return d; }
+function setSeqPlaying(v){ seqPlaying=v; ['seqBtn','seqBtn2'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.textContent=seqPlaying?'⏹ 시퀀스 정지':'▶ 시퀀스 재생'; b.classList.toggle('on',seqPlaying); } }); }
+function toggleSeq(){ if(pages.length<2){ alert('이 화면에 페이지를 2개 이상 추가하세요.'); return; } setSeqPlaying(!seqPlaying); if(seqPlaying){ savePage(); startT=performance.now(); } }
+function refreshSeqTab(){ if(seqTabArr){ seqTabArr.forEach(s=>{ s.inp.value=s.getv(); s.num.value=fmt(s.P,s.getv()); }); } const st=document.getElementById('seqText'); if(st && document.activeElement!==st) st.value=FONT.text; }
+function buildSeqTab(p){
+  p.appendChild(secTitle('시퀀스 — 페이지 선택'));
+  seqChipsEl=document.createElement('div'); seqChipsEl.className='btns'; p.appendChild(seqChipsEl);
+  const ar=document.createElement('div'); ar.className='btns';
+  const npt=document.createElement('input'); npt.type='text'; npt.id='newPageText2'; npt.placeholder='새 페이지 텍스트'; npt.style.flex='1 1 100%';
+  const ab=document.createElement('button'); ab.className='b acc'; ab.textContent='➕ 페이지 추가';
+  const db=document.createElement('button'); db.className='b'; db.textContent='🗑 삭제';
+  ab.onclick=()=>{ const v=npt.value.trim()||('Page '+(pages.length+1)); npt.value=''; addPage(v); if(codeReady) refreshCode(); };
+  npt.addEventListener('keydown',e=>{ if(e.key==='Enter') ab.click(); });
+  db.onclick=()=>{ delPage(); if(codeReady) refreshCode(); };
+  ar.appendChild(npt); ar.appendChild(ab); ar.appendChild(db); p.appendChild(ar);
+  seqTabArr=[];
+  p.appendChild(secTitle('① 텍스트'));
+  const ti=document.createElement('input'); ti.type='text'; ti.id='seqText'; ti.placeholder='이 페이지 텍스트 (비우면 텍스트 없음)'; ti.value=FONT.text;
+  ti.oninput=()=>{ FONT.text=ti.value; const o=document.getElementById('pageText'); if(o)o.value=ti.value; rebuildPageChips(); if(codeReady) refreshCode(); };
+  p.appendChild(ti);
+  seqTabArr.push(mkSlider(p,'typeSpeed',FONTP.typeSpeed,'텍스트 등장 속도(자/초)',()=>FONT.typeSpeed,v=>FONT.typeSpeed=v));
+  p.appendChild(secTitle('② 중앙 요소(오브)'));
+  seqTabArr.push(mkSlider(p,'orbSize',PARAMS.orbSize,'중앙 요소 크기 (0=숨김/텍스트만)',()=>state.orbSize,v=>state.orbSize=v));
+  p.appendChild(secTitle('③ 타이밍'));
+  seqTabArr.push(mkSlider(p,'hold',SEQP.hold,'이 페이지 유지(s)',()=>state.hold,v=>state.hold=v));
+  seqTabArr.push(mkSlider(p,'trans',SEQP.trans,'다음으로 전환(s)',()=>state.trans,v=>state.trans=v));
+  const bd=document.createElement('div'); bd.className='btns';
+  const pb=document.createElement('button'); pb.className='b acc2'; pb.id='seqBtn2'; pb.textContent='▶ 시퀀스 재생'; pb.onclick=()=>toggleSeq();
+  bd.appendChild(pb); p.appendChild(bd);
+  const note=document.createElement('div'); note.className='note'; note.textContent='페이지마다: ① 텍스트(+속도) → ② 중앙요소 크기(0이면 텍스트만, 키우면 패턴 등장) → ③ 유지/전환으로 다음 페이지 연결. 페이지를 추가해 한 글자/한 장면씩 시퀀스를 만드세요.'; p.appendChild(note);
+}
 /* 페이지 = 장면 스냅샷(모든 파라미터+팔레트+엣지+폰트) */
 function captureScene(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]);
   return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], hold:state.hold, trans:state.trans, font:Object.assign({},FONT) }; }
@@ -430,15 +464,14 @@ function savePage(){ if(pages[activePage]) pages[activePage]=captureScene(); }
 function gotoPage(i){ savePage(); activePage=Math.max(0,Math.min(pages.length-1,i)); applyScene(pages[activePage]); }
 function addPage(text){ savePage(); const sc=captureScene(); sc.font=Object.assign({},FONT,{text:text||'New'}); pages.splice(activePage+1,0,sc); activePage++; applyScene(sc); }
 function delPage(){ if(pages.length<=1) return; pages.splice(activePage,1); activePage=Math.min(activePage,pages.length-1); applyScene(pages[activePage]); }
-function rebuildPageChips(){ if(!pageChipsEl) return; pageChipsEl.innerHTML='';
-  pages.forEach((pg,i)=>{ const b=document.createElement('button'); b.className='b'+(i===activePage?' on':''); const txt=(i===activePage?FONT.text:(pg.font&&pg.font.text))||'(빈)'; b.textContent=(i+1)+'. '+txt.slice(0,8); b.onclick=()=>gotoPage(i); pageChipsEl.appendChild(b); }); }
+function rebuildPageChips(){ [pageChipsEl,seqChipsEl].forEach(el=>{ if(!el) return; el.innerHTML='';
+  pages.forEach((pg,i)=>{ const b=document.createElement('button'); b.className='b'+(i===activePage?' on':''); const txt=(i===activePage?FONT.text:(pg.font&&pg.font.text))||'(빈)'; b.textContent=(i+1)+'. '+txt.slice(0,8); b.onclick=()=>gotoPage(i); el.appendChild(b); }); }); }
 /* 스크린(상위 화면) = 서브페이지 그룹 */
 function captureScreen(){ savePage(); return { pages:pages.map(s=>JSON.parse(JSON.stringify(s))), activePage }; }
 function loadScreen(sc){ pages=(sc.pages&&sc.pages.length?sc.pages:[{}]).map(normScene); activePage=Math.min(sc.activePage||0,pages.length-1);
   applyScene(pages[activePage]);
   // 서브페이지가 여러 개면 자동으로 연달아 재생(루핑)
-  seqPlaying = pages.length>1; startT=performance.now();
-  const sb=document.getElementById('seqBtn'); if(sb){ sb.textContent=seqPlaying?'⏹ 시퀀스 정지':'▶ 시퀀스 재생'; sb.classList.toggle('on',seqPlaying); }
+  startT=performance.now(); setSeqPlaying(pages.length>1);
   refreshScreenUI(); }
 function gotoScreen(i){ if(!screens.length) return; screens[activeScreen]=captureScreen(); activeScreen=((i%screens.length)+screens.length)%screens.length; loadScreen(screens[activeScreen]); if(codeReady) refreshCode(); }
 function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){ el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='#'+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); } const lb=document.getElementById('screenLabel'); if(lb) lb.textContent='#'+(activeScreen+1); }
@@ -493,13 +526,13 @@ function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.va
   const cin=document.querySelector('#fontBody input[type=color]'); if(cin) cin.value=FONT.color;
   const sh=document.getElementById('shadowToggle'); if(sh){ sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF'); sh.classList.toggle('on',FONT.shadowOn); }
   const tt=document.getElementById('typeToggle'); if(tt){ tt.textContent='타이핑: '+(FONT.typing?'ON':'OFF'); tt.classList.toggle('on',FONT.typing); }
-  rebuildPageChips(); }
+  rebuildPageChips(); refreshSeqTab(); }
 
 /* ===================== 동기화/코드 ===================== */
 function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].inp.value=state[k]; inputs[k].num.value=fmt(PARAMS[k],state[k]); });
   document.querySelectorAll('[data-tog]').forEach(b=>b._upd&&b._upd()); refreshPaletteUI(); refreshBgUI();
   if(seqInputs){ seqInputs.hold.inp.value=state.hold; seqInputs.hold.num.value=fmt(SEQP.hold,state.hold); seqInputs.trans.inp.value=state.trans; seqInputs.trans.num.value=fmt(SEQP.trans,state.trans); }
-  if(codeReady) refreshCode(); }
+  refreshSeqTab(); if(codeReady) refreshCode(); }
 // 전체 프로젝트(모든 화면+페이지+시퀀스) 내보내기
 function exportConfig(){ const cur=captureScreen(); const arr=screens.slice(); if(screens.length) arr[activeScreen]=cur; else arr.push(cur);
   return JSON.stringify({app:'iridescent-halo-orb',v:9,activeScreen,screens:arr}); }
