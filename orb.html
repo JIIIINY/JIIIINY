@@ -182,7 +182,7 @@ function newFont(text){ const f={text:text||'',color:'#2a2a2a',align:'center',sh
 let pages=[]; let activePage=0; let FONT=newFont('Hey!');
 let screens=[]; let activeScreen=0;
 let seqPlaying=false, seqTrans=0.8, seqHold=1.2;
-const SEQP={ trans:{def:0.8,min:0.1,max:4,step:0.05}, hold:{def:1.2,min:0,max:6,step:0.1} };
+const SEQP={ hold:{def:1.5,min:0,max:8,step:0.1}, trans:{def:1.5,min:0.1,max:6,step:0.05} };
 let seqInputs=null;
 
 /* ===================== 팔레트 (AI 5색 상시 포함) ===================== */
@@ -204,6 +204,7 @@ let palIdx=0;
 const state={}; Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def);
 state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[];
 state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
+state.hold=1.5; state.trans=1.5;
 let codeReady=false;
 const RATIOS=[[3,2,1],[2,1,1],[1,1,1],[4,2,1]]; let ratioIdx=0;
 function generateEdges(){ const ratio=RATIOS[ratioIdx],sum=ratio.reduce((a,b)=>a+b,0); let acc=0; const arcs=[],gap=6;
@@ -351,13 +352,13 @@ function buildEdgeComp(p){ const bd=document.createElement('div'); bd.className=
   bd.appendChild(g); bd.appendChild(ra); bd.appendChild(cl); p.appendChild(bd); }
 function buildMotion(p){ const row=document.createElement('div'); row.className='scrub-row';
   row.innerHTML=`<input type="checkbox" id="loopChk" checked /><span class="lp">자동 모션(회전·호흡·빛)</span>`; p.appendChild(row);
-  const t=document.createElement('div'); t.className='sec-title'; t.textContent='페이지 모션 (연결 재생)'; p.appendChild(t);
-  seqInputs={ trans:mkSlider(p,'trans',SEQP.trans,'전환 시간(s)',()=>seqTrans,v=>seqTrans=v), hold:mkSlider(p,'hold',SEQP.hold,'페이지 유지(s)',()=>seqHold,v=>seqHold=v) };
+  const t=document.createElement('div'); t.className='sec-title'; t.textContent='페이지 시퀀스 (이 페이지 타이밍)'; p.appendChild(t);
+  seqInputs={ hold:mkSlider(p,'hold',SEQP.hold,'이 페이지 유지(s)',()=>state.hold,v=>state.hold=v), trans:mkSlider(p,'trans',SEQP.trans,'다음으로 전환(s)',()=>state.trans,v=>state.trans=v) };
   const bd=document.createElement('div'); bd.className='btns';
-  const pb=document.createElement('button'); pb.className='b acc2'; pb.id='seqBtn'; pb.textContent='▶ 페이지 모션 재생';
-  pb.onclick=()=>{ if(pages.length<2){ alert('페이지를 2개 이상 추가하세요.'); return; } seqPlaying=!seqPlaying; if(seqPlaying){ savePage(); startT=performance.now(); } pb.textContent=seqPlaying?'⏹ 모션 정지':'▶ 페이지 모션 재생'; pb.classList.toggle('on',seqPlaying); };
+  const pb=document.createElement('button'); pb.className='b acc2'; pb.id='seqBtn'; pb.textContent='▶ 시퀀스 재생';
+  pb.onclick=()=>{ if(pages.length<2){ alert('이 화면에 페이지를 2개 이상 추가하세요.'); return; } seqPlaying=!seqPlaying; if(seqPlaying){ savePage(); startT=performance.now(); } pb.textContent=seqPlaying?'⏹ 시퀀스 정지':'▶ 시퀀스 재생'; pb.classList.toggle('on',seqPlaying); };
   bd.appendChild(pb); p.appendChild(bd);
-  const note=document.createElement('div'); note.className='note'; note.textContent='각 페이지의 AI 요소·텍스트를 전환 시간 동안 보간하며 순환합니다.'; p.appendChild(note); }
+  const note=document.createElement('div'); note.className='note'; note.textContent='페이지마다 유지/전환 시간을 따로 설정. 텍스트 등장 속도는 폰트 패널의 「타이핑 속도」.'; p.appendChild(note); }
 
 // 팔레트 블록 (상단에 랜덤/반영 버튼)
 function buildPaletteBlock(p){ const h=document.createElement('div'); h.className='sec-title'; h.textContent='컬러 팔레트'; p.appendChild(h);
@@ -409,17 +410,19 @@ function buildCodeBlock(p){ const h=document.createElement('div'); h.className='
 const fontInputs={}; let pageChipsEl;
 /* 페이지 = 장면 스냅샷(모든 파라미터+팔레트+엣지+폰트) */
 function captureScene(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]);
-  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], font:Object.assign({},FONT) }; }
+  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], hold:state.hold, trans:state.trans, font:Object.assign({},FONT) }; }
 function normScene(o){ o=o||{}; const params={}; Object.keys(PARAMS).forEach(k=> params[k]=(o.params&&k in o.params)?+o.params[k]:PARAMS[k].def);
   const arcsrc = Array.isArray(o.genArcs)?o.genArcs : (Array.isArray(o.edges)?o.edges:[]);
   const bg = Array.isArray(o.bg)&&o.bg.length>=3 ? o.bg.slice(0,3) : ['#E9E4F5','#E2EEF6','#F7E8E2'];
   return { params, palette:o.palette||'AI', ratioIdx:(typeof o.ratioIdx==='number')?o.ratioIdx:0,
     genArcs:arcsrc.map(a=>({relC:+a.relC||0,hw:+a.hw||10,on:a.on?1:0})),
     edgeAOn:('edgeAOn'in o)?(o.edgeAOn?1:0):1, edgeBOn:('edgeBOn'in o)?(o.edgeBOn?1:0):1, bg,
+    hold:(o.hold!=null?+o.hold:1.5), trans:(o.trans!=null?+o.trans:1.5),
     font:Object.assign(newFont(''), o.font||{}) }; }
 function applyScene(sc){ Object.keys(PARAMS).forEach(k=>state[k]=sc.params[k]);
   state.genArcs=sc.genArcs.map(a=>({...a})); state.edgeAOn=sc.edgeAOn; state.edgeBOn=sc.edgeBOn; ratioIdx=sc.ratioIdx;
   if(Array.isArray(sc.bg)){ state.bg1=sc.bg[0]; state.bg2=sc.bg[1]; state.bg3=sc.bg[2]; }
+  state.hold=(sc.hold!=null?sc.hold:1.5); state.trans=(sc.trans!=null?sc.trans:1.5);
   const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':');
   const pi=PALETTES.findIndex(x=>x.name===sc.palette); applyPalette(pi>=0?pi:0);
   FONT=Object.assign(newFont(''), sc.font); syncFontUI(); syncUI(); }
@@ -430,14 +433,12 @@ function delPage(){ if(pages.length<=1) return; pages.splice(activePage,1); acti
 function rebuildPageChips(){ if(!pageChipsEl) return; pageChipsEl.innerHTML='';
   pages.forEach((pg,i)=>{ const b=document.createElement('button'); b.className='b'+(i===activePage?' on':''); const txt=(i===activePage?FONT.text:(pg.font&&pg.font.text))||'(빈)'; b.textContent=(i+1)+'. '+txt.slice(0,8); b.onclick=()=>gotoPage(i); pageChipsEl.appendChild(b); }); }
 /* 스크린(상위 화면) = 서브페이지 그룹 */
-function captureScreen(){ savePage(); return { pages:pages.map(s=>JSON.parse(JSON.stringify(s))), activePage, seq:{trans:seqTrans,hold:seqHold} }; }
+function captureScreen(){ savePage(); return { pages:pages.map(s=>JSON.parse(JSON.stringify(s))), activePage }; }
 function loadScreen(sc){ pages=(sc.pages&&sc.pages.length?sc.pages:[{}]).map(normScene); activePage=Math.min(sc.activePage||0,pages.length-1);
-  if(sc.seq){ seqTrans=+sc.seq.trans||seqTrans; seqHold=(sc.seq.hold!=null?+sc.seq.hold:seqHold); }
   applyScene(pages[activePage]);
-  if(seqInputs){ seqInputs.trans.inp.value=seqTrans; seqInputs.trans.num.value=fmt(SEQP.trans,seqTrans); seqInputs.hold.inp.value=seqHold; seqInputs.hold.num.value=fmt(SEQP.hold,seqHold); }
   // 서브페이지가 여러 개면 자동으로 연달아 재생(루핑)
   seqPlaying = pages.length>1; startT=performance.now();
-  const sb=document.getElementById('seqBtn'); if(sb){ sb.textContent=seqPlaying?'⏹ 모션 정지':'▶ 페이지 모션 재생'; sb.classList.toggle('on',seqPlaying); }
+  const sb=document.getElementById('seqBtn'); if(sb){ sb.textContent=seqPlaying?'⏹ 시퀀스 정지':'▶ 시퀀스 재생'; sb.classList.toggle('on',seqPlaying); }
   refreshScreenUI(); }
 function gotoScreen(i){ if(!screens.length) return; screens[activeScreen]=captureScreen(); activeScreen=((i%screens.length)+screens.length)%screens.length; loadScreen(screens[activeScreen]); if(codeReady) refreshCode(); }
 function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){ el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='#'+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); } const lb=document.getElementById('screenLabel'); if(lb) lb.textContent='#'+(activeScreen+1); }
@@ -496,7 +497,9 @@ function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.va
 
 /* ===================== 동기화/코드 ===================== */
 function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].inp.value=state[k]; inputs[k].num.value=fmt(PARAMS[k],state[k]); });
-  document.querySelectorAll('[data-tog]').forEach(b=>b._upd&&b._upd()); refreshPaletteUI(); refreshBgUI(); if(codeReady) refreshCode(); }
+  document.querySelectorAll('[data-tog]').forEach(b=>b._upd&&b._upd()); refreshPaletteUI(); refreshBgUI();
+  if(seqInputs){ seqInputs.hold.inp.value=state.hold; seqInputs.hold.num.value=fmt(SEQP.hold,state.hold); seqInputs.trans.inp.value=state.trans; seqInputs.trans.num.value=fmt(SEQP.trans,state.trans); }
+  if(codeReady) refreshCode(); }
 // 전체 프로젝트(모든 화면+페이지+시퀀스) 내보내기
 function exportConfig(){ const cur=captureScreen(); const arr=screens.slice(); if(screens.length) arr[activeScreen]=cur; else arr.push(cur);
   return JSON.stringify({app:'iridescent-halo-orb',v:9,activeScreen,screens:arr}); }
@@ -504,16 +507,15 @@ function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.
 // screens 코드 → 전체 교체 / pages 코드 → 현재 화면 교체 / 단일 장면 → 현재 페이지에만 반영
 function applyConfig(txt){ const o=JSON.parse(txt);
   if(Array.isArray(o.screens) && o.screens.length){
-    screens=o.screens.map(s=>({pages:((s.pages&&s.pages.length?s.pages:[{}])).map(normScene), activePage:s.activePage||0, seq:s.seq||{trans:0.8,hold:1.8}}));
+    screens=o.screens.map(s=>({pages:((s.pages&&s.pages.length?s.pages:[{}])).map(np=>{ const n=normScene(np); if(s.seq){ if(np.hold==null&&s.seq.hold!=null)n.hold=+s.seq.hold; if(np.trans==null&&s.seq.trans!=null)n.trans=+s.seq.trans; } return n; }), activePage:s.activePage||0}));
     activeScreen=Math.min(o.activeScreen||0,screens.length-1); loadScreen(screens[activeScreen]); return;
   }
   if(Array.isArray(o.pages) && o.pages.length && o.pages[0] && o.pages[0].params){
     pages=o.pages.map(normScene); activePage=Math.min(o.activePage||0,pages.length-1);
-    if(o.seq){ if('trans'in o.seq) seqTrans=+o.seq.trans; if('hold'in o.seq) seqHold=+o.seq.hold; }
   } else { // 단일 장면 → 현재 페이지에만
     if(!pages.length){ pages=[normScene(o)]; activePage=0; } else pages[activePage]=normScene(o);
   }
-  applyScene(pages[activePage]); if(seqInputs){ seqInputs.trans.inp.value=seqTrans; seqInputs.trans.num.value=fmt(SEQP.trans,seqTrans); seqInputs.hold.inp.value=seqHold; seqInputs.hold.num.value=fmt(SEQP.hold,seqHold); } }
+  applyScene(pages[activePage]); }
 function flash(b,m){ const o=b.textContent; b.textContent=m; setTimeout(()=>b.textContent=o,1200); }
 
 /* ===================== 상단/패널 버튼 ===================== */
@@ -586,10 +588,14 @@ function frame(now){
   let tSec; if(playing){ tSec=(now-startT)/1000; pausedT=now-startT; } else { tSec=pausedT/1000; }
   // 페이지 모션(연결 재생): 장면 보간을 state/stops에 임시 주입
   let seqText=null;
-  if(seqPlaying && pages.length>1){ seqBackup();
-    const seg=seqHold+seqTrans, total=pages.length*seg, tt=((tSec%total)+total)%total;
-    const idx=Math.floor(tt/seg), local=tt-idx*seg; const A=pages[idx], B=pages[(idx+1)%pages.length];
-    const f= local<seqHold ? 0 : (-(Math.cos(Math.PI*Math.min(1,(local-seqHold)/Math.max(seqTrans,0.001)))-1)/2);
+  if(seqPlaying && pages.length>1){ savePage(); seqBackup();
+    // 페이지별 유지(hold)+전환(trans) 타이밍
+    const segs=pages.map(pg=>(pg.hold!=null?pg.hold:1.5)+(pg.trans!=null?pg.trans:1.5));
+    const total=segs.reduce((a,b)=>a+b,0)||1; let tt=((tSec%total)+total)%total;
+    let idx=0,acc=0; while(idx<pages.length-1 && tt>=acc+segs[idx]){ acc+=segs[idx]; idx++; }
+    const local=tt-acc; const A=pages[idx], B=pages[(idx+1)%pages.length];
+    const hold=(A.hold!=null?A.hold:1.5), trans=(A.trans!=null?A.trans:1.5);
+    const f= local<hold ? 0 : (-(Math.cos(Math.PI*Math.min(1,(local-hold)/Math.max(trans,0.001)))-1)/2);
     Object.keys(PARAMS).forEach(k=>state[k]=A.params[k]+(B.params[k]-A.params[k])*f);
     const src=(f<0.5)?A:B; state.genArcs=src.genArcs.map(a=>({...a})); state.edgeAOn=src.edgeAOn; state.edgeBOn=src.edgeBOn; ratioIdx=src.ratioIdx;
     lerpStopsInto(stopsFlat,A.palette,B.palette,f);
