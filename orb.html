@@ -159,8 +159,11 @@ const FONTP = { size:{def:26,min:8,max:160,step:1}, alpha:{def:1,min:0,max:1,ste
   shadowBlur:{def:8,min:0,max:40,step:1}, shadowX:{def:0,min:-30,max:30,step:1}, shadowY:{def:2,min:-30,max:30,step:1}, shadowAlpha:{def:0.5,min:0,max:1,step:0.02} };
 const FONTL = { size:'크기(pt)', alpha:'투명도', x:'X 위치', y:'Y 위치', shadowBlur:'그림자 블러', shadowX:'그림자 X', shadowY:'그림자 Y', shadowAlpha:'그림자 투명도' };
 /* 페이지(텍스트) 시스템 — 페이지마다 고유 폰트/텍스트 */
-function newPage(text){ const pg={text:text||'',color:'#2a2a2a',align:'center',shadowOn:false}; Object.keys(FONTP).forEach(k=>pg[k]=FONTP[k].def); return pg; }
-let pages=[newPage('Hey!')]; let activePage=0; let FONT=pages[0];
+function newFont(text){ const f={text:text||'',color:'#2a2a2a',align:'center',shadowOn:false}; Object.keys(FONTP).forEach(k=>f[k]=FONTP[k].def); return f; }
+let pages=[]; let activePage=0; let FONT=newFont('Hey!');
+let seqPlaying=false, seqTrans=0.8, seqHold=1.2;
+const SEQP={ trans:{def:0.8,min:0.1,max:4,step:0.05}, hold:{def:1.2,min:0,max:6,step:0.1} };
+let seqInputs=null;
 
 /* ===================== 팔레트 (AI 5색 상시 포함) ===================== */
 function hexToRGB(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255]; }
@@ -310,7 +313,14 @@ function buildEdgeComp(p){ const bd=document.createElement('div'); bd.className=
   cl.onclick=()=>{ state.genArcs=[]; if(codeReady) refreshCode(); };
   bd.appendChild(g); bd.appendChild(ra); bd.appendChild(cl); p.appendChild(bd); }
 function buildMotion(p){ const row=document.createElement('div'); row.className='scrub-row';
-  row.innerHTML=`<input type="checkbox" id="loopChk" checked /><span class="lp">자동 모션(회전·호흡·빛)</span>`; p.appendChild(row); }
+  row.innerHTML=`<input type="checkbox" id="loopChk" checked /><span class="lp">자동 모션(회전·호흡·빛)</span>`; p.appendChild(row);
+  const t=document.createElement('div'); t.className='sec-title'; t.textContent='페이지 모션 (연결 재생)'; p.appendChild(t);
+  seqInputs={ trans:mkSlider(p,'trans',SEQP.trans,'전환 시간(s)',()=>seqTrans,v=>seqTrans=v), hold:mkSlider(p,'hold',SEQP.hold,'페이지 유지(s)',()=>seqHold,v=>seqHold=v) };
+  const bd=document.createElement('div'); bd.className='btns';
+  const pb=document.createElement('button'); pb.className='b acc2'; pb.id='seqBtn'; pb.textContent='▶ 페이지 모션 재생';
+  pb.onclick=()=>{ if(pages.length<2){ alert('페이지를 2개 이상 추가하세요.'); return; } seqPlaying=!seqPlaying; if(seqPlaying){ savePage(); startT=performance.now(); } pb.textContent=seqPlaying?'⏹ 모션 정지':'▶ 페이지 모션 재생'; pb.classList.toggle('on',seqPlaying); };
+  bd.appendChild(pb); p.appendChild(bd);
+  const note=document.createElement('div'); note.className='note'; note.textContent='각 페이지의 AI 요소·텍스트를 전환 시간 동안 보간하며 순환합니다.'; p.appendChild(note); }
 
 // 팔레트 블록 (상단에 랜덤/반영 버튼)
 function buildPaletteBlock(p){ const h=document.createElement('div'); h.className='sec-title'; h.textContent='컬러 팔레트'; p.appendChild(h);
@@ -344,9 +354,26 @@ function buildCodeBlock(p){ const h=document.createElement('div'); h.className='
 
 /* ===================== 폰트 패널 ===================== */
 const fontInputs={}; let pageChipsEl;
-function setPage(i){ activePage=Math.max(0,Math.min(pages.length-1,i)); FONT=pages[activePage]; syncFontUI(); if(codeReady) refreshCode(); }
+/* 페이지 = 장면 스냅샷(모든 파라미터+팔레트+엣지+폰트) */
+function captureScene(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]);
+  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, font:Object.assign({},FONT) }; }
+function normScene(o){ o=o||{}; const params={}; Object.keys(PARAMS).forEach(k=> params[k]=(o.params&&k in o.params)?+o.params[k]:PARAMS[k].def);
+  const arcsrc = Array.isArray(o.genArcs)?o.genArcs : (Array.isArray(o.edges)?o.edges:[]);
+  return { params, palette:o.palette||'AI', ratioIdx:(typeof o.ratioIdx==='number')?o.ratioIdx:0,
+    genArcs:arcsrc.map(a=>({relC:+a.relC||0,hw:+a.hw||10,on:a.on?1:0})),
+    edgeAOn:('edgeAOn'in o)?(o.edgeAOn?1:0):1, edgeBOn:('edgeBOn'in o)?(o.edgeBOn?1:0):1,
+    font:Object.assign(newFont(''), o.font||{}) }; }
+function applyScene(sc){ Object.keys(PARAMS).forEach(k=>state[k]=sc.params[k]);
+  state.genArcs=sc.genArcs.map(a=>({...a})); state.edgeAOn=sc.edgeAOn; state.edgeBOn=sc.edgeBOn; ratioIdx=sc.ratioIdx;
+  const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':');
+  const pi=PALETTES.findIndex(x=>x.name===sc.palette); applyPalette(pi>=0?pi:0);
+  FONT=Object.assign(newFont(''), sc.font); syncFontUI(); syncUI(); }
+function savePage(){ if(pages[activePage]) pages[activePage]=captureScene(); }
+function gotoPage(i){ savePage(); activePage=Math.max(0,Math.min(pages.length-1,i)); applyScene(pages[activePage]); }
+function addPage(text){ savePage(); const sc=captureScene(); sc.font=Object.assign({},FONT,{text:text||'New'}); pages.splice(activePage+1,0,sc); activePage++; applyScene(sc); }
+function delPage(){ if(pages.length<=1) return; pages.splice(activePage,1); activePage=Math.min(activePage,pages.length-1); applyScene(pages[activePage]); }
 function rebuildPageChips(){ if(!pageChipsEl) return; pageChipsEl.innerHTML='';
-  pages.forEach((pg,i)=>{ const b=document.createElement('button'); b.className='b'+(i===activePage?' on':''); b.textContent=(i+1)+'. '+((pg.text||'(빈 텍스트)').slice(0,8)); b.onclick=()=>setPage(i); pageChipsEl.appendChild(b); }); }
+  pages.forEach((pg,i)=>{ const b=document.createElement('button'); b.className='b'+(i===activePage?' on':''); const txt=(i===activePage?FONT.text:(pg.font&&pg.font.text))||'(빈)'; b.textContent=(i+1)+'. '+txt.slice(0,8); b.onclick=()=>gotoPage(i); pageChipsEl.appendChild(b); }); }
 (function buildFontUI(){ const p=document.getElementById('fontBody');
   // 페이지
   const tp=document.createElement('div'); tp.className='sec-title'; tp.textContent='페이지'; p.appendChild(tp);
@@ -355,9 +382,9 @@ function rebuildPageChips(){ if(!pageChipsEl) return; pageChipsEl.innerHTML='';
   const npt=document.createElement('input'); npt.type='text'; npt.id='newPageText'; npt.placeholder='새 페이지 텍스트'; npt.style.flex='1 1 100%';
   const addBtn=document.createElement('button'); addBtn.className='b acc'; addBtn.textContent='➕ 페이지 추가';
   const delBtn=document.createElement('button'); delBtn.className='b'; delBtn.textContent='🗑 삭제';
-  const doAdd=()=>{ const t=npt.value.trim()||('Page '+(pages.length+1)); pages.push(newPage(t)); npt.value=''; setPage(pages.length-1); };
+  const doAdd=()=>{ const t=npt.value.trim()||('Page '+(pages.length+1)); npt.value=''; addPage(t); if(codeReady) refreshCode(); };
   addBtn.onclick=doAdd; npt.addEventListener('keydown',e=>{ if(e.key==='Enter') doAdd(); });
-  delBtn.onclick=()=>{ if(pages.length>1){ pages.splice(activePage,1); setPage(Math.min(activePage,pages.length-1)); if(codeReady) refreshCode(); } };
+  delBtn.onclick=()=>{ delPage(); if(codeReady) refreshCode(); };
   addRow.appendChild(npt); addRow.appendChild(addBtn); addRow.appendChild(delBtn); p.appendChild(addRow);
   const t1=document.createElement('div'); t1.className='sec-title'; t1.textContent='현재 페이지 텍스트'; p.appendChild(t1);
   const ta=document.createElement('input'); ta.type='text'; ta.id='pageText'; ta.value=FONT.text; ta.placeholder='표시할 텍스트'; ta.oninput=()=>{ FONT.text=ta.value; rebuildPageChips(); if(codeReady) refreshCode(); }; p.appendChild(ta);
@@ -397,18 +424,20 @@ function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.va
 /* ===================== 동기화/코드 ===================== */
 function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].inp.value=state[k]; inputs[k].num.value=fmt(PARAMS[k],state[k]); });
   document.querySelectorAll('[data-tog]').forEach(b=>b._upd&&b._upd()); refreshPaletteUI(); if(codeReady) refreshCode(); }
-function exportConfig(){ const p={}; Object.keys(PARAMS).forEach(k=>p[k]=state[k]);
-  return JSON.stringify({app:'iridescent-halo-orb',v:7,palette:PALETTES[palIdx].name,ratioIdx,edges:state.genArcs,edgeAOn:state.edgeAOn,edgeBOn:state.edgeBOn,pages,activePage,font:FONT,params:p}); }
+// 전체 프로젝트(모든 페이지 + 시퀀스) 내보내기
+function exportConfig(){ savePage(); return JSON.stringify({app:'iridescent-halo-orb',v:8,activePage,seq:{trans:seqTrans,hold:seqHold},pages:pages.map(normScene)}); }
 function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.value=exportConfig(); }
+// 멀티페이지 코드 → 전체 교체 / 단일 장면 코드 → "현재 페이지에만" 적용(다른 페이지 유지)
 function applyConfig(txt){ const o=JSON.parse(txt);
-  if(o.params) Object.keys(o.params).forEach(k=>{ if(k in state){ const v=parseFloat(o.params[k]); if(!isNaN(v)) state[k]=v; } });
-  if(o.palette){ const i=PALETTES.findIndex(x=>x.name===o.palette); if(i>=0) applyPalette(i); }
-  if(Array.isArray(o.edges)) state.genArcs=o.edges.map(a=>({relC:+a.relC||0,hw:+a.hw||10,on:a.on?1:0}));
-  if('edgeAOn' in o) state.edgeAOn=o.edgeAOn?1:0; if('edgeBOn' in o) state.edgeBOn=o.edgeBOn?1:0;
-  if(typeof o.ratioIdx==='number'){ ratioIdx=((o.ratioIdx%RATIOS.length)+RATIOS.length)%RATIOS.length; const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':'); }
-  if(Array.isArray(o.pages)&&o.pages.length){ pages=o.pages.map(pg=>Object.assign(newPage(''),pg)); activePage=Math.min(o.activePage||0,pages.length-1); FONT=pages[activePage]; }
-  else if(o.font){ pages=[Object.assign(newPage(''),o.font)]; activePage=0; FONT=pages[0]; }
-  syncFontUI(); syncUI(); }
+  if(Array.isArray(o.pages) && o.pages.length && o.pages[0] && o.pages[0].params){
+    pages=o.pages.map(normScene); activePage=Math.min(o.activePage||0,pages.length-1);
+    if(o.seq){ if('trans'in o.seq) seqTrans=+o.seq.trans; if('hold'in o.seq) seqHold=+o.seq.hold; }
+  } else {
+    // 단일 장면(레거시/프리셋) → 현재 선택된 페이지에만 반영
+    if(!pages.length){ pages=[normScene(o)]; activePage=0; }
+    else pages[activePage]=normScene(o);
+  }
+  applyScene(pages[activePage]); if(seqInputs){ seqInputs.trans.inp.value=seqTrans; seqInputs.trans.num.value=fmt(SEQP.trans,seqTrans); seqInputs.hold.inp.value=seqHold; seqInputs.hold.num.value=fmt(SEQP.hold,seqHold); } }
 function flash(b,m){ const o=b.textContent; b.textContent=m; setTimeout(()=>b.textContent=o,1200); }
 
 /* ===================== 상단/패널 버튼 ===================== */
@@ -444,16 +473,34 @@ document.querySelectorAll('.dd').forEach(b=>b.onclick=()=>{ const pn=document.ge
 
 /* ===================== 텍스트 렌더 ===================== */
 function hexA(hex,a){ const c=hexToRGB(hex); return `rgba(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)},${a})`; }
-function drawText(){ if(!FONT.text) return; vctx.save(); vctx.globalAlpha=FONT.alpha;
-  const px=FONT.size*2; vctx.font=`${px}px "Samsung Sharp Sans","SamsungSharpSans","Samsung Sans","One UI Sans",-apple-system,"Helvetica Neue",Arial,sans-serif`;
-  vctx.textAlign=FONT.align; vctx.textBaseline='middle';
-  if(FONT.shadowOn){ vctx.shadowColor=hexA('#000000',FONT.shadowAlpha); vctx.shadowBlur=FONT.shadowBlur*2; vctx.shadowOffsetX=FONT.shadowX*2; vctx.shadowOffsetY=FONT.shadowY*2; }
-  vctx.fillStyle=FONT.color; const x=FONT.x*view.width, y=FONT.y*view.height, lh=px*1.2; const lines=String(FONT.text).split('\n');
+function drawTextScene(F,amul){ if(!F||!F.text||amul<=0) return; vctx.save(); vctx.globalAlpha=(F.alpha==null?1:F.alpha)*amul;
+  const px=(F.size||26)*2; vctx.font=`${px}px "Samsung Sharp Sans","SamsungSharpSans","Samsung Sans","One UI Sans",-apple-system,"Helvetica Neue",Arial,sans-serif`;
+  vctx.textAlign=F.align||'center'; vctx.textBaseline='middle';
+  if(F.shadowOn){ vctx.shadowColor=hexA('#000000',F.shadowAlpha); vctx.shadowBlur=F.shadowBlur*2; vctx.shadowOffsetX=F.shadowX*2; vctx.shadowOffsetY=F.shadowY*2; }
+  vctx.fillStyle=F.color||'#2a2a2a'; const x=F.x*view.width, y=F.y*view.height, lh=px*1.2; const lines=String(F.text).split('\n');
   lines.forEach((ln,i)=>vctx.fillText(ln,x,y+(i-(lines.length-1)/2)*lh)); vctx.restore(); }
+function drawText(){ drawTextScene(FONT,1); }
+// 시퀀스용 팔레트 보간
+function paletteStops(name){ const p=PALETTES.find(x=>x.name===name)||PALETTES[0]; return p.stops; }
+function lerpStopsInto(arr,nameA,nameB,f){ const A=paletteStops(nameA),B=paletteStops(nameB);
+  for(let i=0;i<12;i++){ const ca=hexToRGB(A[i]),cb=hexToRGB(B[i]); for(let k=0;k<3;k++) arr[i*3+k]=ca[k]+(cb[k]-ca[k])*f; } }
+let _seqBk=null;
+function seqBackup(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]); _seqBk={params,genArcs:state.genArcs,edgeAOn:state.edgeAOn,edgeBOn:state.edgeBOn,ratioIdx,stops:stopsFlat.slice()}; }
+function seqRestore(){ if(!_seqBk) return; Object.keys(PARAMS).forEach(k=>state[k]=_seqBk.params[k]); state.genArcs=_seqBk.genArcs; state.edgeAOn=_seqBk.edgeAOn; state.edgeBOn=_seqBk.edgeBOn; ratioIdx=_seqBk.ratioIdx; stopsFlat.set(_seqBk.stops); _seqBk=null; }
 
 /* ===================== 렌더 루프 ===================== */
 function frame(now){
   let tSec; if(playing){ tSec=(now-startT)/1000; pausedT=now-startT; } else { tSec=pausedT/1000; }
+  // 페이지 모션(연결 재생): 장면 보간을 state/stops에 임시 주입
+  let seqText=null;
+  if(seqPlaying && pages.length>1){ seqBackup();
+    const seg=seqHold+seqTrans, total=pages.length*seg, tt=((tSec%total)+total)%total;
+    const idx=Math.floor(tt/seg), local=tt-idx*seg; const A=pages[idx], B=pages[(idx+1)%pages.length];
+    const f= local<seqHold ? 0 : (-(Math.cos(Math.PI*Math.min(1,(local-seqHold)/Math.max(seqTrans,0.001)))-1)/2);
+    Object.keys(PARAMS).forEach(k=>state[k]=A.params[k]+(B.params[k]-A.params[k])*f);
+    const src=(f<0.5)?A:B; state.genArcs=src.genArcs.map(a=>({...a})); state.edgeAOn=src.edgeAOn; state.edgeBOn=src.edgeBOn; ratioIdx=src.ratioIdx;
+    lerpStopsInto(stopsFlat,A.palette,B.palette,f); seqText={A:A.font,B:B.font,f};
+  }
   const lc=document.getElementById('loopChk'); const motion=(lc&&lc.checked)?1.0:0.0;
   const m=0.5-0.5*Math.cos(tSec*Math.PI/3); const scale=1.0+state.breath*motion*m;
   const intPulse=state.intensity*(motion?(0.9+0.25*m):1.0); const haloAngle=motion?(tSec*state.rot)%360:0.0;
@@ -476,7 +523,9 @@ function frame(now){
   gl.uniform3f(U.u_bg,BG[0],BG[1],BG[2]); gl.uniform3fv(uStops,stopsFlat); uploadGen(); gl.uniform3fv(uGen,genFlatU);
   gl.drawArrays(gl.TRIANGLES,0,3);
   // 2D 합성: orb + 텍스트
-  vctx.clearRect(0,0,view.width,view.height); vctx.drawImage(glCanvas,0,0,view.width,view.height); drawText();
+  vctx.clearRect(0,0,view.width,view.height); vctx.drawImage(glCanvas,0,0,view.width,view.height);
+  if(seqText){ drawTextScene(seqText.A,1-seqText.f); drawTextScene(seqText.B,seqText.f); seqRestore(); }
+  else drawText();
   requestAnimationFrame(frame);
 }
 const INIT={"app":"iridescent-halo-orb","v":7,"palette":"AI","ratioIdx":0,"edges":[{"relC":90,"hw":84,"on":0},{"relC":240,"hw":54,"on":1},{"relC":330,"hw":24,"on":1}],"edgeAOn":0,"edgeBOn":1,"font":{"text":"Hey!","color":"#2a2a2a","align":"center","shadowOn":false,"size":26,"alpha":1,"x":0.5,"y":0.52,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5},"params":{"orbSize":0.6488339014329767,"blobAmt":0.25797175661427163,"blobLobes":7,"blobSpeed":0.9001635049519672,"shapeRound":0.19416621659372266,"shapeRot":29,"shapeSides":0,"distortAmt":0.01917588084009752,"distortFreq":6,"edgeAC":38,"edgeAW":33,"edgeBC":89,"edgeBW":81,"edgeContrast":0.861551658796128,"blurAmt":0.1443619064296235,"compRot":251,"lightSize":0.20892809856835717,"lightReach":0.28027863793894825,"lightAmt":0.5269839663668476,"lightUneven":0.8519323464240542,"outerSize":0.7852661605982187,"outerAmt":0.1348519947963876,"hue":-5,"haloMix":0.6255286804962303,"intensity":0.9866260577243123,"exposure":0.8987480750462861,"haloOuter":0.7680515922017943,"falloff":2.166673059375716,"rot":5,"breath":0.10622957021842669}};
