@@ -155,11 +155,12 @@ const SECTIONS=[
 
 /* ===================== 폰트 ===================== */
 const FONTP = { size:{def:26,min:8,max:160,step:1}, alpha:{def:1,min:0,max:1,step:0.02},
-  x:{def:0.5,min:0,max:1,step:0.005}, y:{def:0.86,min:0,max:1,step:0.005},
-  shadowBlur:{def:8,min:0,max:40,step:1}, shadowX:{def:0,min:-30,max:30,step:1}, shadowY:{def:2,min:-30,max:30,step:1}, shadowAlpha:{def:0.5,min:0,max:1,step:0.02} };
-const FONTL = { size:'크기(pt)', alpha:'투명도', x:'X 위치', y:'Y 위치', shadowBlur:'그림자 블러', shadowX:'그림자 X', shadowY:'그림자 Y', shadowAlpha:'그림자 투명도' };
+  x:{def:0.5,min:0,max:1,step:0.005}, y:{def:0.5,min:0,max:1,step:0.005},
+  shadowBlur:{def:8,min:0,max:40,step:1}, shadowX:{def:0,min:-30,max:30,step:1}, shadowY:{def:2,min:-30,max:30,step:1}, shadowAlpha:{def:0.5,min:0,max:1,step:0.02},
+  typeSpeed:{def:6,min:1,max:24,step:1}, typeBlur:{def:12,min:0,max:30,step:1} };
+const FONTL = { size:'크기(pt)', alpha:'투명도', x:'X 위치', y:'Y 위치', shadowBlur:'그림자 블러', shadowX:'그림자 X', shadowY:'그림자 Y', shadowAlpha:'그림자 투명도', typeSpeed:'타이핑 속도(자/초)', typeBlur:'등장 블러' };
 /* 페이지(텍스트) 시스템 — 페이지마다 고유 폰트/텍스트 */
-function newFont(text){ const f={text:text||'',color:'#2a2a2a',align:'center',shadowOn:false}; Object.keys(FONTP).forEach(k=>f[k]=FONTP[k].def); return f; }
+function newFont(text){ const f={text:text||'',color:'#2a2a2a',align:'center',shadowOn:false,typing:true}; Object.keys(FONTP).forEach(k=>f[k]=FONTP[k].def); return f; }
 let pages=[]; let activePage=0; let FONT=newFont('Hey!');
 let seqPlaying=false, seqTrans=0.8, seqHold=1.2;
 const SEQP={ trans:{def:0.8,min:0.1,max:4,step:0.05}, hold:{def:1.2,min:0,max:6,step:0.1} };
@@ -406,6 +407,11 @@ function rebuildPageChips(){ if(!pageChipsEl) return; pageChipsEl.innerHTML='';
   const sb=document.createElement('div'); sb.className='btns'; const sh=document.createElement('button'); sh.id='shadowToggle'; sh.className='b'+(FONT.shadowOn?' on':''); sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF');
   sh.onclick=()=>{ FONT.shadowOn=!FONT.shadowOn; sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF'); sh.classList.toggle('on',FONT.shadowOn); if(codeReady) refreshCode(); }; sb.appendChild(sh); p.appendChild(sb);
   ['shadowBlur','shadowX','shadowY','shadowAlpha'].forEach(k=>{ fontInputs[k]=mkSlider(p,k,FONTP[k],FONTL[k],()=>FONT[k],v=>FONT[k]=v); });
+  // 타이핑(한 글자씩 + 등장 블러)
+  const t5=document.createElement('div'); t5.className='sec-title'; t5.textContent='타이핑 (한 글자씩 · 블러 등장)'; p.appendChild(t5);
+  const tb=document.createElement('div'); tb.className='btns'; const tt=document.createElement('button'); tt.id='typeToggle'; tt.className='b'+(FONT.typing?' on':''); tt.textContent='타이핑: '+(FONT.typing?'ON':'OFF');
+  tt.onclick=()=>{ FONT.typing=!FONT.typing; tt.textContent='타이핑: '+(FONT.typing?'ON':'OFF'); tt.classList.toggle('on',FONT.typing); if(codeReady) refreshCode(); }; tb.appendChild(tt); p.appendChild(tb);
+  ['typeSpeed','typeBlur'].forEach(k=>{ fontInputs[k]=mkSlider(p,k,FONTP[k],FONTL[k],()=>FONT[k],v=>FONT[k]=v); });
   // 버튼
   const bd=document.createElement('div'); bd.className='btns';
   const ap=document.createElement('button'); ap.className='b on'; ap.textContent='이 화면에만 적용';
@@ -419,6 +425,7 @@ function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.va
   const tin=document.getElementById('pageText'); if(tin) tin.value=FONT.text;
   const cin=document.querySelector('#fontBody input[type=color]'); if(cin) cin.value=FONT.color;
   const sh=document.getElementById('shadowToggle'); if(sh){ sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF'); sh.classList.toggle('on',FONT.shadowOn); }
+  const tt=document.getElementById('typeToggle'); if(tt){ tt.textContent='타이핑: '+(FONT.typing?'ON':'OFF'); tt.classList.toggle('on',FONT.typing); }
   rebuildPageChips(); }
 
 /* ===================== 동기화/코드 ===================== */
@@ -473,13 +480,24 @@ document.querySelectorAll('.dd').forEach(b=>b.onclick=()=>{ const pn=document.ge
 
 /* ===================== 텍스트 렌더 ===================== */
 function hexA(hex,a){ const c=hexToRGB(hex); return `rgba(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)},${a})`; }
-function drawTextScene(F,amul){ if(!F||!F.text||amul<=0) return; vctx.save(); vctx.globalAlpha=(F.alpha==null?1:F.alpha)*amul;
-  const px=(F.size||26)*2; vctx.font=`${px}px "Samsung Sharp Sans","SamsungSharpSans","Samsung Sans","One UI Sans",-apple-system,"Helvetica Neue",Arial,sans-serif`;
-  vctx.textAlign=F.align||'center'; vctx.textBaseline='middle';
-  if(F.shadowOn){ vctx.shadowColor=hexA('#000000',F.shadowAlpha); vctx.shadowBlur=F.shadowBlur*2; vctx.shadowOffsetX=F.shadowX*2; vctx.shadowOffsetY=F.shadowY*2; }
-  vctx.fillStyle=F.color||'#2a2a2a'; const x=F.x*view.width, y=F.y*view.height, lh=px*1.2; const lines=String(F.text).split('\n');
-  lines.forEach((ln,i)=>vctx.fillText(ln,x,y+(i-(lines.length-1)/2)*lh)); vctx.restore(); }
-function drawText(){ drawTextScene(FONT,1); }
+const FONTFAM='"Samsung Sharp Sans","SamsungSharpSans","Samsung Sans","One UI Sans",-apple-system,"Helvetica Neue",Arial,sans-serif';
+function layoutGlyphs(F){ const px=(F.size||26)*2; vctx.font=`${px}px ${FONTFAM}`; const lines=String(F.text||'').split('\n'); const lh=px*1.2; const g=[];
+  lines.forEach((ln,li)=>{ const w=vctx.measureText(ln).width; const cx0=F.align==='center'?F.x*view.width-w/2:(F.align==='right'?F.x*view.width-w:F.x*view.width); const yy=F.y*view.height+(li-(lines.length-1)/2)*lh; let cx=cx0; for(const ch of ln){ const cw=vctx.measureText(ch).width; g.push({ch,x:cx,y:yy}); cx+=cw; } });
+  return {g,px}; }
+function applyShadow(F){ if(F.shadowOn){ vctx.shadowColor=hexA('#000000',F.shadowAlpha); vctx.shadowBlur=F.shadowBlur*2; vctx.shadowOffsetX=F.shadowX*2; vctx.shadowOffsetY=F.shadowY*2; } }
+// typed: 표시할 글자 수(소수). null이면 전체 표시. 현재 글자는 블러로 등장→선명.
+function drawTextScene(F,amul,typed){ if(!F||!F.text||amul<=0) return; const {g,px}=layoutGlyphs(F);
+  const base=(F.alpha==null?1:F.alpha)*amul; vctx.save(); vctx.font=`${px}px ${FONTFAM}`; vctx.textAlign='left'; vctx.textBaseline='middle'; vctx.fillStyle=F.color||'#2a2a2a';
+  if(!(F.typing && typed!=null)){ applyShadow(F); vctx.globalAlpha=base; g.forEach(gl=>vctx.fillText(gl.ch,gl.x,gl.y)); vctx.restore(); return; }
+  const cur=Math.floor(typed), frac=typed-cur;
+  for(let i=0;i<g.length && i<=cur;i++){ vctx.save(); applyShadow(F);
+    if(i<cur){ vctx.globalAlpha=base; }
+    else { vctx.globalAlpha=base*Math.min(1,frac*1.3); vctx.filter=`blur(${(F.typeBlur||0)*2*(1-frac)}px)`; }
+    vctx.fillText(g[i].ch,g[i].x,g[i].y); vctx.restore(); }
+  vctx.restore(); }
+function typedCount(F,localT){ if(!F.typing) return null; const n=String(F.text||'').length; if(!n) return 0; const sp=F.typeSpeed||6; const dur=n/sp, cyc=dur+1.6; const tt=((localT%cyc)+cyc)%cyc; return Math.min(n, tt*sp); }
+function typedLinear(F,localT){ if(!F.typing) return null; const n=String(F.text||'').length; const sp=F.typeSpeed||6; return Math.min(n, Math.max(0,localT)*sp); }
+function drawText(tSec){ drawTextScene(FONT,1,typedCount(FONT,tSec)); }
 // 시퀀스용 팔레트 보간
 function paletteStops(name){ const p=PALETTES.find(x=>x.name===name)||PALETTES[0]; return p.stops; }
 function lerpStopsInto(arr,nameA,nameB,f){ const A=paletteStops(nameA),B=paletteStops(nameB);
@@ -499,7 +517,7 @@ function frame(now){
     const f= local<seqHold ? 0 : (-(Math.cos(Math.PI*Math.min(1,(local-seqHold)/Math.max(seqTrans,0.001)))-1)/2);
     Object.keys(PARAMS).forEach(k=>state[k]=A.params[k]+(B.params[k]-A.params[k])*f);
     const src=(f<0.5)?A:B; state.genArcs=src.genArcs.map(a=>({...a})); state.edgeAOn=src.edgeAOn; state.edgeBOn=src.edgeBOn; ratioIdx=src.ratioIdx;
-    lerpStopsInto(stopsFlat,A.palette,B.palette,f); seqText={A:A.font,B:B.font,f};
+    lerpStopsInto(stopsFlat,A.palette,B.palette,f); seqText={A:A.font,B:B.font,f, typedA:typedLinear(A.font, local), typedB:typedLinear(B.font, 0)};
   }
   const lc=document.getElementById('loopChk'); const motion=(lc&&lc.checked)?1.0:0.0;
   const m=0.5-0.5*Math.cos(tSec*Math.PI/3); const scale=1.0+state.breath*motion*m;
@@ -524,11 +542,16 @@ function frame(now){
   gl.drawArrays(gl.TRIANGLES,0,3);
   // 2D 합성: orb + 텍스트
   vctx.clearRect(0,0,view.width,view.height); vctx.drawImage(glCanvas,0,0,view.width,view.height);
-  if(seqText){ drawTextScene(seqText.A,1-seqText.f); drawTextScene(seqText.B,seqText.f); seqRestore(); }
-  else drawText();
+  if(seqText){ drawTextScene(seqText.A,1-seqText.f,seqText.typedA); drawTextScene(seqText.B,seqText.f,seqText.typedB); seqRestore(); }
+  else drawText(tSec);
   requestAnimationFrame(frame);
 }
-const INIT={"app":"iridescent-halo-orb","v":7,"palette":"AI","ratioIdx":0,"edges":[{"relC":90,"hw":84,"on":0},{"relC":240,"hw":54,"on":1},{"relC":330,"hw":24,"on":1}],"edgeAOn":0,"edgeBOn":1,"font":{"text":"Hey!","color":"#2a2a2a","align":"center","shadowOn":false,"size":26,"alpha":1,"x":0.5,"y":0.52,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5},"params":{"orbSize":0.6488339014329767,"blobAmt":0.25797175661427163,"blobLobes":7,"blobSpeed":0.9001635049519672,"shapeRound":0.19416621659372266,"shapeRot":29,"shapeSides":0,"distortAmt":0.01917588084009752,"distortFreq":6,"edgeAC":38,"edgeAW":33,"edgeBC":89,"edgeBW":81,"edgeContrast":0.861551658796128,"blurAmt":0.1443619064296235,"compRot":251,"lightSize":0.20892809856835717,"lightReach":0.28027863793894825,"lightAmt":0.5269839663668476,"lightUneven":0.8519323464240542,"outerSize":0.7852661605982187,"outerAmt":0.1348519947963876,"hue":-5,"haloMix":0.6255286804962303,"intensity":0.9866260577243123,"exposure":0.8987480750462861,"haloOuter":0.7680515922017943,"falloff":2.166673059375716,"rot":5,"breath":0.10622957021842669}};
+const SC1={palette:"AI",ratioIdx:0,edges:[{relC:90,hw:84,on:0},{relC:240,hw:54,on:1},{relC:330,hw:24,on:1}],edgeAOn:0,edgeBOn:1,font:{text:"Hey!",x:0.5,y:0.5},params:{"orbSize":0.6488339014329767,"blobAmt":0.25797175661427163,"blobLobes":7,"blobSpeed":0.9001635049519672,"shapeRound":0.19416621659372266,"shapeRot":29,"shapeSides":0,"distortAmt":0.01917588084009752,"distortFreq":6,"edgeAC":38,"edgeAW":33,"edgeBC":89,"edgeBW":81,"edgeContrast":0.861551658796128,"blurAmt":0.1443619064296235,"compRot":251,"lightSize":0.20892809856835717,"lightReach":0.28027863793894825,"lightAmt":0.5269839663668476,"lightUneven":0.8519323464240542,"outerSize":0.7852661605982187,"outerAmt":0.1348519947963876,"hue":-5,"haloMix":0.6255286804962303,"intensity":0.9866260577243123,"exposure":0.8987480750462861,"haloOuter":0.7680515922017943,"falloff":2.166673059375716,"rot":5,"breath":0.10622957021842669}};
+const SC2={palette:"Aurora",ratioIdx:2,edges:[{relC:60,hw:54,on:0},{relC:180,hw:54,on:0},{relC:300,hw:54,on:1}],edgeAOn:1,edgeBOn:0,font:{text:"Welcome to",x:0.5,y:0.5},params:{"orbSize":0.3536418652086221,"blobAmt":0.22109271569624478,"blobLobes":4,"blobSpeed":0.558155352287074,"shapeRound":0.4582625597693172,"shapeRot":18,"shapeSides":3,"distortAmt":0.20836981194397916,"distortFreq":7,"edgeAC":333,"edgeAW":44,"edgeBC":311,"edgeBW":72,"edgeContrast":0.8976409358121893,"blurAmt":0.2160497942528363,"compRot":174,"lightSize":0.31679788692989297,"lightReach":0.46403068311630735,"lightAmt":0.6199343326942247,"lightUneven":0.6884091139295905,"outerSize":0.583584651867469,"outerAmt":0.377827780017696,"hue":-56,"haloMix":0.6234209818681674,"intensity":1.0501813650087461,"exposure":0.8466470341818711,"haloOuter":0.6081097540726703,"falloff":1.2956208888084728,"rot":20,"breath":0.04901997767776069}};
+const SC3=JSON.parse(JSON.stringify(SC2)); SC3.font={text:"Galaxy AI",x:0.5,y:0.5};
+const INIT={app:"iridescent-halo-orb",v:8,activePage:0,seq:{trans:0.8,hold:1.8},pages:[ {params:SC1.params,palette:SC1.palette,ratioIdx:SC1.ratioIdx,genArcs:SC1.edges,edgeAOn:SC1.edgeAOn,edgeBOn:SC1.edgeBOn,font:SC1.font},
+  {params:SC2.params,palette:SC2.palette,ratioIdx:SC2.ratioIdx,genArcs:SC2.edges,edgeAOn:SC2.edgeAOn,edgeBOn:SC2.edgeBOn,font:SC2.font},
+  {params:SC3.params,palette:SC3.palette,ratioIdx:SC3.ratioIdx,genArcs:SC3.edges,edgeAOn:SC3.edgeAOn,edgeBOn:SC3.edgeBOn,font:SC3.font} ]};
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); requestAnimationFrame(frame);
 </script>
 </body>
