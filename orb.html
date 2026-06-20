@@ -98,7 +98,7 @@
 /* ========================= 파라미터 ========================= */
 const PARAMS = {
   // 중앙 형태 (유기형)
-  orbSize:      { def:0.30, min:0.12, max:0.46, step:0.005 },
+  orbSize:      { def:0.60, min:0.12, max:1.20, step:0.005 }, // 키스크린 밖까지 확대 가능
   blobAmt:      { def:0.10, min:0,    max:0.35, step:0.01 },   // 형태 자유도(유기 변형)
   blobLobes:    { def:3,    min:2,    max:8,    step:1 },      // 형태 복잡도(돌출 수)
   blobSpeed:    { def:0.5,  min:0,    max:3,    step:0.05 },   // 형태 변화 속도
@@ -442,7 +442,7 @@ document.getElementById('palBtn').addEventListener('click',()=>{ applyPalette(pa
 
 function rand(a,b){ return a+Math.random()*(b-a); }
 document.getElementById('rndBtn').addEventListener('click',()=>{
-  state.orbSize=rand(0.18,0.40);
+  state.orbSize=rand(0.30,0.85);
   state.shapeSides=Math.random()<0.7?0:[3,4,5,6][Math.floor(Math.random()*4)];
   state.blobAmt=rand(0.05,0.26); state.blobLobes=Math.round(rand(2,7)); state.blobSpeed=rand(0.2,1.4);
   state.shapeRound=rand(0,0.6); state.shapeRot=Math.round(rand(0,90));
@@ -535,8 +535,9 @@ function frame(now){
   gl.uniform1f(U.u_outerSize,state.outerSize);
   gl.uniform1f(U.u_outerAmt,state.outerAmt);
   gl.uniform1f(U.u_glowSpread,0.08);
-  gl.uniform1f(U.u_haloInner,0.30);
-  gl.uniform1f(U.u_haloOuter,state.haloOuter);
+  // 할로를 형태 가장자리에 붙여 크게 키워도 색 띠가 보이게
+  gl.uniform1f(U.u_haloInner, state.orbSize*scale);
+  gl.uniform1f(U.u_haloOuter, Math.max(state.orbSize*scale+0.04, state.haloOuter));
   gl.uniform1f(U.u_falloff,state.falloff);
   gl.uniform1f(U.u_intensity,intPulse);
   gl.uniform1f(U.u_angle,haloAngle);
