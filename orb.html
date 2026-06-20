@@ -131,6 +131,7 @@ const PARAMS = {
   outerSize:{def:0.55,min:0.2,max:1.3,step:0.01}, outerAmt:{def:0.25,min:0,max:1.0,step:0.01},
   hue:{def:0,min:-180,max:180,step:1}, haloMix:{def:0.72,min:0,max:1,step:0.02}, intensity:{def:1.0,min:0,max:2,step:0.01},
   exposure:{def:0.96,min:0.4,max:1.4,step:0.01}, haloOuter:{def:0.66,min:0.40,max:0.95,step:0.01}, falloff:{def:1.8,min:0.5,max:4,step:0.05},
+  haloWarp:{def:0.15,min:0,max:0.6,step:0.01}, haloWarpFreq:{def:3,min:1,max:10,step:1}, surfWarp:{def:0.20,min:0,max:1,step:0.01}, surfFreq:{def:3,min:1,max:10,step:1},
   rot:{def:12,min:0,max:60,step:1}, breath:{def:0.05,min:0,max:0.20,step:0.005},
 };
 const LABELS = {
@@ -138,7 +139,7 @@ const LABELS = {
   distortAmt:'외곽 왜곡 세기', distortFreq:'왜곡 빈도',
   edgeAC:'엣지A 위치(°)', edgeAW:'엣지A 폭(±°)', edgeBC:'엣지B 위치(°)', edgeBW:'엣지B 폭(±°)', edgeContrast:'엣지 대비', blurAmt:'블러 세기', compRot:'구성 회전(°)',
   lightSize:'빛 코어 크기', lightReach:'빛 길이(번짐)', lightAmt:'빛 세기', lightUneven:'빛 불균등', outerSize:'외곽 빛 크기', outerAmt:'외곽 빛 세기',
-  hue:'색조(hue °)', haloMix:'색 선명도', intensity:'할로 강도', exposure:'밝기', haloOuter:'할로 크기', falloff:'할로 폴오프', rot:'할로 회전(°/s)', breath:'호흡'
+  hue:'색조(hue °)', haloMix:'색 선명도', intensity:'할로 강도', exposure:'밝기', haloOuter:'할로 크기', falloff:'할로 폴오프', haloWarp:'할로 왜곡', haloWarpFreq:'할로 왜곡 빈도', surfWarp:'표면 왜곡(wrap)', surfFreq:'표면 왜곡 빈도', rot:'할로 회전(°/s)', breath:'호흡'
 };
 const TABS=['형태','엣지','라이팅','컬러','모션','코드'];
 const SECTIONS=[
@@ -148,7 +149,7 @@ const SECTIONS=[
   {tab:'엣지', title:'엣지 구성 (3:2:1 랜덤)', keys:['compRot'], buttons:'edgeComp'},
   {tab:'라이팅', title:'라이팅 (앰비언트)', keys:['lightSize','lightReach','lightAmt','lightUneven','outerSize','outerAmt']},
   {tab:'컬러', special:'palette'},
-  {tab:'컬러', title:'컬러 / 할로', keys:['hue','haloMix','intensity','exposure','haloOuter','falloff']},
+  {tab:'컬러', title:'컬러 / 할로', keys:['hue','haloMix','intensity','exposure','haloOuter','falloff','haloWarp','haloWarpFreq','surfWarp','surfFreq']},
   {tab:'모션', title:'모션', keys:['rot','breath'], buttons:'motion'},
   {tab:'코드', special:'code'},
 ];
@@ -209,6 +210,7 @@ uniform float u_shapeSides,u_shapeRound,u_shapeAngle,u_blobAmt,u_blobLobes,u_blo
 uniform vec2 u_edgeA,u_edgeB; uniform float u_edgeAOn,u_edgeBOn; uniform vec3 u_gen[4];
 uniform float u_sharpFeather,u_blurFeather,u_lightSize,u_lightReach,u_lightAmt,u_lightUneven,u_outerSize,u_outerAmt;
 uniform float u_glowSpread,u_haloInner,u_haloOuter,u_falloff,u_intensity,u_angle,u_hue,u_exposure,u_haloMix,u_t;
+uniform float u_haloWarp,u_haloWarpFreq,u_surfWarp,u_surfFreq;
 uniform vec3 u_bg; uniform vec3 u_stops[12];
 const float PI=3.14159265359;
 float adist(float a,float b){ float d=abs(mod(a-b,360.0)); return min(d,360.0-d); }
@@ -234,13 +236,18 @@ void main(){
   for(int i=0;i<4;i++){ if(u_gen[i].z>0.5){ float eg=1.0-smoothstep(u_gen[i].y-SOFT,u_gen[i].y+SOFT,adist(angBase,u_gen[i].x)); edgeness=max(edgeness,eg); } }
   float featPx=mix(u_blurFeather*W,u_sharpFeather*W,edgeness);
   float bgGrad=1.0-smoothstep(0.0,0.95*W,r); vec3 color=mix(u_bg*0.93,u_bg+vec3(0.03,0.03,0.025),bgGrad);
-  vec3 hc=clamp(hueShift(haloColor(mod(angBase+u_angle,360.0)),u_hue),0.0,1.0);
+  // 표면 왜곡(wrap): 색 샘플 각도를 휘게 — 반경에 따라 감기듯 변형
+  float aWarp=u_surfWarp*70.0*sin(u_surfFreq*th + r*0.013 + u_t*0.6);
+  vec3 hc=clamp(hueShift(haloColor(mod(angBase+u_angle+aWarp,360.0)),u_hue),0.0,1.0);
+  // 할로 왜곡: 링 형태를 비원형으로 — 각도별 반경 스케일
+  float hWarp=1.0+u_haloWarp*(0.6*sin(u_haloWarpFreq*th + u_t*0.5)+0.4*sin((u_haloWarpFreq+2.0)*th - u_t*0.4 + 1.1));
+  float rH=r/max(hWarp,0.25);
   float core=u_lightSize*W, reach=max(u_lightReach*W,1.0), dd=max(r-core,0.0); float lightFall=exp(-(dd*dd)/(2.0*reach*reach));
   float a1=0.5+0.5*sin(2.0*th+u_t*0.55),a2=0.5+0.5*sin(3.0*th-u_t*0.42+1.3),a3=0.5+0.5*sin(th+u_t*0.30+4.1);
   float uneven=mix(1.0,(0.5*a1+0.3*a2+0.2*a3),u_lightUneven);
   color+=mix(vec3(1.0,0.985,0.95),hc,0.28)*lightFall*uneven*u_lightAmt;
   float oPx=max(u_outerSize*W,1.0); float outerFall=exp(-(r*r)/(2.0*oPx*oPx)); color+=mix(vec3(1.0,0.97,0.92),hc,0.4)*outerFall*uneven*u_outerAmt;
-  float t=clamp((r-innerPx)/max(outerPx-innerPx,1.0),0.0,1.0); float haloA=(r>outerPx)?0.0:pow(1.0-t,u_falloff);
+  float t=clamp((rH-innerPx)/max(outerPx-innerPx,1.0),0.0,1.0); float haloA=(rH>outerPx)?0.0:pow(1.0-t,u_falloff);
   float a=clamp(haloA*u_intensity,0.0,1.0); vec3 overB=mix(color,hc,a); vec3 addB=color+hc*haloA*u_intensity*0.85; color=mix(addB,overB,u_haloMix);
   float glowAmt=mix(0.4,1.0,1.0-edgeness)*(0.25+0.45*(0.5+0.5*sin(u_t))); float bloom=glowAmt*exp(-(r-rb)*(r-rb)/(2.0*spreadPx*spreadPx+1.0)); color+=hc*bloom*0.30+vec3(1.0)*bloom*0.35;
   float rimW=max(featPx*1.5,2.0); float rim=exp(-(r-(rb+rimW))*(r-(rb+rimW))/(2.0*rimW*rimW))*step(rb,r); color*=1.0-0.28*rim*edgeness;
@@ -255,7 +262,7 @@ const aPos=gl.getAttribLocation(prog,'a_pos'); gl.enableVertexAttribArray(aPos);
 const U={};
 ['u_res','u_center','u_radius','u_shapeSides','u_shapeRound','u_shapeAngle','u_blobAmt','u_blobLobes','u_blobSpeed','u_distortAmt','u_distortFreq',
  'u_edgeA','u_edgeB','u_edgeAOn','u_edgeBOn','u_sharpFeather','u_blurFeather','u_lightSize','u_lightReach','u_lightAmt','u_lightUneven','u_outerSize','u_outerAmt',
- 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_bg'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+ 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_haloWarp','u_haloWarpFreq','u_surfWarp','u_surfFreq','u_bg'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 const uStops=gl.getUniformLocation(prog,'u_stops[0]'); const uGen=gl.getUniformLocation(prog,'u_gen[0]');
 const stopsFlat=new Float32Array(36);
 function applyPalette(idx){ palIdx=(idx+PALETTES.length)%PALETTES.length; PALETTES[palIdx].stops.forEach((s,i)=>{ const c=hexToRGB(s); stopsFlat[i*3]=c[0]; stopsFlat[i*3+1]=c[1]; stopsFlat[i*3+2]=c[2]; }); refreshPaletteUI(); }
@@ -462,6 +469,7 @@ document.getElementById('rndBtn').onclick=()=>{
   state.outerSize=rand(0.3,1.0); state.outerAmt=rand(0.1,0.5);
   state.hue=Math.round(rand(-180,180)); state.haloMix=rand(0.5,1.0); state.intensity=rand(0.6,1.2);
   state.exposure=rand(0.82,1.04); state.haloOuter=rand(0.52,0.80); state.falloff=rand(1.2,3.0); state.rot=Math.round(rand(4,36)); state.breath=rand(0.02,0.12);
+  state.haloWarp=rand(0,0.4); state.haloWarpFreq=Math.round(rand(2,7)); state.surfWarp=rand(0,0.6); state.surfFreq=Math.round(rand(2,7));
   state.compRot=Math.round(rand(0,360)); ratioIdx=Math.floor(rand(0,RATIOS.length)); const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':'); generateEdges();
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
@@ -538,6 +546,7 @@ function frame(now){
   gl.uniform1f(U.u_haloInner,state.orbSize*scale); gl.uniform1f(U.u_haloOuter,Math.max(state.orbSize*scale+0.04,state.haloOuter));
   gl.uniform1f(U.u_falloff,state.falloff); gl.uniform1f(U.u_intensity,intPulse); gl.uniform1f(U.u_angle,haloAngle);
   gl.uniform1f(U.u_hue,state.hue); gl.uniform1f(U.u_exposure,state.exposure); gl.uniform1f(U.u_haloMix,state.haloMix); gl.uniform1f(U.u_t,motion?tSec:0.0);
+  gl.uniform1f(U.u_haloWarp,state.haloWarp); gl.uniform1f(U.u_haloWarpFreq,state.haloWarpFreq); gl.uniform1f(U.u_surfWarp,state.surfWarp); gl.uniform1f(U.u_surfFreq,state.surfFreq);
   gl.uniform3f(U.u_bg,BG[0],BG[1],BG[2]); gl.uniform3fv(uStops,stopsFlat); uploadGen(); gl.uniform3fv(uGen,genFlatU);
   gl.drawArrays(gl.TRIANGLES,0,3);
   // 2D 합성: orb + 텍스트
