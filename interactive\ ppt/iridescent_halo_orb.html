@@ -282,6 +282,9 @@ void main(){
   float glowAmt=mix(0.4,1.0,1.0-edgeness)*(0.25+0.45*(0.5+0.5*sin(u_t))); float bloom=glowAmt*exp(-(r-rb)*(r-rb)/(2.0*spreadPx*spreadPx+1.0)); color+=hc*bloom*0.30+vec3(1.0)*bloom*0.35;
   float rimW=max(featPx*1.5,2.0); float rim=exp(-(r-(rb+rimW))*(r-(rb+rimW))/(2.0*rimW*rimW))*step(rb,r); color*=1.0-0.28*rim*edgeness;
   float orbA=1.0-smoothstep(rb-featPx,rb+featPx,r); color=mix(color,vec3(1.0),orbA);
+  // 빛이 들어오듯 생성: 페이드인 중 중앙 빛 블룸이 차올랐다 가라앉음
+  float influx=clamp(u_reveal*(1.0-u_reveal)*4.0,0.0,1.0);
+  color+=mix(vec3(1.0,0.98,0.95),hc,0.35)*influx*exp(-(r*r)/(2.0*pow(0.5*W,2.0)))*0.7;
   color=mix(bgOnly,color,clamp(u_reveal,0.0,1.0)); // 중앙요소(오브+할로+라이트) 페이드인
   color*=u_exposure; gl_FragColor=vec4(clamp(color,0.0,1.0),1.0);
 }`;
@@ -704,13 +707,14 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   const newp=lines.map(([w,sz])=>{ const pg=JSON.parse(JSON.stringify(base4)); pg.font.text=w; pg.font.fontFamily='One UI Sans'; pg.font.size=sz; return pg; });
   s1.pages.splice(3,1,...newp);
   // 기존 컨셉 원복: 호흡(작아졌다 커졌다) 제거, 회전 복원(특히 3번 폼). 타이밍/사이즈는 유지
-  s1.pages[0].fadeIn=0.3;
+  s1.pages[0].fadeIn=0.5;                     // 빛이 들어오듯 생성(블룸이 보일 만큼)
   const ORB=[0.2,0.45,0.6,0.6,0.6,0.6];      // 사이즈 유지(원복)
   const HOLD=[1.0,0.3,1.0,0.4,0.5,null];     // 타이밍 유지(Hey/Galaxy 1s, 긴문장 auto)
   const ROT=[6,6,8,14,14,14];                // 3번(form3, Hello~)부터 회전
   s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.8; p.params.orbSize=ORB[i];
     p.params.breath=0.03; p.params.shapeRot=ROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6; // 호흡 제거, 회전 복원
     const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
+  s1.pages[1].hold=0.15; s1.pages[1].trans=0.4; // Welcome→Galaxy 간격 2배 빠르게
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
 </script>
