@@ -722,7 +722,10 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
     p.params.breath=(i<2?0.05:0.03); p.params.shapeRot=SROT[i]; p.params.rot=HROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6;
     if(i<2){ p.params.lightAmt=0.55; p.params.lightSize=1.4; p.params.lightReach=0.85; p.params.outerAmt=0.25; } // 빛 들어오는 느낌
     const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
-  [0,1].forEach(i=>{ s1.pages[i].bg=['#000000','#000000','#000000']; s1.pages[i].font.color='#ffffff'; }); // Welcome/Galaxy = 검은 배경 + 흰 텍스트
+  // Welcome·Galaxy 배경/룩에 주신 3번 화면 내용 적용(텍스트·타이밍·fade-in 유지)
+  const BGSC={params:{"orbSize":0.06,"centerX":0.49,"centerY":0.46,"blobAmt":0.06,"blobLobes":2,"blobSpeed":2.05,"shapeRound":0.04,"shapeRot":81,"shapeSides":0,"distortAmt":0.29,"distortFreq":2,"edgeAC":235,"edgeAW":27,"edgeBC":0,"edgeBW":26,"edgeContrast":0.75,"blurAmt":0.25,"compRot":90,"lightSize":0.21,"lightReach":1.65,"lightAmt":0.19,"lightUneven":0.9,"outerSize":0.28,"outerAmt":0,"hue":-180,"haloMix":1,"intensity":1.13,"exposure":0.82,"haloOuter":4,"falloff":0.5,"haloWarp":0.17,"haloWarpFreq":4,"surfWarp":0.07,"surfFreq":6,"rot":12,"breath":0.075},palette:"Iridescent",ratioIdx:2,genArcs:[],edgeAOn:0,edgeBOn:0,bg:["#d7c4e4","#dfbdde","#c2d7b4"]};
+  [0,1].forEach(i=>{ const f=Object.assign({},s1.pages[i].font,{color:"#2a2a2a"}), h=s1.pages[i].hold, t=s1.pages[i].trans, fi=s1.pages[i].fadeIn;
+    const pg=JSON.parse(JSON.stringify(BGSC)); pg.font=f; pg.hold=h; pg.trans=t; if(fi!=null)pg.fadeIn=fi; s1.pages[i]=pg; });
   s1.pages[0].trans=0.5;   // Welcome→Galaxy 빠르게
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
