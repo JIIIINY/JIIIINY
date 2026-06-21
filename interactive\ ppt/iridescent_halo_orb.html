@@ -662,7 +662,7 @@ function frame(now){
     seqText={A:A.font,B:B.font,f, typedA:typedLinear(A.font, local), typedB:typedLinear(B.font, 0)};
   }
   const lc=document.getElementById('loopChk'); const motion=(lc&&lc.checked)?1.0:0.0;
-  const m=0.5-0.5*Math.cos(tSec*Math.PI/3); const mb=0.5-0.5*Math.cos(tSec*Math.PI); const scale=1.0+state.breath*motion*mb;
+  const m=0.5-0.5*Math.cos(tSec*Math.PI/3); const scale=1.0+state.breath*motion*m;
   const intPulse=state.intensity*(motion?(0.9+0.25*m):1.0); const haloAngle=motion?(tSec*state.rot)%360:0.0;
   const shapeAngle=(motion?(tSec*state.shapeRot):0.0)*Math.PI/180; const sharpF=lerp(0.030,0.0025,state.edgeContrast);
   gl.viewport(0,0,glCanvas.width,glCanvas.height);
@@ -703,12 +703,13 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   const lines=[['Hello,',26],['Camila.',26],["To better adapt to you going forward. I'll first carry over the context from your previous device.",22]];
   const newp=lines.map(([w,sz])=>{ const pg=JSON.parse(JSON.stringify(base4)); pg.font.text=w; pg.font.fontFamily='One UI Sans'; pg.font.size=sz; return pg; });
   s1.pages.splice(3,1,...newp);
-  // 크기 이전 버전 원복 + 회전 제거 + 숨쉬는(브리딩) 모션. 폼1(Hey)→폼2(Galaxy)→폼3(Hello~)
+  // 기존 컨셉 원복: 호흡(작아졌다 커졌다) 제거, 회전 복원(특히 3번 폼). 타이밍/사이즈는 유지
   s1.pages[0].fadeIn=0.3;
-  const ORB=[0.2,0.45,0.6,0.6,0.6,0.6];      // 이전 사이즈로 원복
-  const HOLD=[1.0,0.3,1.0,0.4,0.5,null];     // 완성 시 유지(Hey/Galaxy 1s), 긴문장 auto
+  const ORB=[0.2,0.45,0.6,0.6,0.6,0.6];      // 사이즈 유지(원복)
+  const HOLD=[1.0,0.3,1.0,0.4,0.5,null];     // 타이밍 유지(Hey/Galaxy 1s, 긴문장 auto)
+  const ROT=[6,6,8,14,14,14];                // 3번(form3, Hello~)부터 회전
   s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.8; p.params.orbSize=ORB[i];
-    p.params.breath=0.12; p.params.shapeRot=0; p.params.blobAmt=0.06; p.params.blobSpeed=0.5; p.params.rot=6; // 회전 제거, 차분한 블롭, 호흡 강조
+    p.params.breath=0.03; p.params.shapeRot=ROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6; // 호흡 제거, 회전 복원
     const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
