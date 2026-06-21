@@ -282,10 +282,7 @@ void main(){
   float glowAmt=mix(0.4,1.0,1.0-edgeness)*(0.25+0.45*(0.5+0.5*sin(u_t))); float bloom=glowAmt*exp(-(r-rb)*(r-rb)/(2.0*spreadPx*spreadPx+1.0)); color+=hc*bloom*0.30+vec3(1.0)*bloom*0.35;
   float rimW=max(featPx*1.5,2.0); float rim=exp(-(r-(rb+rimW))*(r-(rb+rimW))/(2.0*rimW*rimW))*step(rb,r); color*=1.0-0.28*rim*edgeness;
   float orbA=1.0-smoothstep(rb-featPx,rb+featPx,r); color=mix(color,vec3(1.0),orbA);
-  // 빛이 들어오듯 생성: 페이드인 중 중앙 빛 블룸이 차올랐다 가라앉음
-  float influx=clamp(u_reveal*(1.0-u_reveal)*4.0,0.0,1.0);
-  color+=mix(vec3(1.0,0.98,0.95),hc,0.35)*influx*exp(-(r*r)/(2.0*pow(0.5*W,2.0)))*0.7;
-  // 부분적 fade-in 마스킹: 영역(각도)별로 임계가 달라 빛이 새어 들어오듯 점진 등장(왜곡된 경계)
+  // 부분적 fade-in 마스킹(빛 번짐 블룸은 제거)
   float ang3=radians(angBase);
   float raw=clamp(0.5+0.28*sin(3.0*ang3+u_t*0.6)+0.18*sin(5.0*ang3-u_t*0.4+1.3)+0.10*sin(2.0*ang3+u_t*0.35),0.0,1.0);
   float field=0.2+0.5*raw;
@@ -723,7 +720,7 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
     if(i<2){ p.params.lightAmt=0.55; p.params.lightSize=1.4; p.params.lightReach=0.85; p.params.outerAmt=0.25; } // 빛 들어오는 느낌
     const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
   // Welcome·Galaxy 배경/룩에 주신 3번 화면 내용 적용(텍스트·타이밍·fade-in 유지)
-  const BGSC={params:{"orbSize":0.06,"centerX":0.49,"centerY":0.46,"blobAmt":0.06,"blobLobes":2,"blobSpeed":2.05,"shapeRound":0.04,"shapeRot":81,"shapeSides":0,"distortAmt":0.29,"distortFreq":2,"edgeAC":235,"edgeAW":27,"edgeBC":0,"edgeBW":26,"edgeContrast":0.75,"blurAmt":0.25,"compRot":90,"lightSize":0.21,"lightReach":1.65,"lightAmt":0.19,"lightUneven":0.9,"outerSize":0.28,"outerAmt":0,"hue":-180,"haloMix":1,"intensity":1.13,"exposure":0.82,"haloOuter":4,"falloff":0.5,"haloWarp":0.17,"haloWarpFreq":4,"surfWarp":0.07,"surfFreq":6,"rot":12,"breath":0.075},palette:"Iridescent",ratioIdx:2,genArcs:[],edgeAOn:0,edgeBOn:0,bg:["#d7c4e4","#dfbdde","#c2d7b4"]};
+  const BGSC={params:{"orbSize":0.06,"centerX":0.49,"centerY":0.46,"blobAmt":0.06,"blobLobes":2,"blobSpeed":2.05,"shapeRound":0.04,"shapeRot":3,"shapeSides":0,"distortAmt":0.29,"distortFreq":2,"edgeAC":235,"edgeAW":27,"edgeBC":0,"edgeBW":26,"edgeContrast":0.75,"blurAmt":0.25,"compRot":90,"lightSize":0.21,"lightReach":1.65,"lightAmt":0.19,"lightUneven":0.9,"outerSize":0.28,"outerAmt":0,"hue":-180,"haloMix":1,"intensity":1.13,"exposure":0.82,"haloOuter":4,"falloff":0.5,"haloWarp":0.17,"haloWarpFreq":4,"surfWarp":0.07,"surfFreq":6,"rot":4,"breath":0.075},palette:"Iridescent",ratioIdx:2,genArcs:[],edgeAOn:0,edgeBOn:0,bg:["#d7c4e4","#dfbdde","#c2d7b4"]};
   [0,1].forEach(i=>{ const f=Object.assign({},s1.pages[i].font,{color:"#2a2a2a"}), h=s1.pages[i].hold, t=s1.pages[i].trans, fi=s1.pages[i].fadeIn;
     const pg=JSON.parse(JSON.stringify(BGSC)); pg.font=f; pg.hold=h; pg.trans=t; if(fi!=null)pg.fadeIn=fi; s1.pages[i]=pg; });
   s1.pages[0].trans=0.5;   // Welcome→Galaxy 빠르게
