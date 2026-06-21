@@ -722,6 +722,7 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
     p.params.breath=(i<2?0.05:0.03); p.params.shapeRot=SROT[i]; p.params.rot=HROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6;
     if(i<2){ p.params.lightAmt=0.55; p.params.lightSize=1.4; p.params.lightReach=0.85; p.params.outerAmt=0.25; } // 빛 들어오는 느낌
     const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
+  [0,1].forEach(i=>{ s1.pages[i].bg=['#000000','#000000','#000000']; s1.pages[i].font.color='#ffffff'; }); // Welcome/Galaxy = 검은 배경 + 흰 텍스트
   s1.pages[0].trans=0.5;   // Welcome→Galaxy 빠르게
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
