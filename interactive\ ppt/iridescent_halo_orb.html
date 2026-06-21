@@ -703,12 +703,12 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   const lines=[['Hello,',26],['Camila.',26],["To better adapt to you going forward. I'll first carry over the context from your previous device.",22]];
   const newp=lines.map(([w,sz])=>{ const pg=JSON.parse(JSON.stringify(base4)); pg.font.text=w; pg.font.fontFamily='One UI Sans'; pg.font.size=sz; return pg; });
   s1.pages.splice(3,1,...newp);
-  // 1페이지: 텍스트 먼저 → 중앙요소 fade-in + 사이즈 성장
-  s1.pages[0].params.orbSize=0.2; s1.pages[0].fadeIn=0.15;
-  // 링/텍스트 등장 속도 2배: 타이핑 18→36, 갭 유지(긴 문장만 자동 확보)
-  s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.3; const tlen=String(p.font.text).length; p.hold=(i===0?0.5:(tlen>30?tlen/p.font.typeSpeed+0.6:0.3)); });
-  // 원형이 완성되는 시점 = Galaxy AI. 완성 상태에서 1초 스테이 후 Hello/Camila로
-  s1.pages[1].params.orbSize=0.45; s1.pages[2].params.orbSize=0.6; s1.pages[2].hold=1.0;
+  // 3개 중앙 원형(폼): Form1(Hey)→Form2(Galaxy AI)→Form3(Camila/긴문장). 숨쉬듯 브리딩 + 단계 성장
+  s1.pages[0].fadeIn=0.3;
+  const ORB=[0.35,0.5,0.62,0.78,0.9,0.9];   // 폼1 → (전환) → 폼2 → (전환,커짐) → 폼3
+  const HOLD=[1.0,0.3,1.0,0.3,0.6,null];     // 완성 시 유지(Hey/Galaxy 1s), 전환은 짧게, 긴문장 auto
+  s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.5; p.params.orbSize=ORB[i]; p.params.breath=0.1;
+    const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
 </script>
