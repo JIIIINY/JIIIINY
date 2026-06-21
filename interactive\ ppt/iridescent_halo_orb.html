@@ -704,9 +704,9 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   const newp=lines.map(([w,sz])=>{ const pg=JSON.parse(JSON.stringify(base4)); pg.font.text=w; pg.font.fontFamily='One UI Sans'; pg.font.size=sz; return pg; });
   s1.pages.splice(3,1,...newp);
   // 1페이지: 텍스트 먼저 → 중앙요소 fade-in + 사이즈 성장
-  s1.pages[0].params.orbSize=0.2; s1.pages[0].fadeIn=0.3;
-  // 4배 빠르게: 갭(유지/전환) ↓~0.3s, 타이핑 ↑(6→18=3배). 긴 문장만 읽을 시간 자동 확보
-  s1.pages.forEach((p,i)=>{ p.font.typeSpeed=18; p.trans=0.3; const tlen=String(p.font.text).length; p.hold=(i===0?0.6:(tlen>30?tlen/p.font.typeSpeed+0.6:0.3)); });
+  s1.pages[0].params.orbSize=0.2; s1.pages[0].fadeIn=0.15;
+  // 링/텍스트 등장 속도 2배: 타이핑 18→36, 갭 유지(긴 문장만 자동 확보)
+  s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.3; const tlen=String(p.font.text).length; p.hold=(i===0?0.5:(tlen>30?tlen/p.font.typeSpeed+0.6:0.3)); });
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
 </script>
