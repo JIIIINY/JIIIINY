@@ -711,19 +711,18 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   const lines=[["Hello,\nCamila.",26],["To better adapt to you going forward. I'll first carry over the context from your previous device.",22]];
   const newp=lines.map(([w,sz])=>{ const pg=JSON.parse(JSON.stringify(base4)); pg.font.text=w; pg.font.fontFamily='One UI Sans'; pg.font.size=sz; return pg; });
   s1.pages.splice(3,1,...newp);
-  // 기존 컨셉 원복: 호흡(작아졌다 커졌다) 제거, 회전 복원(특히 3번 폼). 타이밍/사이즈는 유지
-  s1.pages[0].fadeIn=0.35;                    // 빛이 퍼져 들어오듯 시작
-  // Hey~Galaxy AI(0,1,2) = 빛 들어오는 원형(글로우) / Hello·Camila(3)=2번 원형 / 긴문장(4)=3번 원형
-  const ORB=[0,0,0,0.6,0.6];                 // 빛 페이지는 원형 없음(빛만), 2·3번 원형은 이전 사이즈(0.6)
-  const HOLD=[0.7,0.15,1.0,1.2,null];
-  const SROT=[0,0,0,4,6];                     // 형태(원형) 회전: 원형 페이지만
-  const HROT=[8,8,8,6,6];                     // 할로(빛) 회전: 뒤에서 360° 호흡하듯 느리게
+  s1.pages.shift();                           // Hey! 페이지 삭제 → [Welcome, Galaxy, Hello/Camila, 긴문장]
+  // Welcome·Galaxy(0,1)=빛 들어오는 원형(글로우) / Hello·Camila(2)=2번 원형 / 긴문장(3)=3번 원형
+  s1.pages[0].fadeIn=0.45;                     // Welcome = 빛이 퍼져 들어오며 시작
+  const ORB=[0,0,0.6,0.6];                    // 빛 페이지(0,1)는 원형 없음, 2·3번 원형=0.6(이전 사이즈)
+  const HOLD=[0.7,1.0,1.2,null];
+  const SROT=[0,0,4,6];                        // 형태(원형) 회전: 원형 페이지만
+  const HROT=[8,8,6,6];                        // 할로(빛) 360° 호흡하듯 느린 회전
   s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.8; p.params.orbSize=ORB[i];
-    p.params.breath=(i<3?0.05:0.03); p.params.shapeRot=SROT[i]; p.params.rot=HROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6;
-    if(i<3){ p.params.lightAmt=0.55; p.params.lightSize=1.4; p.params.lightReach=0.85; p.params.outerAmt=0.25; } // 빛 들어오는 느낌 유지
+    p.params.breath=(i<2?0.05:0.03); p.params.shapeRot=SROT[i]; p.params.rot=HROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6;
+    if(i<2){ p.params.lightAmt=0.55; p.params.lightSize=1.4; p.params.lightReach=0.85; p.params.outerAmt=0.25; } // 빛 들어오는 느낌
     const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
-  s1.pages[0].trans=0.5;   // Hey→Welcome 1.5배
-  s1.pages[1].trans=0.4;   // Welcome→Galaxy 2배
+  s1.pages[0].trans=0.5;   // Welcome→Galaxy 빠르게
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
 </script>
