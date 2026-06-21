@@ -712,14 +712,14 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   const newp=lines.map(([w,sz])=>{ const pg=JSON.parse(JSON.stringify(base4)); pg.font.text=w; pg.font.fontFamily='One UI Sans'; pg.font.size=sz; return pg; });
   s1.pages.splice(3,1,...newp);
   // 기존 컨셉 원복: 호흡(작아졌다 커졌다) 제거, 회전 복원(특히 3번 폼). 타이밍/사이즈는 유지
-  s1.pages[0].fadeIn=0.35;                    // 빛이 새어 들어오듯 생성
-  const ORB=[0.2,0.45,0.6,0.6,0.6,0.6];      // 사이즈 유지(원복)
-  const HOLD=[0.7,0.15,1.0,0.4,0.5,null];    // Hey→Welcome 1.5배 빠르게, Welcome→Galaxy 2배 빠르게
-  const ROT=[6,6,8,14,14,14];                // 3번(form3, Hello~)부터 회전
+  s1.pages[0].fadeIn=0.35;                    // 빛이 퍼져 들어오듯 시작
+  const ORB=[0,0.45,0.6,0.6,0.6,0.6];        // 1번: 원형 없음(빛만) → 2번부터 원형 생성
+  const HOLD=[0.7,0.15,1.0,0.4,0.5,null];    // Hey→Welcome 1.5배, Welcome→Galaxy 2배 빠르게
+  const ROT=[2,2,3,4,4,4];                    // 부유하듯/숨쉬듯 아주 느린 회전
   s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.8; p.params.orbSize=ORB[i];
-    p.params.breath=0.03; p.params.shapeRot=ROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6; // 호흡 제거, 회전 복원
+    p.params.breath=0.03; p.params.shapeRot=ROT[i]; p.params.blobAmt=0.06; p.params.blobSpeed=0.6;
     const tlen=String(p.font.text).length; p.hold=(HOLD[i]!=null?HOLD[i]:tlen/p.font.typeSpeed+0.6); });
-  s1.pages[0].trans=0.5; s1.pages[0].params.blobAmt=0.18;  // Hey→Welcome 빠르게 + 생성 시 왜곡
+  s1.pages[0].trans=0.5; s1.pages[0].params.lightAmt=0.5;  // Hey→Welcome 빠르게 + 빛 퍼짐 또렷하게
   s1.pages[1].trans=0.4;                                   // Welcome→Galaxy 2배 빠르게
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
