@@ -707,6 +707,8 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   s1.pages[0].params.orbSize=0.2; s1.pages[0].fadeIn=0.15;
   // 링/텍스트 등장 속도 2배: 타이핑 18→36, 갭 유지(긴 문장만 자동 확보)
   s1.pages.forEach((p,i)=>{ p.font.typeSpeed=36; p.trans=0.3; const tlen=String(p.font.text).length; p.hold=(i===0?0.5:(tlen>30?tlen/p.font.typeSpeed+0.6:0.3)); });
+  // 원형이 완성되는 시점 = Galaxy AI. 완성 상태에서 1초 스테이 후 Hello/Camila로
+  s1.pages[1].params.orbSize=0.45; s1.pages[2].params.orbSize=0.6; s1.pages[2].hold=1.0;
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
 </script>
