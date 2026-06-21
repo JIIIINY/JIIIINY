@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iridescent Edge Blur</title>
+<style>
+  :root{
+    --panel-bg: rgba(20,20,24,0.72);
+    --panel-br: rgba(255,255,255,0.10);
+    --txt: rgba(255,255,255,0.86);
+    --txt-dim: rgba(255,255,255,0.45);
+    --accent: #c9b8ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+
+  /* background stage — toggles behind the transparent canvas */
+  #stage{
+    position:fixed;inset:0;
+    background:#ffffff;
+    transition:background .4s ease;
+  }
+  #stage.dark{background:#0a0a0c}
+  #stage.checker{
+    background-color:#cfcfcf;
+    background-image:
+      linear-gradient(45deg,#9a9a9a 25%,transparent 25%),
+      linear-gradient(-45deg,#9a9a9a 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#9a9a9a 75%),
+      linear-gradient(-45deg,transparent 75%,#9a9a9a 75%);
+    background-size:28px 28px;
+    background-position:0 0,0 14px,14px -14px,-14px 0;
+  }
+
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+  /* control panel */
+  #panel{
+    position:fixed;left:18px;bottom:18px;z-index:10;
+    width:248px;padding:14px 14px 12px;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-br);
+    border-radius:16px;
+    backdrop-filter:blur(18px) saturate(1.2);
+    -webkit-backdrop-filter:blur(18px) saturate(1.2);
+    color:var(--txt);
+    box-shadow:0 8px 40px rgba(0,0,0,.28);
+    user-select:none;
+    transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;
+  }
+  #panel.collapsed{transform:translateY(calc(100% - 42px));opacity:.92}
+  .head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:10px}
+  .head h1{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--txt)}
+  .head .dot{font-size:11px;color:var(--txt-dim)}
+
+  .row{margin:11px 0}
+  .row label{display:flex;justify-content:space-between;font-size:11px;color:var(--txt-dim);margin-bottom:6px;letter-spacing:.02em}
+  .row label b{color:var(--accent);font-weight:600}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:rgba(255,255,255,.16);outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0);
+    box-shadow:0 1px 6px rgba(0,0,0,.35);
+  }
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border:none;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0)}
+
+  .btns{display:flex;gap:7px;margin-top:13px}
+  button{
+    flex:1;padding:8px 0;font-size:11px;font-weight:600;letter-spacing:.02em;
+    color:var(--txt);background:rgba(255,255,255,.07);
+    border:1px solid var(--panel-br);border-radius:10px;cursor:pointer;
+    transition:background .2s,border-color .2s;
+  }
+  button:hover{background:rgba(255,255,255,.13)}
+  button.active{border-color:var(--accent);color:#fff}
+  button.rec{color:#ff8da3}
+  button.rec.on{background:rgba(255,80,110,.18);border-color:#ff5a6e;color:#ffd0d8}
+
+  .bgrow{display:flex;gap:6px;margin-top:11px}
+  .bgrow button{padding:7px 0}
+  .hint{font-size:10px;color:var(--txt-dim);margin-top:10px;line-height:1.5}
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+  <canvas id="gl"></canvas>
+
+  <div id="panel">
+    <div class="head" id="head">
+      <h1>IRIDESCENT EDGE BLUR</h1>
+      <span class="dot" id="chev">▾</span>
+    </div>
+
+    <div class="row">
+      <label>속도 <b id="vSpeed">0.6</b></label>
+      <input type="range" id="speed" min="0" max="2" step="0.01" value="0.6">
+    </div>
+    <div class="row">
+      <label>두께 변동 <b id="vThick">1.0</b></label>
+      <input type="range" id="thick" min="0" max="2" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>무지갯빛 세기 <b id="vIrid">1.0</b></label>
+      <input type="range" id="irid" min="0" max="2" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>크기 <b id="vRad">0.40</b></label>
+      <input type="range" id="rad" min="0.2" max="0.46" step="0.005" value="0.40">
+    </div>
+
+    <div class="btns">
+      <button id="play" class="active">⏸ 정지</button>
+      <button id="rec" class="rec">● 녹화</button>
+    </div>
+
+    <div class="bgrow">
+      <button data-bg="" class="active">투명</button>
+      <button data-bg="dark">검정</button>
+      <button data-bg="checker">체커</button>
+    </div>
+
+    <div class="hint">배경은 미리보기용. 캔버스는 투명 알파로 렌더링됩니다. ‘녹화’는 알파 포함 .webm으로 저장됩니다.</div>
+  </div>
+
+<script>
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl', {alpha:true, premultipliedAlpha:false, antialias:true, preserveDrawingBuffer:true});
+if(!gl){ alert('이 브라우저는 WebGL을 지원하지 않습니다.'); }
+
+const VERT = `
+attribute vec2 a;
+void main(){ gl_Position = vec4(a,0.0,1.0); }`;
+
+const FRAG = `
+precision highp float;
+uniform vec2  u_res;
+uniform float u_time;
+uniform float u_thick;
+uniform float u_irid;
+uniform float u_radius;
+
+float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
+float noise(vec2 p){
+  vec2 i=floor(p), f=fract(p);
+  float a=hash(i), b=hash(i+vec2(1.,0.)), c=hash(i+vec2(0.,1.)), d=hash(i+vec2(1.,1.));
+  vec2 u=f*f*(3.0-2.0*f);
+  return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+}
+float fbm(vec2 p){
+  float v=0.0, amp=0.5;
+  for(int i=0;i<5;i++){ v+=amp*noise(p); p=p*2.0+vec2(11.3,7.1); amp*=0.5; }
+  return v;
+}
+
+// soft pastel iridescent cosine palette
+vec3 palette(float t){
+  vec3 a=vec3(0.78,0.75,0.80);
+  vec3 b=vec3(0.20,0.22,0.24);
+  vec3 c=vec3(1.0,1.0,1.0);
+  vec3 d=vec3(0.00,0.33,0.62);
+  return a + b*cos(6.28318*(c*t + d));
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*u_res)/min(u_res.x,u_res.y);
+  float t = u_time;
+  vec2 p = uv;
+
+  // domain warp -> organic distortion of the whole ring
+  vec2 q = vec2(
+    fbm(p*1.5 + vec2(0.0,  t*0.05)),
+    fbm(p*1.5 + vec2(5.2, -t*0.04))
+  );
+  p += (q-0.5)*0.07*(0.6+0.4*u_thick);
+
+  float r   = length(p);
+  float ang = atan(p.y, p.x);
+
+  // breathing base radius
+  float R0 = u_radius + 0.012*sin(t*0.12);
+
+  // uneven thickness: multi-sine boundary modulation
+  float tv = u_thick;
+  float Rb = R0
+    + tv*0.035*sin(ang*2.0 + t*0.10)
+    + tv*0.022*sin(ang*3.0 - t*0.07)
+    + tv*0.015*sin(ang*5.0 + t*0.05)
+    + tv*0.010*sin(ang*7.0 - t*0.03);
+
+  float d = r - Rb; // signed distance to boundary
+
+  // angle-varying edge softness -> blur thickness differs around the ring
+  float soft = 0.040
+    + 0.030*tv*(0.5+0.5*sin(ang*2.0 - t*0.08))
+    + 0.018*tv*(0.5+0.5*sin(ang*4.0 + t*0.06));
+
+  // opaque black core (soft outer edge)
+  float core = smoothstep(soft, -soft, d);
+
+  // iridescent band: glow straddling boundary, fading outward
+  float bandW = 0.055 + 0.050*tv*(0.5+0.5*sin(ang*3.0 + t*0.05));
+  float band = exp(-pow(max(d + soft*0.35, 0.0)/bandW, 1.7));
+  band += 0.55*exp(-pow(d/(soft*1.25), 2.0));   // halo right on the edge
+  band = clamp(band, 0.0, 1.0);
+
+  // iridescent color rotates around the ring + shifts with radius & noise
+  float cidx = ang/6.28318 + d*1.8 + t*0.02 + 0.25*fbm(p*2.0 + t*0.03);
+  vec3 col = palette(cidx);
+  col = mix(vec3(dot(col,vec3(0.333))), col, 0.88); // keep it pastel
+
+  vec3 rgb = col * band * u_irid;
+  float alpha = max(core, band*0.9*u_irid);
+
+  // color lives only outside the dark disk
+  rgb = mix(rgb, vec3(0.0), core);
+
+  gl_FragColor = vec4(rgb, clamp(alpha,0.0,1.0));
+}`;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog,'a');
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+const U = {
+  res:   gl.getUniformLocation(prog,'u_res'),
+  time:  gl.getUniformLocation(prog,'u_time'),
+  thick: gl.getUniformLocation(prog,'u_thick'),
+  irid:  gl.getUniformLocation(prog,'u_irid'),
+  radius:gl.getUniformLocation(prog,'u_radius'),
+};
+
+let DPR = Math.min(window.devicePixelRatio||1, 2);
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  cv.width  = Math.floor(innerWidth*DPR);
+  cv.height = Math.floor(innerHeight*DPR);
+  gl.viewport(0,0,cv.width,cv.height);
+}
+window.addEventListener('resize', resize); resize();
+
+// state
+const state = { speed:0.6, thick:1.0, irid:1.0, rad:0.40, playing:true };
+let simTime = 0, last = performance.now();
+
+function frame(now){
+  const dt = Math.min((now-last)/1000, 0.05); last = now;
+  if(state.playing) simTime += dt*state.speed;
+  gl.uniform2f(U.res, cv.width, cv.height);
+  gl.uniform1f(U.time, simTime);
+  gl.uniform1f(U.thick, state.thick);
+  gl.uniform1f(U.irid, state.irid);
+  gl.uniform1f(U.radius, state.rad);
+  gl.clearColor(0,0,0,0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- UI ----
+const $ = id => document.getElementById(id);
+function bind(id, key, label, fmt){
+  const el = $(id), out = $(label);
+  el.addEventListener('input', ()=>{ state[key]=parseFloat(el.value); out.textContent=fmt(state[key]); });
+}
+bind('speed','speed','vSpeed', v=>v.toFixed(2));
+bind('thick','thick','vThick', v=>v.toFixed(2));
+bind('irid','irid','vIrid', v=>v.toFixed(2));
+bind('rad','rad','vRad', v=>v.toFixed(2));
+
+const playBtn = $('play');
+playBtn.addEventListener('click', ()=>{
+  state.playing = !state.playing;
+  playBtn.textContent = state.playing ? '⏸ 정지' : '▶ 재생';
+  playBtn.classList.toggle('active', state.playing);
+});
+
+// background toggle
+const stage = $('stage');
+document.querySelectorAll('.bgrow button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.bgrow button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    stage.className = b.dataset.bg;
+  });
+});
+
+// collapse panel
+const panel = $('panel'), chev = $('chev');
+$('head').addEventListener('click', ()=>{
+  panel.classList.toggle('collapsed');
+  chev.textContent = panel.classList.contains('collapsed') ? '▴' : '▾';
+});
+
+// ---- recording (alpha webm) ----
+let recorder=null, chunks=[];
+const recBtn = $('rec');
+recBtn.addEventListener('click', ()=>{
+  if(recorder && recorder.state==='recording'){ recorder.stop(); return; }
+  const stream = cv.captureStream(60);
+  const types = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mime = types.find(t=>MediaRecorder.isTypeSupported(t)) || '';
+  try{
+    recorder = new MediaRecorder(stream, mime?{mimeType:mime, videoBitsPerSecond:12_000_000}:undefined);
+  }catch(e){ alert('이 브라우저에서 녹화를 지원하지 않습니다.'); return; }
+  chunks=[];
+  recorder.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+  recorder.onstop = ()=>{
+    const blob = new Blob(chunks, {type:'video/webm'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download='iridescent-edge-blur.webm'; a.click();
+    URL.revokeObjectURL(url);
+    recBtn.classList.remove('on'); recBtn.textContent='● 녹화';
+  };
+  recorder.start();
+  recBtn.classList.add('on'); recBtn.textContent='■ 정지';
+});
+</script>
+</body>
+</html>
