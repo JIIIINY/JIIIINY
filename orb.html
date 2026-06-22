@@ -90,7 +90,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.6</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.7</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -734,7 +734,7 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   s1.pages.forEach(p=>p.params.centerY=0.55);  // 원형 위치 아래로(Y=0.55)
   s1.pages.forEach(p=>{ p.font.color='#ffffff'; p.font.weight='500'; });  // 글자 흰색 + 두께 Medium
   const SIZE=[26,26,22,22];                     // Welcome·Galaxy=26pt / Hello·긴문장=22pt
-  s1.pages.forEach((p,i)=>{ p.font.size=SIZE[i]; p.font.shadowOn=true; p.font.shadowBlur=10; p.font.shadowY=2; p.font.shadowAlpha=0.45; });  // 그림자 처리
+  s1.pages.forEach((p,i)=>{ p.font.size=SIZE[i]; p.font.shadowOn=true; p.font.shadowBlur=5; p.font.shadowY=1; p.font.shadowAlpha=0.225; });  // 그림자 처리(1/2 강도)
   s1.pages[0].trans=0.5;   // Welcome→Galaxy 빠르게
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
