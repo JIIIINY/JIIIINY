@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frosted Glass Card</title>
+<style>
+  :root{
+    --panel-bg: rgba(20,20,24,0.72);
+    --panel-br: rgba(255,255,255,0.10);
+    --txt: rgba(255,255,255,0.86);
+    --txt-dim: rgba(255,255,255,0.45);
+    --accent: #c9b8ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+  /* control panel */
+  #panel{
+    position:fixed;left:18px;bottom:18px;z-index:10;
+    width:248px;padding:14px 14px 12px;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-br);
+    border-radius:16px;
+    backdrop-filter:blur(18px) saturate(1.2);
+    -webkit-backdrop-filter:blur(18px) saturate(1.2);
+    color:var(--txt);
+    box-shadow:0 8px 40px rgba(0,0,0,.28);
+    user-select:none;
+    transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;
+  }
+  #panel.collapsed{transform:translateY(calc(100% - 42px));opacity:.92}
+  .head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:10px}
+  .head h1{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--txt)}
+  .head .dot{font-size:11px;color:var(--txt-dim)}
+
+  .row{margin:11px 0}
+  .row label{display:flex;justify-content:space-between;font-size:11px;color:var(--txt-dim);margin-bottom:6px;letter-spacing:.02em}
+  .row label b{color:var(--accent);font-weight:600}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:rgba(255,255,255,.16);outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0);
+    box-shadow:0 1px 6px rgba(0,0,0,.35);
+  }
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border:none;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0)}
+
+  .btns{display:flex;gap:7px;margin-top:13px}
+  button{
+    flex:1;padding:8px 0;font-size:11px;font-weight:600;letter-spacing:.02em;
+    color:var(--txt);background:rgba(255,255,255,.07);
+    border:1px solid var(--panel-br);border-radius:10px;cursor:pointer;
+    transition:background .2s,border-color .2s;
+  }
+  button:hover{background:rgba(255,255,255,.13)}
+  button.active{border-color:var(--accent);color:#fff}
+  button.rec{color:#ff8da3}
+  button.rec.on{background:rgba(255,80,110,.18);border-color:#ff5a6e;color:#ffd0d8}
+
+  .bgrow{display:flex;gap:6px;margin-top:11px}
+  .bgrow button{padding:7px 0}
+  .hint{font-size:10px;color:var(--txt-dim);margin-top:10px;line-height:1.5}
+</style>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <input type="file" id="file" accept="image/*" style="display:none">
+
+  <div id="panel">
+    <div class="head" id="head">
+      <h1>FROSTED GLASS CARD</h1>
+      <span class="dot" id="chev">▾</span>
+    </div>
+
+    <div class="row">
+      <label>굴절 강도 <b id="vRefract">1.00</b></label>
+      <input type="range" id="refract" min="0" max="2" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>프로스트(블러) <b id="vFrost">1.00</b></label>
+      <input type="range" id="frost" min="0" max="2" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>색분산 <b id="vDisp">1.00</b></label>
+      <input type="range" id="disp" min="0" max="3" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>우유빛 틴트 <b id="vTint">1.00</b></label>
+      <input type="range" id="tint" min="0" max="2" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>무지갯빛 글린트 <b id="vIrid">1.00</b></label>
+      <input type="range" id="irid" min="0" max="2" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>모서리 둥글기 <b id="vCorner">0.09</b></label>
+      <input type="range" id="corner" min="0.0" max="0.26" step="0.005" value="0.09">
+    </div>
+    <div class="row">
+      <label>크기 <b id="vSize">0.26</b></label>
+      <input type="range" id="size" min="0.12" max="0.40" step="0.005" value="0.26">
+    </div>
+
+    <div class="btns">
+      <button id="play" class="active">⏸ 정지</button>
+      <button id="rec" class="rec">● 녹화</button>
+    </div>
+
+    <div class="bgrow">
+      <button data-bg="0" class="active">그라데이션</button>
+      <button data-bg="1">사진</button>
+      <button data-bg="2">체커</button>
+    </div>
+
+    <div class="hint">카드는 뒤 배경을 굴절·확산해 반영합니다. ‘사진’을 누르면 이미지를 올려 배경으로 쓸 수 있어요.</div>
+  </div>
+
+<script>
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl', {alpha:false, antialias:true, preserveDrawingBuffer:true});
+if(!gl){ alert('이 브라우저는 WebGL을 지원하지 않습니다.'); }
+
+const VERT = `
+attribute vec2 a;
+void main(){ gl_Position = vec4(a,0.0,1.0); }`;
+
+const FRAG = `
+precision highp float;
+uniform vec2  u_res;
+uniform float u_time;
+uniform float u_refract;
+uniform float u_frost;
+uniform float u_disp;
+uniform float u_tint;
+uniform float u_irid;
+uniform float u_corner;
+uniform float u_size;
+uniform int   u_bg;
+uniform sampler2D u_photo;
+uniform float u_hasPhoto;
+uniform float u_photoAspect;
+
+float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
+float noise(vec2 p){
+  vec2 i=floor(p), f=fract(p);
+  float a=hash(i), b=hash(i+vec2(1.,0.)), c=hash(i+vec2(0.,1.)), d=hash(i+vec2(1.,1.));
+  vec2 u=f*f*(3.0-2.0*f);
+  return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+}
+float fbm(vec2 p){
+  float v=0.0, amp=0.5;
+  for(int i=0;i<4;i++){ v+=amp*noise(p); p=p*2.0+vec2(11.3,7.1); amp*=0.5; }
+  return v;
+}
+
+// soft pastel iridescent cosine palette
+vec3 palette(float t){
+  vec3 a=vec3(0.80,0.74,0.70);
+  vec3 b=vec3(0.22,0.20,0.22);
+  vec3 c=vec3(1.0,1.0,1.0);
+  vec3 d=vec3(0.00,0.20,0.45);
+  return a + b*cos(6.28318*(c*t + d));
+}
+
+// background color sampled in screen-uv space (0..1)
+vec3 bgColor(vec2 uv){
+  if(u_bg==2){                                   // checker
+    vec2 g = floor(uv*u_res/30.0);
+    float c = mod(g.x+g.y,2.0);
+    return mix(vec3(0.82),vec3(0.58),c);
+  }
+  if(u_bg==1){                                   // photo
+    if(u_hasPhoto>0.5){
+      float ca = u_res.x/u_res.y;                // cover-fit the image
+      vec2 t = uv;
+      float s = u_photoAspect/ca;
+      if(s>1.0) t.x=(uv.x-0.5)/s+0.5;
+      else      t.y=(uv.y-0.5)*s+0.5;
+      return texture2D(u_photo, vec2(t.x,1.0-t.y)).rgb;
+    }
+    // placeholder vivid field so refraction/dispersion are visible
+    vec2 q=uv*3.0;
+    vec3 c1=vec3(0.95,0.42,0.55), c2=vec3(0.32,0.55,0.95), c3=vec3(0.97,0.86,0.42);
+    float a=0.5+0.5*sin(q.x*2.0+u_time*0.2);
+    float b=0.5+0.5*cos(q.y*2.3-u_time*0.15);
+    return mix(mix(c1,c2,a),c3,b*0.6);
+  }
+  // gradient — soft blue-grey, light toward top, like the reference
+  vec3 top=vec3(0.83,0.87,0.90);
+  vec3 bot=vec3(0.69,0.75,0.80);
+  vec3 col=mix(bot,top,uv.y);
+  float vig=distance(uv,vec2(0.5,0.62));
+  col*=1.0-0.13*smoothstep(0.2,0.95,vig);
+  return col;
+}
+
+// signed-distance to a rounded square (negative inside)
+float sdBox(vec2 p){
+  vec2 b=vec2(u_size);
+  float r=min(u_corner,u_size*0.98);
+  vec2 q=abs(p)-b+r;
+  return min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-r;
+}
+vec2 sdNormal(vec2 p){
+  float e=0.0015;
+  float dx=sdBox(p+vec2(e,0.0))-sdBox(p-vec2(e,0.0));
+  float dy=sdBox(p+vec2(0.0,e))-sdBox(p-vec2(0.0,e));
+  return normalize(vec2(dx,dy)+1e-6);
+}
+
+// frosted (multi-tap blurred) background sample
+vec3 sampleFrost(vec2 uv, float aspect){
+  float rad=u_frost*0.012;
+  vec3 acc=vec3(0.0);
+  for(int i=0;i<12;i++){
+    float a=float(i)*2.39996;                    // golden-angle spiral
+    float rr=rad*sqrt((float(i)+0.5)/12.0);
+    acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(1.0/aspect,1.0));
+  }
+  return acc/12.0;
+}
+
+void main(){
+  float aspect=u_res.x/u_res.y;
+  vec2 suv=gl_FragCoord.xy/u_res;
+  vec2 p=(suv-0.5); p.x*=aspect;
+
+  float d=sdBox(p);
+  vec2  n=sdNormal(p);
+  float inside=smoothstep(0.003,-0.003,d);
+
+  // ---- base background + soft contact shadow under the card ----
+  vec3 base=bgColor(suv);
+  float dsh=sdBox(p-vec2(0.0,-0.035));
+  float sh=smoothstep(0.11,-0.05,dsh)*smoothstep(-0.02,0.05,d);
+  base=mix(base,base*0.74,sh*0.55);
+
+  // ---- refraction: bevel near the edge bends the background ----
+  float bevel=u_refract*exp(-pow(max(-d,0.0)/0.05,1.6));
+  vec2  refr=n*bevel*0.13;                         // offset in p-space
+  vec2  ro=vec2(refr.x/aspect,refr.y);             // back to screen-uv
+
+  vec3 body=sampleFrost(suv+ro,aspect);            // frosted, refracted bg
+
+  // chromatic dispersion concentrated at the edge
+  float disp=u_disp*0.012;
+  float edgeMix=clamp(bevel,0.0,1.0);
+  body.r=mix(body.r,bgColor(suv+ro*(1.0+disp)).r,edgeMix);
+  body.b=mix(body.b,bgColor(suv+ro*(1.0-disp)).b,edgeMix);
+
+  // ---- milky frost tint + slight desaturation ----
+  vec3 col=mix(body,vec3(1.0),0.20*u_tint);
+  col=mix(vec3(dot(col,vec3(0.333))),col,0.84);
+
+  // inner ambient occlusion gives the glass thickness
+  float ao=exp(-pow(max(-d,0.0)/0.020,2.0));
+  col*=1.0-0.12*ao;
+
+  // ---- composite card over background ----
+  vec3 outc=mix(base,col,inside);
+
+  // thin highlight band straddling the boundary
+  float edgeLine=exp(-pow(d/0.007,2.0));
+
+  // top-lit specular rim (light from upper-left)
+  vec2 L=normalize(vec2(-0.35,1.0));
+  float spec=pow(max(dot(n,L),0.0),2.0);
+  outc+=edgeLine*spec*0.55;
+
+  // warm iridescent glints (left edge + bottom-right corner)
+  vec3 irid=palette(atan(n.y,n.x)/6.28318+0.25*fbm(p*3.0)+u_time*0.02);
+  irid=mix(irid,vec3(1.0,0.62,0.30),0.45);         // warm bias like the reference
+  float glint=pow(max(dot(n,normalize(vec2(-1.0,0.05))),0.0),3.0)
+             +pow(max(dot(n,normalize(vec2(0.65,-0.8))),0.0),3.0);
+  outc+=irid*edgeLine*glint*u_irid*0.7;
+
+  gl_FragColor=vec4(outc,1.0);
+}`;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog,'a');
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+const U = {
+  res:    gl.getUniformLocation(prog,'u_res'),
+  time:   gl.getUniformLocation(prog,'u_time'),
+  refract:gl.getUniformLocation(prog,'u_refract'),
+  frost:  gl.getUniformLocation(prog,'u_frost'),
+  disp:   gl.getUniformLocation(prog,'u_disp'),
+  tint:   gl.getUniformLocation(prog,'u_tint'),
+  irid:   gl.getUniformLocation(prog,'u_irid'),
+  corner: gl.getUniformLocation(prog,'u_corner'),
+  size:   gl.getUniformLocation(prog,'u_size'),
+  bg:     gl.getUniformLocation(prog,'u_bg'),
+  photo:  gl.getUniformLocation(prog,'u_photo'),
+  hasPhoto:gl.getUniformLocation(prog,'u_hasPhoto'),
+  photoAspect:gl.getUniformLocation(prog,'u_photoAspect'),
+};
+
+// photo texture (NPOT-safe)
+const tex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([200,200,200,255]));
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+gl.uniform1i(U.photo, 0);
+
+let DPR = Math.min(window.devicePixelRatio||1, 2);
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  cv.width  = Math.floor(innerWidth*DPR);
+  cv.height = Math.floor(innerHeight*DPR);
+  gl.viewport(0,0,cv.width,cv.height);
+}
+window.addEventListener('resize', resize); resize();
+
+// state
+const state = { refract:1.0, frost:1.0, disp:1.0, tint:1.0, irid:1.0,
+                corner:0.09, size:0.26, bg:0, hasPhoto:0, photoAspect:1.0, playing:true };
+let simTime = 0, last = performance.now();
+
+function frame(now){
+  const dt = Math.min((now-last)/1000, 0.05); last = now;
+  if(state.playing) simTime += dt;
+  gl.uniform2f(U.res, cv.width, cv.height);
+  gl.uniform1f(U.time, simTime);
+  gl.uniform1f(U.refract, state.refract);
+  gl.uniform1f(U.frost, state.frost);
+  gl.uniform1f(U.disp, state.disp);
+  gl.uniform1f(U.tint, state.tint);
+  gl.uniform1f(U.irid, state.irid);
+  gl.uniform1f(U.corner, state.corner);
+  gl.uniform1f(U.size, state.size);
+  gl.uniform1i(U.bg, state.bg);
+  gl.uniform1f(U.hasPhoto, state.hasPhoto);
+  gl.uniform1f(U.photoAspect, state.photoAspect);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- UI ----
+const $ = id => document.getElementById(id);
+function bind(id, key, label, fmt){
+  const el = $(id), out = $(label);
+  el.addEventListener('input', ()=>{ state[key]=parseFloat(el.value); out.textContent=fmt(state[key]); });
+}
+bind('refract','refract','vRefract', v=>v.toFixed(2));
+bind('frost','frost','vFrost', v=>v.toFixed(2));
+bind('disp','disp','vDisp', v=>v.toFixed(2));
+bind('tint','tint','vTint', v=>v.toFixed(2));
+bind('irid','irid','vIrid', v=>v.toFixed(2));
+bind('corner','corner','vCorner', v=>v.toFixed(3));
+bind('size','size','vSize', v=>v.toFixed(3));
+
+const playBtn = $('play');
+playBtn.addEventListener('click', ()=>{
+  state.playing = !state.playing;
+  playBtn.textContent = state.playing ? '⏸ 정지' : '▶ 재생';
+  playBtn.classList.toggle('active', state.playing);
+});
+
+// background toggle (그라데이션 / 사진 / 체커)
+const fileInput = $('file');
+document.querySelectorAll('.bgrow button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.bgrow button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    state.bg = parseInt(b.dataset.bg,10);
+    if(state.bg===1 && !state.hasPhoto) fileInput.click();   // prompt for an image
+  });
+});
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const img = new Image();
+  img.onload = ()=>{
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+    state.photoAspect = img.width/img.height;
+    state.hasPhoto = 1;
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(f);
+});
+
+// collapse panel
+const panel = $('panel'), chev = $('chev');
+$('head').addEventListener('click', ()=>{
+  panel.classList.toggle('collapsed');
+  chev.textContent = panel.classList.contains('collapsed') ? '▴' : '▾';
+});
+
+// ---- recording (webm) ----
+let recorder=null, chunks=[];
+const recBtn = $('rec');
+recBtn.addEventListener('click', ()=>{
+  if(recorder && recorder.state==='recording'){ recorder.stop(); return; }
+  const stream = cv.captureStream(60);
+  const types = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mime = types.find(t=>MediaRecorder.isTypeSupported(t)) || '';
+  try{
+    recorder = new MediaRecorder(stream, mime?{mimeType:mime, videoBitsPerSecond:12_000_000}:undefined);
+  }catch(e){ alert('이 브라우저에서 녹화를 지원하지 않습니다.'); return; }
+  chunks=[];
+  recorder.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+  recorder.onstop = ()=>{
+    const blob = new Blob(chunks, {type:'video/webm'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download='frosted-glass-card.webm'; a.click();
+    URL.revokeObjectURL(url);
+    recBtn.classList.remove('on'); recBtn.textContent='● 녹화';
+  };
+  recorder.start();
+  recBtn.classList.add('on'); recBtn.textContent='■ 정지';
+});
+</script>
+</body>
+</html>
