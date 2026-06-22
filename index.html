@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.3</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.4</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -219,7 +219,6 @@ state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
 state.hold=1.5; state.trans=1.5; state.fadeIn=0;
 // 아트보드(에디터 무대) 배경: 듀오 2색 + 보색 1색 그라데이션(linear/radial)
 const artboard={ type:'linear', angle:135, c1:'#1a1a22', c2:'#23232c', c3:'#2c2638' };
-let waveOn=true;   // #2 가로 웨이브 라인 레이어 on/off
 let codeReady=false;
 const RATIOS=[[3,2,1],[2,1,1],[1,1,1],[4,2,1]]; let ratioIdx=0;
 function generateEdges(){ const ratio=RATIOS[ratioIdx],sum=ratio.reduce((a,b)=>a+b,0); let acc=0; const arcs=[],gap=6;
@@ -540,7 +539,7 @@ function gotoScreen(i){ if(!screens.length||_switching) return; const target=((i
 const SCREEN_NAMES=['Welcome','Hello','Home'];
 function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){ el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='#'+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); }
   const bx=document.getElementById('screenBtns'); if(bx){ bx.innerHTML=''; screens.forEach((s,i)=>{ const b=document.createElement('button'); b.className=(i===activeScreen?'on':''); b.textContent='#'+(i+1)+(SCREEN_NAMES[i]?' '+SCREEN_NAMES[i]:''); b.onclick=()=>gotoScreen(i); bx.appendChild(b); }); }
-  const cx=document.getElementById('ctxCtrl'); if(cx){ cx.innerHTML=''; if(activeScreen===1){ const w=document.createElement('button'); w.className=waveOn?'on':''; w.textContent='〜 Edge Wave: '+(waveOn?'ON':'OFF'); w.onclick=()=>{ waveOn=!waveOn; w.className=waveOn?'on':''; w.textContent='〜 Edge Wave: '+(waveOn?'ON':'OFF'); }; cx.appendChild(w); } } }
+  const cx=document.getElementById('ctxCtrl'); if(cx) cx.innerHTML=''; }
 (function buildFontUI(){ const p=document.getElementById('fontBody');
   // 페이지
   const tp=document.createElement('div'); tp.className='sec-title'; tp.textContent='페이지'; p.appendChild(tp);
@@ -705,20 +704,6 @@ function drawTextScene(F,amul,typed){ if(!F||!F.text||amul<=0) return; const {g,
 function typedCount(F,localT){ if(!F.typing) return null; const n=String(F.text||'').length; if(!n) return 0; const sp=F.typeSpeed||6; const dur=n/sp, cyc=dur+1.6; const tt=((localT%cyc)+cyc)%cyc; return Math.min(n, tt*sp); }
 function typedLinear(F,localT){ if(!F.typing) return null; const n=String(F.text||'').length; const sp=F.typeSpeed||6; return Math.min(n, Math.max(0,localT)*sp); }
 function drawText(tSec){ drawTextScene(FONT,1,typedCount(FONT,tSec)); }
-const AI_COLS=['#FF8D7A','#C2B2FF','#8BBDFF','#88E6E3','#F0F488'];
-function vRoundRect(x,y,w,h,r){ if(vctx.roundRect){ vctx.beginPath(); vctx.roundRect(x,y,w,h,r); return; }
-  vctx.beginPath(); vctx.moveTo(x+r,y); vctx.arcTo(x+w,y,x+w,y+h,r); vctx.arcTo(x+w,y+h,x,y+h,r); vctx.arcTo(x,y+h,x,y,r); vctx.arcTo(x,y,x+w,y,r); vctx.closePath(); }
-// #2 가로 웨이브 라인 레이어 (텍스트 뒤, 양끝 테이퍼 + 흐르는 애니메이션)
-function drawWaveLayer(tSec){ if(!waveOn) return; const W=view.width,H=view.height;
-  const appear=Math.min(1,Math.max(0,(tSec-0.2)/0.8)); if(appear<=0) return;
-  const cy=H*0.5, amp=H*0.055; vctx.save(); vctx.lineCap='round';
-  const grad=vctx.createLinearGradient(0,0,W,0); AI_COLS.forEach((c,i)=>grad.addColorStop(i/(AI_COLS.length-1),c));
-  vctx.strokeStyle=grad; vctx.shadowColor='rgba(150,170,255,0.45)'; vctx.shadowBlur=26;
-  for(let layer=0; layer<3; layer++){ const ph=tSec*(0.8+layer*0.35)+layer*1.3, a=amp*(1-layer*0.22), fr=1.6+layer*0.55;
-    vctx.globalAlpha=appear*(0.9-layer*0.26); vctx.lineWidth=8-layer*2; vctx.beginPath();
-    for(let x=0;x<=W;x+=6){ const t=x/W, y=cy+Math.sin(t*Math.PI*2*fr+ph)*a*Math.sin(t*Math.PI); if(x===0)vctx.moveTo(x,y); else vctx.lineTo(x,y); }
-    vctx.stroke(); }
-  vctx.restore(); }
 // #3 home: frosted glass(배경광 영향) — 상단 Notification 카드 + 하단 아이콘 4개
 function cardPath(x,y,w,h,rt,rb){ vctx.beginPath();
   if(vctx.roundRect){ vctx.roundRect(x,y,w,h,[rt,rt,rb,rb]); return; }
@@ -801,7 +786,6 @@ function frame(now){
   gl.drawArrays(gl.TRIANGLES,0,3);
   // 2D 합성: orb + 텍스트
   vctx.clearRect(0,0,view.width,view.height); vctx.drawImage(glCanvas,0,0,view.width,view.height);
-  if(activeScreen===1) drawWaveLayer(tSec);              // #2 가로 웨이브 라인(텍스트 뒤)
   if(seqText){ drawTextScene(seqText.A,1-seqText.f,seqText.typedA); drawTextScene(seqText.B,seqText.f,seqText.typedB); seqRestore(); }
   else drawText(tSec);
   if(activeScreen===2) drawHomeFrost(tSec);             // #3 frosted 카드 + 아이콘
@@ -812,10 +796,13 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"screens":[{"page
 (function(){ const intro=INIT.screens[0].pages.slice();
   INIT.screens[0].pages=intro.slice(0,2); INIT.screens[0].activePage=1;
   INIT.screens[1].pages=intro.slice(2); INIT.screens[1].activePage=Math.max(0,intro.length-3); })();
-// #1·#2 텍스트: 검은색·그림자제거 / Welcome·Galaxy=Sharp Sans Bold, 나머지=One UI Sans Medium 20pt
-[INIT.screens[0],INIT.screens[1]].forEach(s=>s.pages.forEach(p=>{ if(!p.font) return; p.font.color="#2a2a2a"; p.font.shadowOn=false;
+// 폰트 통일(그림자제거) / Welcome·Galaxy=Sharp Sans Bold, 나머지=One UI Sans Medium 20pt
+[INIT.screens[0],INIT.screens[1]].forEach((s,si)=>s.pages.forEach(p=>{ if(!p.font) return; p.font.shadowOn=false;
+  p.font.color = si===0 ? "#ffffff" : "#2a2a2a";   // #1 흰색 텍스트 / #2 검은색
   if(p.font.fontFamily==="Samsung Sharp Sans"){ p.font.weight="700"; }
   else { p.font.fontFamily="One UI Sans"; p.font.weight="500"; p.font.size=20; } }));
+// #1 배경 검정
+INIT.screens[0].pages.forEach(p=>{ p.bg=["#000000","#000000","#000000"]; });
 // #3 home: 중앙 오브 유지 + 상단 Notification 카드 / 하단 frosted 아이콘 4개 오버레이
 (function(){ const p=INIT.screens[2].pages[0]; p.params.centerX=0.5; p.params.centerY=0.56; p.params.orbSize=0.28; p.font.text=""; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
