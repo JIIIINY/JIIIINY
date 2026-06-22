@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.10</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.11</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -225,6 +225,7 @@ state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[];
 state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
 state.bgType=0; state.bgSize=100; state.bgAlpha=1;   // iridescent 배경 타입/사이즈/알파
 state.blankBg='#000000';   // 최하단 blank(솔리드) 배경
+state.orbFill='#ffffff';   // 중앙 오브 채움색
 state.hold=1.5; state.trans=1.5; state.fadeIn=0;
 // 아트보드(에디터 무대) 배경: 화면별로 저장됨. 타입 linear/radial/solid/gradation + size + alpha
 const artboard={ type:'linear', angle:135, c1:'#1a1a22', c2:'#23232c', c3:'#2c2638', size:100, alpha:1 };
@@ -269,6 +270,7 @@ uniform float u_reveal;
 uniform vec3 u_bg1,u_bg2,u_bg3; uniform vec3 u_stops[12];
 uniform float u_bgType,u_bgSize,u_bgAlpha;   // 키스크린 iridescent 배경: 0 linear/1 radial/2 solid/3 gradation
 uniform vec3 u_blankBg;                       // 최하단 blank(솔리드) 배경 — iridescent는 이 위에 u_bgAlpha로 얹힘
+uniform vec3 u_orbFill;                        // 중앙 오브 채움색 (기존 흰색 → 색 지정 가능)
 const float PI=3.14159265359;
 float adist(float a,float b){ float d=abs(mod(a-b,360.0)); return min(d,360.0-d); }
 vec3 haloColor(float deg){ float a=mod(deg,360.0)/30.0; vec3 col=u_stops[0];
@@ -325,7 +327,7 @@ void main(){
   float a=clamp(haloA*u_intensity,0.0,1.0); vec3 overB=mix(color,hc,a); vec3 addB=color+hc*haloA*u_intensity*0.85; color=mix(addB,overB,u_haloMix);
   float glowAmt=mix(0.4,1.0,1.0-edgeness)*(0.25+0.45*(0.5+0.5*sin(u_t))); float bloom=glowAmt*exp(-(r-rb)*(r-rb)/(2.0*spreadPx*spreadPx+1.0)); color+=hc*bloom*0.30+vec3(1.0)*bloom*0.35;
   float rimW=max(featPx*1.5,2.0); float rim=exp(-(r-(rb+rimW))*(r-(rb+rimW))/(2.0*rimW*rimW))*step(rb,r); color*=1.0-0.28*rim*edgeness;
-  float orbA=1.0-smoothstep(rb-featPx,rb+featPx,r); color=mix(color,vec3(1.0),orbA);
+  float orbA=1.0-smoothstep(rb-featPx,rb+featPx,r); color=mix(color,u_orbFill,orbA);
   // 부분적 fade-in 마스킹(빛 번짐 블룸은 제거)
   float ang3=radians(angBase);
   float raw=clamp(0.5+0.28*sin(3.0*ang3+u_t*0.6)+0.18*sin(5.0*ang3-u_t*0.4+1.3)+0.10*sin(2.0*ang3+u_t*0.35),0.0,1.0);
@@ -342,7 +344,7 @@ const aPos=gl.getAttribLocation(prog,'a_pos'); gl.enableVertexAttribArray(aPos);
 const U={};
 ['u_res','u_center','u_radius','u_shapeSides','u_shapeRound','u_shapeAngle','u_blobAmt','u_blobLobes','u_blobSpeed','u_distortAmt','u_distortFreq',
  'u_edgeA','u_edgeB','u_edgeAOn','u_edgeBOn','u_sharpFeather','u_blurFeather','u_lightSize','u_lightReach','u_lightAmt','u_lightUneven','u_outerSize','u_outerAmt',
- 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_haloWarp','u_haloWarpFreq','u_surfWarp','u_surfFreq','u_reveal','u_bg1','u_bg2','u_bg3','u_bgType','u_bgSize','u_bgAlpha','u_blankBg'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+ 'u_glowSpread','u_haloInner','u_haloOuter','u_falloff','u_intensity','u_angle','u_hue','u_exposure','u_haloMix','u_t','u_haloWarp','u_haloWarpFreq','u_surfWarp','u_surfFreq','u_reveal','u_bg1','u_bg2','u_bg3','u_bgType','u_bgSize','u_bgAlpha','u_blankBg','u_orbFill'].forEach(n=>U[n]=gl.getUniformLocation(prog,n));
 const uStops=gl.getUniformLocation(prog,'u_stops[0]'); const uGen=gl.getUniformLocation(prog,'u_gen[0]');
 
 /* ===== #3 유리(frosted glass) 패스: 실제 배경을 텍스처로 받아 SDF 굴절·색분산·프로스트 ===== */
@@ -432,7 +434,7 @@ function generateBg(){ const H=Math.random()*360, s=0.32+Math.random()*0.23, l=0
 
 /* ===================== UI 빌드 ===================== */
 const inputs={};
-let swatchEl, palNameEl, codeBox, bgSwatchEl, bgInputs=null, bgSizeSl=null, bgAlphaSl=null, bgTypeWrap=null, blankInput=null;
+let swatchEl, palNameEl, codeBox, bgSwatchEl, bgInputs=null, bgSizeSl=null, bgAlphaSl=null, bgTypeWrap=null, blankInput=null, orbFillInput=null;
 const BLANK_PRESETS=['#000000','#0d0f14','#15171d','#8a8a90','#1a1430','#0f2230','#241a14','#e9e4f5','#1b2a22','#2a0d1d'];
 let seqChipsEl, seqTabArr=null;
 let artInputs=null, artSwatchEl=null;
@@ -497,7 +499,14 @@ function buildMotion(p){ const row=document.createElement('div'); row.className=
   const note=document.createElement('div'); note.className='note'; note.textContent='페이지마다 유지/전환 시간을 따로 설정. 텍스트 등장 속도는 폰트 패널의 「타이핑 속도」.'; p.appendChild(note); }
 
 // 팔레트 블록 (상단에 랜덤/반영 버튼)
-function buildPaletteBlock(p){ const h=document.createElement('div'); h.className='sec-title'; h.textContent='컬러 팔레트'; p.appendChild(h);
+function buildPaletteBlock(p){
+  // 중앙 오브 채움색 (기존 흰색→회색으로 보이던 a9a9a9 자리)
+  p.appendChild(secTitle('중앙 오브 채움색'));
+  { const w=document.createElement('div'); w.style.marginBottom='4px';
+    const ci=document.createElement('input'); ci.type='color'; ci.value=state.orbFill; ci.oninput=()=>{ state.orbFill=ci.value; if(codeReady) refreshCode(); };
+    w.appendChild(ci); p.appendChild(w); orbFillInput=ci; }
+  const on=document.createElement('div'); on.className='note'; on.textContent='오브 안쪽 채움색. 흰색이 노출(exposure)로 회색처럼 보이던 부분. 화면별 저장.'; p.appendChild(on);
+  const h=document.createElement('div'); h.className='sec-title'; h.textContent='컬러 팔레트'; p.appendChild(h);
   const bd=document.createElement('div'); bd.className='btns';
   const r=document.createElement('button'); r.className='b acc2'; r.textContent='🎲 팔레트 랜덤';
   const a=document.createElement('button'); a.className='b acc'; a.textContent='📥 다음 코드에 반영';
@@ -510,7 +519,8 @@ function buildPaletteBlock(p){ const h=document.createElement('div'); h.classNam
   palNameEl=document.createElement('div'); palNameEl.className='pal-name'; p.appendChild(palNameEl);
   const note=document.createElement('div'); note.className='note'; note.textContent='AI 대표색: #FF8D7A #C2B2FF #8BBDFF #88E6E3 #F0F488'; p.appendChild(note);
 }
-function refreshPaletteUI(){ if(!swatchEl) return; const pal=PALETTES[palIdx]; palNameEl.textContent='팔레트: '+pal.name;
+function refreshPaletteUI(){ if(orbFillInput) orbFillInput.value=state.orbFill||'#ffffff';
+  if(!swatchEl) return; const pal=PALETTES[palIdx]; palNameEl.textContent='팔레트: '+pal.name;
   swatchEl.innerHTML=''; [0,2,4,6,8,10].forEach(i=>{ const s=document.createElement('i'); s.style.background=pal.stops[i]; swatchEl.appendChild(s); }); }
 // 키스크린 배경 — 화면별 / ① 최하단 blank(솔리드) ② 그 위 iridescent(엣지·라이팅 팔레트)
 function buildKeyBgBlock(p){ p.appendChild(secTitle('① 최하단 Blank 배경 (솔리드 · 화면별)'));
@@ -668,20 +678,20 @@ function buildSeqTab(p){
 }
 /* 페이지 = 장면 스냅샷(모든 파라미터+팔레트+엣지+폰트) */
 function captureScene(){ const params={}; Object.keys(PARAMS).forEach(k=>params[k]=state[k]);
-  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], bgType:state.bgType, bgSize:state.bgSize, bgAlpha:state.bgAlpha, blankBg:state.blankBg, hold:state.hold, trans:state.trans, fadeIn:state.fadeIn, font:Object.assign({},FONT) }; }
+  return { params, palette:PALETTES[palIdx].name, ratioIdx, genArcs:state.genArcs.map(a=>({...a})), edgeAOn:state.edgeAOn, edgeBOn:state.edgeBOn, bg:[state.bg1,state.bg2,state.bg3], bgType:state.bgType, bgSize:state.bgSize, bgAlpha:state.bgAlpha, blankBg:state.blankBg, orbFill:state.orbFill, hold:state.hold, trans:state.trans, fadeIn:state.fadeIn, font:Object.assign({},FONT) }; }
 function normScene(o){ o=o||{}; const params={}; Object.keys(PARAMS).forEach(k=> params[k]=(o.params&&k in o.params)?+o.params[k]:PARAMS[k].def);
   const arcsrc = Array.isArray(o.genArcs)?o.genArcs : (Array.isArray(o.edges)?o.edges:[]);
   const bg = Array.isArray(o.bg)&&o.bg.length>=3 ? o.bg.slice(0,3) : ['#E9E4F5','#E2EEF6','#F7E8E2'];
   return { params, palette:o.palette||'AI', ratioIdx:(typeof o.ratioIdx==='number')?o.ratioIdx:0,
     genArcs:arcsrc.map(a=>({relC:+a.relC||0,hw:+a.hw||10,on:a.on?1:0})),
     edgeAOn:('edgeAOn'in o)?(o.edgeAOn?1:0):1, edgeBOn:('edgeBOn'in o)?(o.edgeBOn?1:0):1, bg,
-    bgType:(o.bgType!=null?+o.bgType:0), bgSize:(o.bgSize!=null?+o.bgSize:100), bgAlpha:(o.bgAlpha!=null?+o.bgAlpha:1), blankBg:(o.blankBg||'#000000'),
+    bgType:(o.bgType!=null?+o.bgType:0), bgSize:(o.bgSize!=null?+o.bgSize:100), bgAlpha:(o.bgAlpha!=null?+o.bgAlpha:1), blankBg:(o.blankBg||'#000000'), orbFill:(o.orbFill||'#ffffff'),
     hold:(o.hold!=null?+o.hold:1.5), trans:(o.trans!=null?+o.trans:1.5), fadeIn:(o.fadeIn!=null?+o.fadeIn:0),
     font:Object.assign(newFont(''), o.font||{}) }; }
 function applyScene(sc){ Object.keys(PARAMS).forEach(k=>state[k]=sc.params[k]);
   state.genArcs=sc.genArcs.map(a=>({...a})); state.edgeAOn=sc.edgeAOn; state.edgeBOn=sc.edgeBOn; ratioIdx=sc.ratioIdx;
   if(Array.isArray(sc.bg)){ state.bg1=sc.bg[0]; state.bg2=sc.bg[1]; state.bg3=sc.bg[2]; }
-  state.bgType=(sc.bgType!=null?sc.bgType:0); state.bgSize=(sc.bgSize!=null?sc.bgSize:100); state.bgAlpha=(sc.bgAlpha!=null?sc.bgAlpha:1); state.blankBg=(sc.blankBg||'#000000');
+  state.bgType=(sc.bgType!=null?sc.bgType:0); state.bgSize=(sc.bgSize!=null?sc.bgSize:100); state.bgAlpha=(sc.bgAlpha!=null?sc.bgAlpha:1); state.blankBg=(sc.blankBg||'#000000'); state.orbFill=(sc.orbFill||'#ffffff');
   state.hold=(sc.hold!=null?sc.hold:1.5); state.trans=(sc.trans!=null?sc.trans:1.5); state.fadeIn=(sc.fadeIn!=null?sc.fadeIn:0);
   const rb=document.getElementById('ratioBtn'); if(rb) rb.textContent='비율: '+RATIOS[ratioIdx].join(':');
   const pi=PALETTES.findIndex(x=>x.name===sc.palette); applyPalette(pi>=0?pi:0);
@@ -825,7 +835,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.10.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.11.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
@@ -931,6 +941,7 @@ function frame(now){
   gl.uniform3f(U.u_bg1,b1[0],b1[1],b1[2]); gl.uniform3f(U.u_bg2,b2[0],b2[1],b2[2]); gl.uniform3f(U.u_bg3,b3[0],b3[1],b3[2]);
   gl.uniform1f(U.u_bgType,state.bgType||0); gl.uniform1f(U.u_bgSize,(state.bgSize==null?100:state.bgSize)/100); gl.uniform1f(U.u_bgAlpha,state.bgAlpha==null?1:state.bgAlpha);
   const kb=hexToRGB(state.blankBg||'#000000'); gl.uniform3f(U.u_blankBg,kb[0],kb[1],kb[2]);
+  const of=hexToRGB(state.orbFill||'#ffffff'); gl.uniform3f(U.u_orbFill,of[0],of[1],of[2]);
   gl.uniform3fv(uStops,stopsFlat); uploadGen(); gl.uniform3fv(uGen,genFlatU);
   gl.drawArrays(gl.TRIANGLES,0,3);
   // 2D 합성: orb + 텍스트
