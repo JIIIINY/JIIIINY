@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.4</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.5</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -708,25 +708,40 @@ function drawText(tSec){ drawTextScene(FONT,1,typedCount(FONT,tSec)); }
 function cardPath(x,y,w,h,rt,rb){ vctx.beginPath();
   if(vctx.roundRect){ vctx.roundRect(x,y,w,h,[rt,rt,rb,rb]); return; }
   vctx.moveTo(x+rt,y); vctx.arcTo(x+w,y,x+w,y+h,rt); vctx.arcTo(x+w,y+h,x,y+h,rb); vctx.arcTo(x,y+h,x,y,rb); vctx.arcTo(x,y,x+w,y,rt); vctx.closePath(); }
-// frosted glass 1조각: 외곽 글로우 → 블러 배경 → 글래스 틴트/sheen → 림 라이트
-function drawFrost(buildPath,bx,by,bw,bh){
-  vctx.save(); buildPath(); vctx.shadowColor='rgba(188,206,255,0.6)'; vctx.shadowBlur=22; vctx.shadowOffsetY=6; vctx.fillStyle='rgba(255,255,255,0.45)'; vctx.fill(); vctx.restore();
-  vctx.save(); buildPath(); vctx.clip();
-  vctx.filter='blur(14px)'; vctx.drawImage(glCanvas,-16,-16,view.width+32,view.height+32); vctx.filter='none';
-  vctx.fillStyle='rgba(255,255,255,0.22)'; vctx.fillRect(bx-6,by-6,bw+12,bh+12);
-  const sheen=vctx.createLinearGradient(0,by,0,by+bh); sheen.addColorStop(0,'rgba(255,255,255,0.40)'); sheen.addColorStop(0.55,'rgba(255,255,255,0.0)'); vctx.fillStyle=sheen; vctx.fillRect(bx-6,by-6,bw+12,bh+12);
+// 유리 굴절: 실제 배경(glCanvas)을 형상 중심 기준으로 확대 투영 + 가장자리 강한 굴절 밴드
+// outer=바깥 형상, inner=안쪽 형상(가장자리 밴드 폭만큼 축소), (ccx,ccy)=형상 중심
+function drawGlass(outer,inner,ccx,ccy,bx,by,bw,bh,ox,oy){
+  const W=view.width,H=view.height; ox=ox||0; oy=oy||0;
+  const bg=(s,k)=>vctx.drawImage(glCanvas, ccx*(1-s)+ox*k, ccy*(1-s)+oy*k, W*s, H*s);
+  // 1) 가장자리: 크게 확대된 배경(굴절이 강하게 휘는 띠) — 투영 오프셋 강하게
+  vctx.save(); outer(); vctx.clip(); vctx.filter='blur(1.5px)'; bg(1.85,1.0); vctx.filter='none'; vctx.restore();
+  // 2) 중앙부: 약하게 확대된 배경(렌즈 투영) → 안쪽 형상에만 → 가장자리 띠만 남김
+  vctx.save(); inner(); vctx.clip(); vctx.filter='blur(1px)'; bg(1.12,0.55); vctx.filter='none'; vctx.restore();
+  // 3) 유리 질감: 아주 옅은 틴트 + 상단 sheen
+  vctx.save(); outer(); vctx.clip();
+  vctx.fillStyle='rgba(255,255,255,0.06)'; vctx.fillRect(bx-8,by-8,bw+16,bh+16);
+  const sheen=vctx.createLinearGradient(0,by,0,by+bh); sheen.addColorStop(0,'rgba(255,255,255,0.30)'); sheen.addColorStop(0.5,'rgba(255,255,255,0.0)'); sheen.addColorStop(1,'rgba(255,255,255,0.10)'); vctx.fillStyle=sheen; vctx.fillRect(bx-8,by-8,bw+16,bh+16);
   vctx.restore();
-  vctx.save(); buildPath(); vctx.lineWidth=Math.max(1.2,bw*0.005); const rg=vctx.createLinearGradient(0,by,0,by+bh); rg.addColorStop(0,'rgba(255,255,255,0.92)'); rg.addColorStop(1,'rgba(255,255,255,0.30)'); vctx.strokeStyle=rg; vctx.stroke(); vctx.restore(); }
+  // 4) 테두리 굴절 하이라이트(안쪽 어두운 림 + 바깥 밝은 림)
+  vctx.save(); inner(); vctx.lineWidth=Math.max(1,bw*0.006); vctx.strokeStyle='rgba(0,0,0,0.10)'; vctx.stroke(); vctx.restore();
+  vctx.save(); outer(); vctx.lineWidth=Math.max(1.2,bw*0.006); const rg=vctx.createLinearGradient(0,by,0,by+bh); rg.addColorStop(0,'rgba(255,255,255,0.85)'); rg.addColorStop(1,'rgba(255,255,255,0.35)'); vctx.strokeStyle=rg; vctx.stroke(); vctx.restore(); }
 function drawHomeFrost(tSec){ const W=view.width,H=view.height, DP=W/360;
+  // 배경 오브 중심(투영이 오브 색을 끌어오도록): 현재 #3 페이지 centerX/Y
+  const orbX=W*0.5, orbY=H*0.56, K=0.42;
   // 상단 Notification 카드: 340x233dp, 여백 상·좌·우 10dp, R 상80/하60dp
-  const cw=340*DP, chh=233*DP, cx=10*DP, cy=10*DP, rt=80*DP, rb=60*DP;
+  const cw=340*DP, chh=233*DP, cx=10*DP, cy=10*DP, rt=80*DP, rb=60*DP, ein=16*DP;
   const cardAp=Math.min(1,Math.max(0,(tSec-0.2)/0.6));
-  if(cardAp>0){ vctx.save(); vctx.globalAlpha=cardAp; drawFrost(()=>cardPath(cx,cy,cw,chh,rt,rb),cx,cy,cw,chh); vctx.restore(); }
+  if(cardAp>0){ vctx.save(); vctx.globalAlpha=cardAp; const mcx=cx+cw/2, mcy=cy+chh/2;
+    drawGlass(()=>cardPath(cx,cy,cw,chh,rt,rb),
+              ()=>cardPath(cx+ein,cy+ein,cw-2*ein,chh-2*ein,Math.max(0,rt-ein),Math.max(0,rb-ein)),
+              mcx,mcy,cx,cy,cw,chh,(mcx-orbX)*K,(mcy-orbY)*K); vctx.restore(); }
   // 하단 아이콘 4개: 70x70dp, 간격 8dp, 하단에서 45dp 위, 가로 중앙 정렬
-  const isz=70*DP, gp=8*DP, n=4, totw=n*isz+(n-1)*gp, sx=(W-totw)/2, iy=H-45*DP-isz;
+  const isz=70*DP, gp=8*DP, n=4, totw=n*isz+(n-1)*gp, sx=(W-totw)/2, iy=H-45*DP-isz, iein=9*DP;
   for(let i=0;i<n;i++){ const t0=0.5+i*0.12, ap=Math.min(1,Math.max(0,(tSec-t0)/0.5)); if(ap<=0) continue;
-    const ix=sx+i*(isz+gp); vctx.save(); vctx.globalAlpha=ap;
-    drawFrost(()=>{ vctx.beginPath(); vctx.arc(ix+isz/2,iy+isz/2,isz/2,0,Math.PI*2); },ix,iy,isz,isz);
+    const ix=sx+i*(isz+gp), mcx=ix+isz/2, mcy=iy+isz/2; vctx.save(); vctx.globalAlpha=ap;
+    drawGlass(()=>{ vctx.beginPath(); vctx.arc(mcx,mcy,isz/2,0,Math.PI*2); },
+              ()=>{ vctx.beginPath(); vctx.arc(mcx,mcy,isz/2-iein,0,Math.PI*2); },
+              mcx,mcy,ix,iy,isz,isz,(mcx-orbX)*K,(mcy-orbY)*K);
     vctx.restore(); } }
 // 시퀀스용 팔레트 보간
 function paletteStops(name){ const p=PALETTES.find(x=>x.name===name)||PALETTES[0]; return p.stops; }
@@ -804,7 +819,9 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"screens":[{"page
 // #1 배경 검정
 INIT.screens[0].pages.forEach(p=>{ p.bg=["#000000","#000000","#000000"]; });
 // #3 home: 중앙 오브 유지 + 상단 Notification 카드 / 하단 frosted 아이콘 4개 오버레이
-(function(){ const p=INIT.screens[2].pages[0]; p.params.centerX=0.5; p.params.centerY=0.56; p.params.orbSize=0.28; p.font.text=""; })();
+// (유리 굴절이 보이도록 오브의 과노출/헤일로를 낮춰 색이 배경에 드러나게)
+(function(){ const p=INIT.screens[2].pages[0]; p.params.centerX=0.5; p.params.centerY=0.56; p.params.orbSize=0.34;
+  p.params.exposure=0.74; p.params.intensity=1.08; p.params.haloMix=0.62; p.font.text=""; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
 // 임베드 폰트 로드 보장 후 렌더 시작
 if(document.fonts && document.fonts.load){ Promise.all([document.fonts.load('700 60px "Samsung Sharp Sans"'),document.fonts.load('500 60px "One UI Sans"')]).catch(()=>{}).finally(()=>requestAnimationFrame(frame)); }
