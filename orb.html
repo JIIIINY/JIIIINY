@@ -45,6 +45,11 @@
   .pageind .dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.28); cursor:pointer; transition:all .2s; }
   .pageind .dot.on{ width:22px; border-radius:4px; background:#fff; }
   .screenlabel{ margin-top:-6px; font-size:12px; letter-spacing:2px; color:#9a9aa2; }
+  .screenbtns{ display:flex; gap:8px; margin-top:2px; }
+  .screenbtns button{ background:rgba(40,40,48,.92); color:#cfcfd6; border:1px solid #3a3a44; border-radius:999px; padding:6px 14px; font-size:12px; cursor:pointer; transition:all .2s; }
+  .screenbtns button.on{ background:#fff; color:#15151a; border-color:#fff; font-weight:600; }
+  .canvas-wrap{ transition:opacity .28s ease; }
+  .canvas-wrap.switching{ opacity:0; }
 
   /* 패널 공통 */
   .panel{ position:fixed; top:52px; bottom:0; width:300px; background:#141417; z-index:30; overflow-y:auto; padding:0 0 40px;
@@ -92,7 +97,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.0</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.1</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -115,7 +120,7 @@
         <div class="pageind" id="pageind"></div>
         <button class="nav navR" id="navR">›</button>
       </div>
-      <div class="screenlabel" id="screenLabel">#1</div>
+      <div class="screenbtns" id="screenBtns"></div>
     </div>
   </div>
 
@@ -159,9 +164,8 @@ const LABELS = {
   lightSize:'빛 코어 크기', lightReach:'빛 길이(번짐)', lightAmt:'빛 세기', lightUneven:'빛 불균등', outerSize:'외곽 빛 크기', outerAmt:'외곽 빛 세기',
   hue:'색조(hue °)', haloMix:'색 선명도', intensity:'할로 강도', exposure:'밝기', haloOuter:'할로 크기', falloff:'할로 폴오프', haloWarp:'할로 왜곡', haloWarpFreq:'할로 왜곡 빈도', surfWarp:'표면 왜곡(wrap)', surfFreq:'표면 왜곡 빈도', rot:'할로 회전(°/s)', breath:'호흡'
 };
-const TABS=['시퀀스','형태','엣지','라이팅','컬러','모션','코드'];
+const TABS=['형태','엣지','라이팅','컬러','모션','코드'];
 const SECTIONS=[
-  {tab:'시퀀스', special:'seq'},
   {tab:'형태', title:'중앙 형태 (유기형)', keys:['orbSize','centerX','centerY','blobAmt','blobLobes','blobSpeed','shapeRound','shapeRot','shapeSides'], buttons:'form'},
   {tab:'형태', title:'외곽 왜곡', keys:['distortAmt','distortFreq']},
   {tab:'엣지', title:'엣지 / 블러 위치', keys:['edgeAC','edgeAW','edgeBC','edgeBW','edgeContrast','blurAmt'], buttons:'edgeToggles'},
@@ -169,6 +173,7 @@ const SECTIONS=[
   {tab:'라이팅', title:'라이팅 (앰비언트)', keys:['lightSize','lightReach','lightAmt','lightUneven','outerSize','outerAmt']},
   {tab:'컬러', special:'palette'},
   {tab:'컬러', special:'bg'},
+  {tab:'컬러', special:'artboard'},
   {tab:'컬러', title:'컬러 / 할로', keys:['hue','haloMix','intensity','exposure','haloOuter','falloff','haloWarp','haloWarpFreq','surfWarp','surfFreq']},
   {tab:'모션', title:'모션', keys:['rot','breath'], buttons:'motion'},
   {tab:'코드', special:'code'},
@@ -208,6 +213,8 @@ const state={}; Object.keys(PARAMS).forEach(k=>state[k]=PARAMS[k].def);
 state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[];
 state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
 state.hold=1.5; state.trans=1.5; state.fadeIn=0;
+// 아트보드(에디터 무대) 배경: 듀오 2색 + 보색 1색 그라데이션(linear/radial)
+const artboard={ type:'linear', angle:135, c1:'#1a1a22', c2:'#23232c', c3:'#2c2638' };
 let codeReady=false;
 const RATIOS=[[3,2,1],[2,1,1],[1,1,1],[4,2,1]]; let ratioIdx=0;
 function generateEdges(){ const ratio=RATIOS[ratioIdx],sum=ratio.reduce((a,b)=>a+b,0); let acc=0; const arcs=[],gap=6;
@@ -312,6 +319,7 @@ function generateBg(){ const H=Math.random()*360, s=0.32+Math.random()*0.23, l=0
 const inputs={};
 let swatchEl, palNameEl, codeBox, bgSwatchEl, bgInputs=null;
 let seqChipsEl, seqTabArr=null;
+let artInputs=null, artSwatchEl=null;
 function fmt(P,v){ const st=P.step; return (+v).toFixed(st<0.01?3:(st<1?2:0)); }
 function mkSlider(parent,key,P,label,getv,setv){
   const row=document.createElement('div'); row.className='row';
@@ -334,9 +342,9 @@ function selectTab(t){ TABS.forEach(x=>{ paneOf[x].classList.toggle('on',x===t);
 
 SECTIONS.forEach(sec=>{
   const pane=paneOf[sec.tab];
-  if(sec.special==='seq'){ buildSeqTab(pane); return; }
   if(sec.special==='palette'){ buildPaletteBlock(pane); return; }
   if(sec.special==='bg'){ buildBgBlock(pane); return; }
+  if(sec.special==='artboard'){ buildArtboardBlock(pane); return; }
   if(sec.special==='code'){ buildCodeBlock(pane); return; }
   const h=document.createElement('div'); h.className='sec-title'; h.textContent=sec.title; pane.appendChild(h);
   (sec.keys||[]).forEach(k=>{ inputs[k]=mkSlider(pane,k,PARAMS[k],LABELS[k],()=>state[k],v=>state[k]=v); });
@@ -405,6 +413,39 @@ function buildBgBlock(p){ const h=document.createElement('div'); h.className='se
   refreshBgUI(); }
 function refreshBgUI(){ if(!bgInputs) return; const v=[state.bg1,state.bg2,state.bg3]; bgInputs.forEach((ci,i)=>ci.value=v[i]);
   if(bgSwatchEl){ bgSwatchEl.innerHTML=''; v.forEach(c=>{ const s=document.createElement('i'); s.style.background=c; bgSwatchEl.appendChild(s); }); } }
+
+// 아트보드(무대) 배경 — 듀오 2색 + 보색 1색 그라데이션
+function applyArtboard(){ const st=document.querySelector('.stage'); if(!st) return;
+  const {type,angle,c1,c2,c3}=artboard;
+  st.style.background = type==='radial'
+    ? `radial-gradient(circle at 50% 42%, ${c1} 0%, ${c2} 55%, ${c3} 100%)`
+    : `linear-gradient(${angle}deg, ${c1} 0%, ${c2} 55%, ${c3} 100%)`; }
+function randomArtboard(){ const H=Math.random()*360, s=0.10+Math.random()*0.22, l=0.10+Math.random()*0.14, d=14+Math.random()*26;
+  artboard.c1=hsl2hex(H,s,l); artboard.c2=hsl2hex(H+d,s*0.9,Math.min(0.92,l*1.25)); artboard.c3=hsl2hex(H+180,s*0.8,Math.min(0.92,l*1.1));
+  artboard.angle=Math.round(Math.random()*360); }
+function buildArtboardBlock(p){ p.appendChild(secTitle('아트보드 배경 (무대)'));
+  // 그라데이션 타입
+  const tb=document.createElement('div'); tb.className='btns';
+  [['linear','Linear'],['radial','Radial']].forEach(([v,n])=>{ const b=document.createElement('button'); b.className='b'+(artboard.type===v?' on':''); b.textContent=n; b.dataset.at=v;
+    b.onclick=()=>{ artboard.type=v; tb.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.at===v)); applyArtboard(); if(codeReady) refreshCode(); }; tb.appendChild(b); }); p.appendChild(tb);
+  // 각도(linear)
+  artInputs={}; artInputs.angle=mkSlider(p,'artAngle',{def:135,min:0,max:360,step:1},'그라데이션 각도(°)',()=>artboard.angle,v=>{ artboard.angle=v; applyArtboard(); });
+  // 3색(듀오 A·B + 보색)
+  const labels=['듀오 A','듀오 B','보색']; const keys=['c1','c2','c3']; artInputs.cols=[];
+  keys.forEach((k,i)=>{ const w=document.createElement('div'); w.style.marginBottom='6px';
+    const l=document.createElement('label'); l.style.cssText='font-size:12px;color:#b9b9c0;display:block;margin-bottom:4px'; l.textContent=labels[i];
+    const ci=document.createElement('input'); ci.type='color'; ci.value=artboard[k]; ci.oninput=()=>{ artboard[k]=ci.value; applyArtboard(); refreshArtUI(); if(codeReady) refreshCode(); };
+    w.appendChild(l); w.appendChild(ci); p.appendChild(w); artInputs.cols.push(ci); });
+  artSwatchEl=document.createElement('div'); artSwatchEl.className='swatches'; p.appendChild(artSwatchEl);
+  const bd=document.createElement('div'); bd.className='btns';
+  const rnd=document.createElement('button'); rnd.className='b acc2'; rnd.textContent='🎲 아트보드 색상 랜덤';
+  rnd.onclick=()=>{ randomArtboard(); applyArtboard(); refreshArtUI(); if(codeReady) refreshCode(); };
+  bd.appendChild(rnd); p.appendChild(bd);
+  const note=document.createElement('div'); note.className='note'; note.textContent='키스크린 뒤 무대(아트보드) 배경. 듀오 2색 + 보색 1색 그라데이션(linear/radial).'; p.appendChild(note);
+  refreshArtUI(); applyArtboard(); }
+function refreshArtUI(){ if(!artInputs) return; if(artInputs.cols){ const v=[artboard.c1,artboard.c2,artboard.c3]; artInputs.cols.forEach((ci,i)=>ci.value=v[i]);
+  if(artSwatchEl){ artSwatchEl.innerHTML=''; v.forEach(c=>{ const s=document.createElement('i'); s.style.background=c; artSwatchEl.appendChild(s); }); } }
+  if(artInputs.angle){ artInputs.angle.inp.value=artboard.angle; artInputs.angle.num.value=artboard.angle; } }
 
 // 코드 블록
 function buildCodeBlock(p){ const h=document.createElement('div'); h.className='sec-title'; h.textContent='코드 (저장 / 불러오기)'; p.appendChild(h);
@@ -484,8 +525,16 @@ function loadScreen(sc){ pages=(sc.pages&&sc.pages.length?sc.pages:[{}]).map(nor
   // 서브페이지가 여러 개면 자동으로 연달아 재생(루핑)
   startT=performance.now(); setSeqPlaying(pages.length>1);
   refreshScreenUI(); }
-function gotoScreen(i){ if(!screens.length) return; screens[activeScreen]=captureScreen(); activeScreen=((i%screens.length)+screens.length)%screens.length; loadScreen(screens[activeScreen]); if(codeReady) refreshCode(); }
-function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){ el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='#'+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); } const lb=document.getElementById('screenLabel'); if(lb) lb.textContent='#'+(activeScreen+1); }
+let _switching=false;
+function gotoScreen(i){ if(!screens.length||_switching) return; const target=((i%screens.length)+screens.length)%screens.length; if(target===activeScreen) return;
+  const wrap=document.querySelector('.canvas-wrap');
+  const doSwap=()=>{ screens[activeScreen]=captureScreen(); activeScreen=target; loadScreen(screens[activeScreen]); if(codeReady) refreshCode(); };
+  if(!wrap){ doSwap(); return; }
+  _switching=true; wrap.classList.add('switching');           // 페이드아웃 → 전환 → 페이드인
+  setTimeout(()=>{ doSwap(); wrap.classList.remove('switching'); setTimeout(()=>_switching=false,300); }, 300); }
+const SCREEN_NAMES=['Welcome','Hello','Home'];
+function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){ el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='#'+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); }
+  const bx=document.getElementById('screenBtns'); if(bx){ bx.innerHTML=''; screens.forEach((s,i)=>{ const b=document.createElement('button'); b.className=(i===activeScreen?'on':''); b.textContent='#'+(i+1)+(SCREEN_NAMES[i]?' '+SCREEN_NAMES[i]:''); b.onclick=()=>gotoScreen(i); bx.appendChild(b); }); } }
 (function buildFontUI(){ const p=document.getElementById('fontBody');
   // 페이지
   const tp=document.createElement('div'); tp.className='sec-title'; tp.textContent='페이지'; p.appendChild(tp);
@@ -562,10 +611,11 @@ function syncUI(){ Object.keys(inputs).forEach(k=>{ inputs[k].inp.value=state[k]
   refreshSeqTab(); if(codeReady) refreshCode(); }
 // 전체 프로젝트(모든 화면+페이지+시퀀스) 내보내기
 function exportConfig(){ const cur=captureScreen(); const arr=screens.slice(); if(screens.length) arr[activeScreen]=cur; else arr.push(cur);
-  return JSON.stringify({app:'iridescent-halo-orb',v:9,activeScreen,screens:arr}); }
+  return JSON.stringify({app:'iridescent-halo-orb',v:9,activeScreen,artboard:Object.assign({},artboard),screens:arr}); }
 function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.value=exportConfig(); }
 // screens 코드 → 전체 교체 / pages 코드 → 현재 화면 교체 / 단일 장면 → 현재 페이지에만 반영
 function applyConfig(txt){ const o=JSON.parse(txt);
+  if(o.artboard){ Object.assign(artboard,o.artboard); applyArtboard(); refreshArtUI(); }
   if(Array.isArray(o.screens) && o.screens.length){
     screens=o.screens.map(s=>({pages:((s.pages&&s.pages.length?s.pages:[{}])).map(np=>{ const n=normScene(np); if(s.seq){ if(np.hold==null&&s.seq.hold!=null)n.hold=+s.seq.hold; if(np.trans==null&&s.seq.trans!=null)n.trans=+s.seq.trans; } return n; }), activePage:s.activePage||0}));
     activeScreen=Math.min(o.activeScreen||0,screens.length-1); loadScreen(screens[activeScreen]); return;
@@ -635,12 +685,16 @@ function applyShadow(F){ if(F.shadowOn){ vctx.shadowColor=hexA('#000000',F.shado
 // typed: 표시할 글자 수(소수). null이면 전체 표시. 현재 글자는 블러로 등장→선명.
 function drawTextScene(F,amul,typed){ if(!F||!F.text||amul<=0) return; const {g,px}=layoutGlyphs(F);
   const base=(F.alpha==null?1:F.alpha)*amul; vctx.save(); vctx.font=`${F.weight||'500'} ${px}px ${famString(F.fontFamily)}`; vctx.textAlign='left'; vctx.textBaseline='middle'; vctx.fillStyle=F.color||'#ffffff';
-  if(!(F.typing && typed!=null)){ applyShadow(F); vctx.globalAlpha=base; g.forEach(gl=>vctx.fillText(gl.ch,gl.x,gl.y)); vctx.restore(); return; }
+  // 굵기 보정: 폰트 합성 볼드는 브라우저(특히 모바일/캔버스)에서 불안정 → 외곽선 stroke로 확실히 굵게
+  const wN=parseInt(F.weight)||500; const boldW=wN>=600?px*0.04:(wN>=500?px*0.012:0);
+  vctx.strokeStyle=F.color||'#ffffff'; vctx.lineJoin='round'; vctx.lineCap='round';
+  const ink=(ch,x,y)=>{ vctx.fillText(ch,x,y); if(boldW>0){ vctx.lineWidth=boldW; vctx.strokeText(ch,x,y); } };
+  if(!(F.typing && typed!=null)){ applyShadow(F); vctx.globalAlpha=base; g.forEach(gl=>ink(gl.ch,gl.x,gl.y)); vctx.restore(); return; }
   const cur=Math.floor(typed), frac=typed-cur;
   for(let i=0;i<g.length && i<=cur;i++){ vctx.save(); applyShadow(F);
     if(i<cur){ vctx.globalAlpha=base; }
     else { vctx.globalAlpha=base*Math.min(1,frac*1.3); vctx.filter=`blur(${(F.typeBlur||0)*2*(1-frac)}px)`; }
-    vctx.fillText(g[i].ch,g[i].x,g[i].y); vctx.restore(); }
+    ink(g[i].ch,g[i].x,g[i].y); vctx.restore(); }
   vctx.restore(); }
 function typedCount(F,localT){ if(!F.typing) return null; const n=String(F.text||'').length; if(!n) return 0; const sp=F.typeSpeed||6; const dur=n/sp, cyc=dur+1.6; const tt=((localT%cyc)+cyc)%cyc; return Math.min(n, tt*sp); }
 function typedLinear(F,localT){ if(!F.typing) return null; const n=String(F.text||'').length; const sp=F.typeSpeed||6; return Math.min(n, Math.max(0,localT)*sp); }
