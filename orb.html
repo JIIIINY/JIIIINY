@@ -90,7 +90,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.4</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.5</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -179,7 +179,7 @@ const FONTP = { size:{def:26,min:8,max:160,step:1}, alpha:{def:1,min:0,max:1,ste
   typeSpeed:{def:6,min:1,max:24,step:1}, typeBlur:{def:12,min:0,max:30,step:1} };
 const FONTL = { size:'크기(pt)', alpha:'투명도', x:'X 위치', y:'Y 위치', shadowBlur:'그림자 블러', shadowX:'그림자 X', shadowY:'그림자 Y', shadowAlpha:'그림자 투명도', typeSpeed:'타이핑 속도(자/초)', typeBlur:'등장 블러' };
 /* 페이지(텍스트) 시스템 — 페이지마다 고유 폰트/텍스트 */
-function newFont(text){ const f={text:text||'',color:'#2a2a2a',align:'center',shadowOn:false,typing:true,fontFamily:'Samsung Sharp Sans'}; Object.keys(FONTP).forEach(k=>f[k]=FONTP[k].def); return f; }
+function newFont(text){ const f={text:text||'',color:'#ffffff',align:'center',shadowOn:false,typing:true,fontFamily:'Samsung Sharp Sans',weight:'500'}; Object.keys(FONTP).forEach(k=>f[k]=FONTP[k].def); return f; }
 let pages=[]; let activePage=0; let FONT=newFont('Hey!');
 let screens=[]; let activeScreen=0;
 let seqPlaying=false, seqTrans=0.8, seqHold=1.2;
@@ -509,6 +509,13 @@ function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){
   ['Samsung Sharp Sans','One UI Sans'].forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; fsel.appendChild(o); });
   fsel.value=FONT.fontFamily||'Samsung Sharp Sans'; fsel.onchange=()=>{ FONT.fontFamily=fsel.value; if(codeReady) refreshCode(); };
   fw.appendChild(fl); fw.appendChild(fsel); p.appendChild(fw);
+  // 두께(weight)
+  const ww=document.createElement('div'); ww.style.marginTop='8px';
+  const wl=document.createElement('label'); wl.style.cssText='font-size:12px;color:#b9b9c0;display:block;margin-bottom:5px'; wl.textContent='두께';
+  const wsel=document.createElement('select'); wsel.id='fontWeightSel'; wsel.style.cssText='width:100%;background:#0f0f12;color:#e8e8ea;border:1px solid #2a2a31;border-radius:9px;padding:8px;font:12px/1.4 inherit;';
+  [['300','Light'],['400','Regular'],['500','Medium'],['700','Bold']].forEach(([v,n])=>{ const o=document.createElement('option'); o.value=v; o.textContent=n; wsel.appendChild(o); });
+  wsel.value=FONT.weight||'500'; wsel.onchange=()=>{ FONT.weight=wsel.value; if(codeReady) refreshCode(); };
+  ww.appendChild(wl); ww.appendChild(wsel); p.appendChild(ww);
   // 정렬
   const t2=document.createElement('div'); t2.className='sec-title'; t2.textContent='정렬'; p.appendChild(t2);
   const ab=document.createElement('div'); ab.className='btns';
@@ -541,6 +548,7 @@ function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.va
   const tin=document.getElementById('pageText'); if(tin) tin.value=FONT.text;
   const cin=document.querySelector('#fontBody input[type=color]'); if(cin) cin.value=FONT.color;
   const fsel=document.getElementById('fontFamSel'); if(fsel) fsel.value=FONT.fontFamily||'Samsung Sharp Sans';
+  const wsel=document.getElementById('fontWeightSel'); if(wsel) wsel.value=FONT.weight||'500';
   const sh=document.getElementById('shadowToggle'); if(sh){ sh.textContent='그림자: '+(FONT.shadowOn?'ON':'OFF'); sh.classList.toggle('on',FONT.shadowOn); }
   const tt=document.getElementById('typeToggle'); if(tt){ tt.textContent='타이핑: '+(FONT.typing?'ON':'OFF'); tt.classList.toggle('on',FONT.typing); }
   rebuildPageChips(); refreshSeqTab(); }
@@ -609,11 +617,11 @@ function hexA(hex,a){ const c=hexToRGB(hex); return `rgba(${Math.round(c[0]*255)
 const FAMS={'Samsung Sharp Sans':'"Samsung Sharp Sans","SamsungSharpSans","Samsung Sans","One UI Sans",-apple-system,"Helvetica Neue",Arial,sans-serif','One UI Sans':'"One UI Sans","OneUI Sans","Samsung One UI","Samsung Sans",-apple-system,"Helvetica Neue",Arial,sans-serif'};
 function famString(n){ return FAMS[n]||FAMS['Samsung Sharp Sans']; }
 const TXT_MARGIN=60; // 좌우 30dp(버퍼 2x)
-function wrapLines(F,maxW){ vctx.font=`${(F.size||26)*2}px ${famString(F.fontFamily)}`; const out=[];
+function wrapLines(F,maxW){ vctx.font=`${F.weight||'500'} ${(F.size||26)*2}px ${famString(F.fontFamily)}`; const out=[];
   String(F.text||'').split('\n').forEach(par=>{ const words=par.split(' '); let cur='';
     words.forEach(w=>{ const test=cur?cur+' '+w:w; if(vctx.measureText(test).width>maxW && cur){ out.push(cur); cur=w; } else cur=test; }); out.push(cur); });
   return out; }
-function layoutGlyphs(F){ const px=(F.size||26)*2; vctx.font=`${px}px ${famString(F.fontFamily)}`;
+function layoutGlyphs(F){ const px=(F.size||26)*2; vctx.font=`${F.weight||'500'} ${px}px ${famString(F.fontFamily)}`;
   const maxW=view.width-2*TXT_MARGIN; const lines=wrapLines(F,maxW); const lh=px*1.25; const g=[];
   lines.forEach((ln,li)=>{ const w=vctx.measureText(ln).width;
     let sx=F.align==='center'?F.x*view.width-w/2:(F.align==='right'?F.x*view.width-w:F.x*view.width);
@@ -624,7 +632,7 @@ function layoutGlyphs(F){ const px=(F.size||26)*2; vctx.font=`${px}px ${famStrin
 function applyShadow(F){ if(F.shadowOn){ vctx.shadowColor=hexA('#000000',F.shadowAlpha); vctx.shadowBlur=F.shadowBlur*2; vctx.shadowOffsetX=F.shadowX*2; vctx.shadowOffsetY=F.shadowY*2; } }
 // typed: 표시할 글자 수(소수). null이면 전체 표시. 현재 글자는 블러로 등장→선명.
 function drawTextScene(F,amul,typed){ if(!F||!F.text||amul<=0) return; const {g,px}=layoutGlyphs(F);
-  const base=(F.alpha==null?1:F.alpha)*amul; vctx.save(); vctx.font=`${px}px ${famString(F.fontFamily)}`; vctx.textAlign='left'; vctx.textBaseline='middle'; vctx.fillStyle=F.color||'#2a2a2a';
+  const base=(F.alpha==null?1:F.alpha)*amul; vctx.save(); vctx.font=`${F.weight||'500'} ${px}px ${famString(F.fontFamily)}`; vctx.textAlign='left'; vctx.textBaseline='middle'; vctx.fillStyle=F.color||'#ffffff';
   if(!(F.typing && typed!=null)){ applyShadow(F); vctx.globalAlpha=base; g.forEach(gl=>vctx.fillText(gl.ch,gl.x,gl.y)); vctx.restore(); return; }
   const cur=Math.floor(typed), frac=typed-cur;
   for(let i=0;i<g.length && i<=cur;i++){ vctx.save(); applyShadow(F);
@@ -724,6 +732,7 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"screens":[{"page
   [0,1].forEach(i=>{ const f=Object.assign({},s1.pages[i].font,{color:"#2a2a2a",fontFamily:"Samsung Sharp Sans"}), h=s1.pages[i].hold, t=s1.pages[i].trans, fi=s1.pages[i].fadeIn;
     const pg=JSON.parse(JSON.stringify(BGSC)); pg.font=f; pg.hold=h; pg.trans=t; if(fi!=null)pg.fadeIn=fi; s1.pages[i]=pg; });
   s1.pages.forEach(p=>p.params.centerY=0.55);  // 원형 위치 아래로(Y=0.55)
+  s1.pages.forEach(p=>{ p.font.color='#ffffff'; p.font.weight='500'; });  // 글자 흰색 + 두께 Medium
   s1.pages[0].trans=0.5;   // Welcome→Galaxy 빠르게
   s1.activePage=0; INIT.activeScreen=0; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI(); requestAnimationFrame(frame);
