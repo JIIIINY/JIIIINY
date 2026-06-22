@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.2</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v1.3</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -719,21 +719,30 @@ function drawWaveLayer(tSec){ if(!waveOn) return; const W=view.width,H=view.heig
     for(let x=0;x<=W;x+=6){ const t=x/W, y=cy+Math.sin(t*Math.PI*2*fr+ph)*a*Math.sin(t*Math.PI); if(x===0)vctx.moveTo(x,y); else vctx.lineTo(x,y); }
     vctx.stroke(); }
   vctx.restore(); }
-// #3 AI 추천 카드 (중앙 오브 유지 / 카드·아이콘 순차 fade in)
-const HOME_CARDS=[['Morning Brief','Weather · Calendar · News'],['Continue listening','Your Daily Mix'],['Suggested reply','3 messages need a look']];
-function drawHomeCards(tSec){ const W=view.width,H=view.height; const mx=W*0.075, cw=W-mx*2, ch=H*0.082, gap=H*0.022, top=H*0.50;
-  vctx.save(); vctx.textBaseline='alphabetic';
-  // 헤더
-  const hAp=Math.min(1,Math.max(0,(tSec-0.15)/0.5));
-  if(hAp>0){ vctx.globalAlpha=hAp; vctx.fillStyle='#3a3a44'; vctx.textAlign='left'; vctx.font='700 '+Math.round(H*0.020)+'px '+famString('One UI Sans'); vctx.fillText('AI suggestions',mx,top-H*0.020); }
-  HOME_CARDS.forEach((cd,i)=>{ const t0=0.35+i*0.26, ap=Math.min(1,Math.max(0,(tSec-t0)/0.6)); if(ap<=0) return;
-    const y=top+i*(ch+gap)+(1-ap)*22; vctx.globalAlpha=ap;
-    vctx.fillStyle='rgba(255,255,255,0.9)'; vctx.shadowColor='rgba(0,0,0,0.12)'; vctx.shadowBlur=18; vctx.shadowOffsetY=6; vRoundRect(mx,y,cw,ch,ch*0.30); vctx.fill(); vctx.shadowColor='transparent'; vctx.shadowOffsetY=0;
-    const ir=ch*0.30, icx=mx+ch*0.55, icy=y+ch*0.5; const g=vctx.createLinearGradient(icx-ir,icy-ir,icx+ir,icy+ir); g.addColorStop(0,AI_COLS[i%AI_COLS.length]); g.addColorStop(1,AI_COLS[(i+2)%AI_COLS.length]);
-    vctx.fillStyle=g; vctx.beginPath(); vctx.arc(icx,icy,ir,0,Math.PI*2); vctx.fill();
-    const tx=mx+ch*1.1; vctx.textAlign='left'; vctx.fillStyle='#1c1c22'; vctx.font='700 '+Math.round(ch*0.27)+'px '+famString('One UI Sans'); vctx.fillText(cd[0],tx,y+ch*0.44);
-    vctx.fillStyle='#6b6b75'; vctx.font='500 '+Math.round(ch*0.21)+'px '+famString('One UI Sans'); vctx.fillText(cd[1],tx,y+ch*0.74); });
-  vctx.restore(); }
+// #3 home: frosted glass(배경광 영향) — 상단 Notification 카드 + 하단 아이콘 4개
+function cardPath(x,y,w,h,rt,rb){ vctx.beginPath();
+  if(vctx.roundRect){ vctx.roundRect(x,y,w,h,[rt,rt,rb,rb]); return; }
+  vctx.moveTo(x+rt,y); vctx.arcTo(x+w,y,x+w,y+h,rt); vctx.arcTo(x+w,y+h,x,y+h,rb); vctx.arcTo(x,y+h,x,y,rb); vctx.arcTo(x,y,x+w,y,rt); vctx.closePath(); }
+// frosted glass 1조각: 외곽 글로우 → 블러 배경 → 글래스 틴트/sheen → 림 라이트
+function drawFrost(buildPath,bx,by,bw,bh){
+  vctx.save(); buildPath(); vctx.shadowColor='rgba(188,206,255,0.6)'; vctx.shadowBlur=22; vctx.shadowOffsetY=6; vctx.fillStyle='rgba(255,255,255,0.45)'; vctx.fill(); vctx.restore();
+  vctx.save(); buildPath(); vctx.clip();
+  vctx.filter='blur(14px)'; vctx.drawImage(glCanvas,-16,-16,view.width+32,view.height+32); vctx.filter='none';
+  vctx.fillStyle='rgba(255,255,255,0.22)'; vctx.fillRect(bx-6,by-6,bw+12,bh+12);
+  const sheen=vctx.createLinearGradient(0,by,0,by+bh); sheen.addColorStop(0,'rgba(255,255,255,0.40)'); sheen.addColorStop(0.55,'rgba(255,255,255,0.0)'); vctx.fillStyle=sheen; vctx.fillRect(bx-6,by-6,bw+12,bh+12);
+  vctx.restore();
+  vctx.save(); buildPath(); vctx.lineWidth=Math.max(1.2,bw*0.005); const rg=vctx.createLinearGradient(0,by,0,by+bh); rg.addColorStop(0,'rgba(255,255,255,0.92)'); rg.addColorStop(1,'rgba(255,255,255,0.30)'); vctx.strokeStyle=rg; vctx.stroke(); vctx.restore(); }
+function drawHomeFrost(tSec){ const W=view.width,H=view.height, DP=W/360;
+  // 상단 Notification 카드: 340x233dp, 여백 상·좌·우 10dp, R 상80/하60dp
+  const cw=340*DP, chh=233*DP, cx=10*DP, cy=10*DP, rt=80*DP, rb=60*DP;
+  const cardAp=Math.min(1,Math.max(0,(tSec-0.2)/0.6));
+  if(cardAp>0){ vctx.save(); vctx.globalAlpha=cardAp; drawFrost(()=>cardPath(cx,cy,cw,chh,rt,rb),cx,cy,cw,chh); vctx.restore(); }
+  // 하단 아이콘 4개: 70x70dp, 간격 8dp, 하단에서 45dp 위, 가로 중앙 정렬
+  const isz=70*DP, gp=8*DP, n=4, totw=n*isz+(n-1)*gp, sx=(W-totw)/2, iy=H-45*DP-isz;
+  for(let i=0;i<n;i++){ const t0=0.5+i*0.12, ap=Math.min(1,Math.max(0,(tSec-t0)/0.5)); if(ap<=0) continue;
+    const ix=sx+i*(isz+gp); vctx.save(); vctx.globalAlpha=ap;
+    drawFrost(()=>{ vctx.beginPath(); vctx.arc(ix+isz/2,iy+isz/2,isz/2,0,Math.PI*2); },ix,iy,isz,isz);
+    vctx.restore(); } }
 // 시퀀스용 팔레트 보간
 function paletteStops(name){ const p=PALETTES.find(x=>x.name===name)||PALETTES[0]; return p.stops; }
 function lerpStopsInto(arr,nameA,nameB,f){ const A=paletteStops(nameA),B=paletteStops(nameB);
@@ -795,20 +804,20 @@ function frame(now){
   if(activeScreen===1) drawWaveLayer(tSec);              // #2 가로 웨이브 라인(텍스트 뒤)
   if(seqText){ drawTextScene(seqText.A,1-seqText.f,seqText.typedA); drawTextScene(seqText.B,seqText.f,seqText.typedB); seqRestore(); }
   else drawText(tSec);
-  if(activeScreen===2) drawHomeCards(tSec);              // #3 AI 추천 카드(텍스트 위)
+  if(activeScreen===2) drawHomeFrost(tSec);             // #3 frosted 카드 + 아이콘
   requestAnimationFrame(frame);
 }
 const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"screens":[{"pages":[{"params":{"orbSize":0.06,"centerX":0.49,"centerY":0.55,"blobAmt":0.06,"blobLobes":2,"blobSpeed":2.05,"shapeRound":0.04,"shapeRot":3,"shapeSides":0,"distortAmt":0.29,"distortFreq":2,"edgeAC":235,"edgeAW":27,"edgeBC":0,"edgeBW":26,"edgeContrast":0.75,"blurAmt":0.25,"compRot":90,"lightSize":0.21,"lightReach":1.65,"lightAmt":0.19,"lightUneven":0.9,"outerSize":0.28,"outerAmt":0,"hue":-180,"haloMix":1,"intensity":1.13,"exposure":0.82,"haloOuter":4,"falloff":0.5,"haloWarp":0.17,"haloWarpFreq":4,"surfWarp":0.07,"surfFreq":6,"rot":4,"breath":0.075},"palette":"Iridescent","ratioIdx":2,"genArcs":[],"edgeAOn":0,"edgeBOn":0,"bg":["#d7c4e4","#dfbdde","#c2d7b4"],"hold":0.7,"trans":0.5,"fadeIn":0.45,"font":{"text":"Welcome to","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}},{"params":{"orbSize":0.06,"centerX":0.49,"centerY":0.55,"blobAmt":0.06,"blobLobes":2,"blobSpeed":2.05,"shapeRound":0.04,"shapeRot":3,"shapeSides":0,"distortAmt":0.29,"distortFreq":2,"edgeAC":235,"edgeAW":27,"edgeBC":0,"edgeBW":26,"edgeContrast":0.75,"blurAmt":0.25,"compRot":90,"lightSize":0.21,"lightReach":1.65,"lightAmt":0.19,"lightUneven":0.9,"outerSize":0.28,"outerAmt":0,"hue":-180,"haloMix":1,"intensity":1.13,"exposure":0.82,"haloOuter":4,"falloff":0.5,"haloWarp":0.17,"haloWarpFreq":4,"surfWarp":0.07,"surfFreq":6,"rot":4,"breath":0.075},"palette":"Iridescent","ratioIdx":2,"genArcs":[],"edgeAOn":0,"edgeBOn":0,"bg":["#d7c4e4","#dfbdde","#c2d7b4"],"hold":1,"trans":0.8,"fadeIn":0,"font":{"text":"Galaxy AI","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}},{"params":{"orbSize":0.5,"centerX":0.5,"centerY":0.55,"blobAmt":0.06,"blobLobes":4,"blobSpeed":0.6,"shapeRound":0.32,"shapeRot":4,"shapeSides":0,"distortAmt":0.12,"distortFreq":6,"edgeAC":333,"edgeAW":44,"edgeBC":311,"edgeBW":72,"edgeContrast":0.8976409358121893,"blurAmt":0.2160497942528363,"compRot":174,"lightSize":1.035,"lightReach":0.91,"lightAmt":0.62,"lightUneven":0.6884091139295905,"outerSize":0.583584651867469,"outerAmt":0.377827780017696,"hue":-108,"haloMix":0.4,"intensity":2,"exposure":0.67,"haloOuter":0.89,"falloff":3.75,"haloWarp":0.6,"haloWarpFreq":2,"surfWarp":0,"surfFreq":1,"rot":39,"breath":0.095},"palette":"Aurora","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":0},{"relC":180,"hw":54,"on":0},{"relC":300,"hw":54,"on":1}],"edgeAOn":1,"edgeBOn":0,"bg":["#beafe5","#cea8df","#c8d7a1"],"hold":1.2,"trans":0.8,"fadeIn":0,"font":{"text":"Hello\nCamila.","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"One UI Sans","weight":"500","size":22,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}},{"params":{"orbSize":0.59,"centerX":0.48,"centerY":0.55,"blobAmt":0.21,"blobLobes":3,"blobSpeed":0.6,"shapeRound":0.4,"shapeRot":28,"shapeSides":0,"distortAmt":0.07,"distortFreq":9,"edgeAC":333,"edgeAW":44,"edgeBC":311,"edgeBW":72,"edgeContrast":0.8976409358121893,"blurAmt":0.2160497942528363,"compRot":174,"lightSize":0.05,"lightReach":0.47,"lightAmt":0.26,"lightUneven":0.52,"outerSize":0.2,"outerAmt":0.1,"hue":40,"haloMix":0.46,"intensity":1.16,"exposure":0.86,"haloOuter":1.42,"falloff":1.2,"haloWarp":0.32,"haloWarpFreq":7,"surfWarp":0.24,"surfFreq":1,"rot":6,"breath":0.03},"palette":"Aurora","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":0},{"relC":180,"hw":54,"on":1},{"relC":300,"hw":54,"on":1}],"edgeAOn":1,"edgeBOn":1,"bg":["#dce8b7","#b7e3b0","#b3a7da"],"hold":3.3222222222222224,"trans":0.8,"fadeIn":0,"font":{"text":"To better adapt to you going forward. I'll first carry over the context from your previous device.","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"One UI Sans","weight":"500","size":22,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}}],"activePage":3},{"pages":[{"params":{"orbSize":0.5,"centerX":0.5,"centerY":0.46,"blobAmt":0.12,"blobLobes":3,"blobSpeed":0.5,"shapeRound":0.4,"shapeRot":24,"shapeSides":4,"distortAmt":0,"distortFreq":5,"edgeAC":15,"edgeAW":45,"edgeBC":210,"edgeBW":60,"edgeContrast":0.88,"blurAmt":0.12,"compRot":0,"lightSize":0.3,"lightReach":0.3,"lightAmt":0.5,"lightUneven":0.65,"outerSize":0.55,"outerAmt":0.25,"hue":0,"haloMix":0.72,"intensity":1,"exposure":0.96,"haloOuter":0.8,"falloff":1.8,"haloWarp":0.15,"haloWarpFreq":3,"surfWarp":0.2,"surfFreq":3,"rot":12,"breath":0.05},"palette":"Ocean","ratioIdx":0,"genArcs":[],"edgeAOn":0,"edgeBOn":0,"bg":["#E9E4F5","#E2EEF6","#F7E8E2"],"hold":1.8,"trans":0.8,"fadeIn":0,"font":{"text":"","color":"#2a2a2a","align":"center","shadowOn":false,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5,"typeSpeed":6,"typeBlur":12}}],"activePage":0},{"pages":[{"params":{"orbSize":0.4927770247430743,"centerX":0.32,"centerY":0.46,"blobAmt":0.24508533655264214,"blobLobes":5,"blobSpeed":0.999258081190256,"shapeRound":0.2726166242370211,"shapeRot":72,"shapeSides":0,"distortAmt":0.011625649908982585,"distortFreq":5,"edgeAC":250,"edgeAW":24,"edgeBC":144,"edgeBW":43,"edgeContrast":0.7507672771645827,"blurAmt":0.1414949839415801,"compRot":163,"lightSize":0.2528231270474508,"lightReach":0.24945893973355435,"lightAmt":0.35885051814304136,"lightUneven":0.8995709894250532,"outerSize":0.5196188666143687,"outerAmt":0.1804333095306793,"hue":-61,"haloMix":0.9331355455584822,"intensity":0.6037848138248306,"exposure":0.9963804846720774,"haloOuter":0.6460511359215684,"falloff":1.372204996589531,"haloWarp":0.3213950387127403,"haloWarpFreq":3,"surfWarp":0.5339450959535662,"surfFreq":6,"rot":12,"breath":0.0750912508379228},"palette":"Aurora","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":1},{"relC":180,"hw":54,"on":0},{"relC":300,"hw":54,"on":0}],"edgeAOn":1,"edgeBOn":0,"bg":["#cbe1e4","#c3d3df","#d7beba"],"hold":1.8,"trans":0.8,"fadeIn":0,"font":{"text":"","color":"#2a2a2a","align":"center","shadowOn":false,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5,"typeSpeed":6,"typeBlur":12}}],"activePage":0}]};
-// #1 텍스트: 검은색·그림자제거 / Welcome·Galaxy=Sharp Sans Bold, 나머지=One UI Sans Medium 20pt
-INIT.screens[0].pages.forEach(p=>{ if(!p.font) return; p.font.color="#2a2a2a"; p.font.shadowOn=false;
+// 화면 분할: #1=Welcome+Galaxy AI, #2=Hello Camila→To better (Galaxy AI 다음부터 분리)
+(function(){ const intro=INIT.screens[0].pages.slice();
+  INIT.screens[0].pages=intro.slice(0,2); INIT.screens[0].activePage=1;
+  INIT.screens[1].pages=intro.slice(2); INIT.screens[1].activePage=Math.max(0,intro.length-3); })();
+// #1·#2 텍스트: 검은색·그림자제거 / Welcome·Galaxy=Sharp Sans Bold, 나머지=One UI Sans Medium 20pt
+[INIT.screens[0],INIT.screens[1]].forEach(s=>s.pages.forEach(p=>{ if(!p.font) return; p.font.color="#2a2a2a"; p.font.shadowOn=false;
   if(p.font.fontFamily==="Samsung Sharp Sans"){ p.font.weight="700"; }
-  else { p.font.fontFamily="One UI Sans"; p.font.weight="500"; p.font.size=20; } });
-// #2 Hello + 가로 웨이브 라인: 오브 숨김, Hello 텍스트
-(function(){ const p=INIT.screens[1].pages[0]; p.params.orbSize=0; p.params.centerY=0.5;
-  p.font.text="Hello"; p.font.fontFamily="One UI Sans"; p.font.weight="700"; p.font.size=30; p.font.color="#2a2a2a"; p.font.shadowOn=false; p.font.x=0.5; p.font.y=0.30; p.font.typing=false; })();
-// #3 home: 중앙 오브 유지(상단 중앙), 텍스트 없음 → AI 추천 카드 오버레이
-(function(){ const p=INIT.screens[2].pages[0]; p.params.centerX=0.5; p.params.centerY=0.30; p.params.orbSize=0.26;
-  p.font.text=""; })();
+  else { p.font.fontFamily="One UI Sans"; p.font.weight="500"; p.font.size=20; } }));
+// #3 home: 중앙 오브 유지 + 상단 Notification 카드 / 하단 frosted 아이콘 4개 오버레이
+(function(){ const p=INIT.screens[2].pages[0]; p.params.centerX=0.5; p.params.centerY=0.56; p.params.orbSize=0.28; p.font.text=""; })();
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
 // 임베드 폰트 로드 보장 후 렌더 시작
 if(document.fonts && document.fonts.load){ Promise.all([document.fonts.load('700 60px "Samsung Sharp Sans"'),document.fonts.load('500 60px "One UI Sans"')]).catch(()=>{}).finally(()=>requestAnimationFrame(frame)); }
