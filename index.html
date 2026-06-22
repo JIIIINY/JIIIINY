@@ -28,7 +28,7 @@
   body.lp-open .stage{ padding-left:300px; }
   body.rp-open .stage{ padding-right:300px; }
   @media (max-width:900px){ body.lp-open .stage{ padding-left:0; } body.rp-open .stage{ padding-right:0; } }
-  .canvas-wrap{ position:relative; width:360px; height:760px; max-height:82vh; aspect-ratio:360/760;
+  .canvas-wrap{ position:relative; width:360px; height:780px; max-height:82vh; aspect-ratio:360/780;
     border-radius:92px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.55); }
   canvas#view{ display:block; width:100%; height:100%; border-radius:92px; }
   .rec-dot{ position:absolute; top:12px; left:12px; display:none; align-items:center; gap:6px; font-size:12px; color:#fff;
@@ -90,7 +90,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.3</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.4</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -105,7 +105,7 @@
   <div class="stage">
     <div class="kswrap">
       <div class="canvas-wrap">
-        <canvas id="view" width="720" height="1520"></canvas>
+        <canvas id="view" width="720" height="1560"></canvas>
         <div class="rec-dot" id="recDot"><span class="blink"></span> REC</div>
       </div>
       <div class="navbar">
@@ -218,7 +218,7 @@ function lerp(a,b,t){ return a+(b-a)*t; }
 function rand(a,b){ return a+Math.random()*(b-a); }
 
 /* ===================== WebGL (오프스크린) ===================== */
-const glCanvas=document.createElement('canvas'); glCanvas.width=720; glCanvas.height=1520;
+const glCanvas=document.createElement('canvas'); glCanvas.width=720; glCanvas.height=1560;
 const gl=glCanvas.getContext('webgl',{preserveDrawingBuffer:true,antialias:true});
 const view=document.getElementById('view'); const vctx=view.getContext('2d');
 if(!gl){ alert('이 브라우저는 WebGL을 지원하지 않습니다.'); }
