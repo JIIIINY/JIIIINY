@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.25</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.26</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -228,7 +228,13 @@ state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[];
 state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
 state.bgType=0; state.bgSize=100; state.bgAlpha=1;   // iridescent 배경 타입/사이즈/알파
 // #3 카드/아이콘 유리·빛 파라미터(패널에서 조절)
-const GLASS={ frost:1.0, disp:1.0, lpow:0.85, lspd:1.0, bgBlur:0.0, spread:1.0, lmode:0, lcol1:'#ffffff', lcol2:'#88bbff', cardTint:'#ffffff' };
+const GLASS={ frost:1.0, disp:1.0, lpow:0.85, lspd:1.0, bgBlur:0.0, spread:1.0, lmode:0, lcol1:'#ffffff', lcol2:'#88bbff',
+  cardType:0, cardC1:'#ffffff', cardC2:'#c9b8ff', cardC3:'#bdeef0',     // 카드 색(솔리드/리니어/래디얼)
+  elBright:0.5, elThick:0.006, elBlur:0.5, elLayers:1, elSpeed:1.0 };   // 외곽 따라 도는 빛(밝기/두께/블러/레이어/속도)
+const CARD_PRESETS=[
+  ['#ffffff','#c9b8ff','#bdeef0'], ['#ffd2f0','#c9b8ff','#bdeef0'], ['#a7c0dc','#beafe5','#c8d7a1'],
+  ['#ffb37a','#ff7eb0','#7ad0ff'], ['#88e6e3','#8bbdff','#f0f488'], ['#2a2340','#3a2a55','#123a4a'],
+  ['#f7d9c4','#f2b8c6','#bcd0f0'], ['#0d0f14','#1a2030','#2a1a22'], ['#d6f0e2','#cfe6f0','#f0e0cf'], ['#ff8d7a','#c2b2ff','#88e6e3'] ];
 state.blankBg='#000000';   // 최하단 blank(솔리드) 배경
 state.orbFill='#ffffff'; state.orbFill2='#ffffff'; state.orbFill3='#ffffff'; state.orbFillType=2; state.orbFillSize=100; state.orbFillAlpha=1; state.orbFillBlur=0;   // 중앙 오브 채움(그라데이션/타입/사이즈/opacity/컬러블러)
 state.hold=1.5; state.trans=1.5; state.fadeIn=0;
@@ -377,7 +383,11 @@ uniform float u_refract,u_frost,u_disp,u_tint;
 uniform vec2 u_cardC,u_cardH; uniform float u_cardRT,u_cardRB;
 uniform vec2 u_circ[4]; uniform float u_circR;
 uniform float u_time,u_lpow,u_lspd;   // 이동하는 컬러 라이트(카드 반영)
-uniform float u_bgBlur,u_spread,u_lmode; uniform vec3 u_lcol1,u_lcol2,u_cardTint;  // bg블러/빛분산/빛색(솔리드·그라디언트)/카드틴트
+uniform float u_bgBlur,u_spread,u_lmode,u_cardType,u_elBright,u_elThick,u_elBlur,u_elLayers,u_elSpeed; // bg블러/빛분산/빛색모드/카드색타입/엣지광(밝기·두께·블러·레이어·속도)
+uniform vec3 u_lcol1,u_lcol2,u_cardC1,u_cardC2,u_cardC3;  // 빛색1·2 / 카드색1·2·3
+vec3 cardTintCol(vec2 lp){ if(u_cardType<0.5) return u_cardC1;
+  if(u_cardType<1.5){ float gx=clamp(0.5+(lp.x+lp.y)/(u_cardH.x+u_cardH.y+1e-4),0.0,1.0); return mix(u_cardC1,u_cardC2,gx); }
+  float rr=clamp(length(lp/(u_cardH+1e-4)),0.0,1.0); return mix(mix(u_cardC1,u_cardC2,rr),u_cardC3,smoothstep(0.6,1.0,rr)*0.5); }
 float h21(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
 float gnoise(vec2 p){ vec2 i=floor(p),f=fract(p); float a=h21(i),b=h21(i+vec2(1.,0.)),c=h21(i+vec2(0.,1.)),d=h21(i+vec2(1.,1.)); vec2 u=f*f*(3.0-2.0*f); return mix(mix(a,b,u.x),mix(c,d,u.x),u.y); }
 float gfbm(vec2 p){ float v=0.0,amp=0.5; for(int i=0;i<4;i++){ v+=amp*gnoise(p); p=p*2.0+vec2(11.3,7.1); amp*=0.5; } return v; }
@@ -402,46 +412,53 @@ void main(){
   vec2 P=(uvT*u_res-0.5*u_res)/m;
   float d=scene(P); vec2 n=nrm(P);
   float inside=smoothstep(0.002,-0.002,d);
-  // 배경: bg블러 + 1·4사분면(우측) 추가 프로스트(더 blurly)
-  float rightMask=smoothstep(0.42,0.58,uvT.x);              // 우측 절반(Q1+Q4)
-  float bgRad=u_bgBlur*0.02 + rightMask*0.022;              // 우측에 추가 블러
-  vec3 base = bgRad>0.0005 ? frost(uvT,bgRad) : smp(uvT);
-  base=mix(base, mix(base,vec3(1.0),0.10), rightMask*0.6);  // 우측에 옅은 우유빛(프로스트 마스킹)
+  // 배경: 전체 bg 블러만(사분면 프로스트는 카드 안에서 처리)
+  vec3 base = u_bgBlur>0.02 ? frost(uvT,u_bgBlur*0.02) : smp(uvT);
   // 접촉 그림자
   float sh=smoothstep(0.05,-0.02, scene(P+vec2(0.0,-0.022)))*smoothstep(-0.015,0.03,d);
   base=mix(base,base*0.82,sh*0.45);
+  // 카드 내부 좌표 + 1·4사분면(카드 우측)에 추가 프로스트
+  float dCard=sdRB(P,u_cardC,u_cardH,u_cardRT,u_cardRB);
+  float cardRight=(dCard<0.0)?smoothstep(u_cardC.x-0.03,u_cardC.x+0.03,P.x):0.0;  // 카드 안 우측(Q1+Q4)
   // 굴절(가장자리 베벨이 배경을 휘게)
   float bevel=u_refract*exp(-pow(max(-d,0.0)/0.05,1.6));
   vec2 roP=n*bevel*0.13; vec2 ro=vec2(roP.x, roP.y*u_res.x/u_res.y);
-  vec3 body=frost(uvT+ro, u_frost*0.012);
+  float bodyRad=u_frost*0.012 + cardRight*0.018;              // 카드 우측 더 blurly
+  vec3 body=frost(uvT+ro, bodyRad);
   // 색분산(가장자리 집중)
   float disp=u_disp*0.012, em=clamp(bevel,0.0,1.0);
   body.r=mix(body.r, smp(uvT+ro*(1.0+disp)).r, em);
   body.b=mix(body.b, smp(uvT+ro*(1.0-disp)).b, em);
-  // 카드/아이콘 틴트 + 약한 채도저하
-  vec3 col=mix(body, u_cardTint, 0.16*u_tint);
+  // 카드 색(솔리드/리니어/래디얼 그라데이션) — 아이콘은 색1
+  vec3 tcol=(dCard<0.0)?cardTintCol(P-u_cardC):u_cardC1;
+  vec3 col=mix(body, tcol, 0.20*u_tint);
   col=mix(vec3(dot(col,vec3(0.333))), col, 0.86);
+  col=mix(col, mix(col,vec3(1.0),0.10), cardRight*0.5);       // 우측 옅은 우유빛
   // 내부 AO(유리 두께감)
   col*=1.0-0.10*exp(-pow(max(-d,0.0)/0.02,2.0));
-  // ===== 이동하는 컬러 라이트가 카드/아이콘에 반영 =====
+  // ===== 빛: 코어 글로우(분산) =====
   float lt=u_time*u_lspd;
-  vec2 lightP=vec2(0.42*sin(lt*0.5), 0.86*sin(lt*0.31+0.7));   // 카드/아이콘 뒤를 지나는 빛
-  vec3 lcol = (u_lmode<0.5) ? u_lcol1 : mix(u_lcol1,u_lcol2, 0.5+0.5*sin(u_time*0.5));  // 솔리드 / 그라디언트(시간)
+  vec2 lightP=vec2(0.42*sin(lt*0.5), 0.86*sin(lt*0.31+0.7));
+  vec3 lcol = (u_lmode<0.5) ? u_lcol1 : mix(u_lcol1,u_lcol2, 0.5+0.5*sin(u_time*0.5));
   float spread=max(u_spread,0.04);
-  float ldist=length(P-lightP);
-  float trans=exp(-ldist*ldist/(0.16*spread))*u_lpow;          // 빛 투과(코어 글로우) — 분산
+  float trans=exp(-dot(P-lightP,P-lightP)/(0.16*spread))*u_lpow;
   col+=lcol*trans*0.30;
-  // 가장자리 림 + 빛 따라가는 스펙큘러 + 무지갯빛 글린트
-  float edgeLine=exp(-pow(d/0.006,2.0));
-  vec2 toL=normalize(lightP-P+1e-5);
-  float topSpec=pow(max(dot(n,normalize(vec2(-0.3,-1.0))),0.0),2.0);
-  float spec=pow(max(dot(n,toL),0.0),3.0);
   vec3 outc=mix(base,col,inside);
-  outc+=edgeLine*(spec*(0.30+0.40*u_lpow)*lcol + vec3(topSpec*0.16));
-  vec3 irid=gpal(atan(n.y,n.x)/6.28318+0.25*gfbm(P*3.0)+u_time*0.02);
-  irid=mix(irid,lcol,0.5);
-  float glint=pow(max(dot(n,toL),0.0),2.0);
-  outc+=irid*edgeLine*glint*u_lpow*0.5;
+  // ===== 카드·아이콘 외곽을 따라 도는 빛(레이어) =====
+  vec2 sc=u_cardC; float bd=distance(P,u_cardC);
+  for(int i=0;i<4;i++){ float di=distance(P,u_circ[i]); if(di<bd){ bd=di; sc=u_circ[i]; } }
+  float pang=atan(P.y-sc.y, P.x-sc.x);
+  float eb=exp(-pow(d/max(u_elThick,0.001),2.0));            // 외곽 밴드(두께)
+  float ar2=max(u_elBlur,0.02);                              // 각도 퍼짐(블러)
+  float el=0.0;
+  for(int k=0;k<4;k++){ if(float(k)>=u_elLayers) break;
+    float ph=u_time*u_elSpeed + float(k)*6.2832/max(u_elLayers,1.0);
+    float da=pang-ph; da=atan(sin(da),cos(da));
+    el+=exp(-da*da/ar2); }
+  outc+=lcol*eb*el*u_elBright;
+  // 은은한 상단 고정 하이라이트
+  float topSpec=pow(max(dot(n,normalize(vec2(-0.3,-1.0))),0.0),2.0);
+  outc+=exp(-pow(d/0.006,2.0))*topSpec*0.14;
   gl_FragColor=vec4(outc,1.0);
 }`;
 const gcv=document.createElement('canvas'); gcv.width=720; gcv.height=1560;
@@ -454,7 +471,7 @@ let glassReady=false; const GU={}; let gtex=null;
   gg.useProgram(gp);
   const gvb=gg.createBuffer(); gg.bindBuffer(gg.ARRAY_BUFFER,gvb); gg.bufferData(gg.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gg.STATIC_DRAW);
   const ga=gg.getAttribLocation(gp,'a_pos'); gg.enableVertexAttribArray(ga); gg.vertexAttribPointer(ga,2,gg.FLOAT,false,0,0);
-  ['u_res','u_bg','u_refract','u_frost','u_disp','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_lpow','u_lspd','u_bgBlur','u_spread','u_lmode','u_lcol1','u_lcol2','u_cardTint'].forEach(n=>GU[n]=gg.getUniformLocation(gp,n));
+  ['u_res','u_bg','u_refract','u_frost','u_disp','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_lpow','u_lspd','u_bgBlur','u_spread','u_lmode','u_lcol1','u_lcol2','u_cardType','u_cardC1','u_cardC2','u_cardC3','u_elBright','u_elThick','u_elBlur','u_elLayers','u_elSpeed'].forEach(n=>GU[n]=gg.getUniformLocation(gp,n));
   GU.u_circ=gg.getUniformLocation(gp,'u_circ[0]');
   gtex=gg.createTexture(); gg.bindTexture(gg.TEXTURE_2D,gtex);
   gg.texParameteri(gg.TEXTURE_2D,gg.TEXTURE_WRAP_S,gg.CLAMP_TO_EDGE); gg.texParameteri(gg.TEXTURE_2D,gg.TEXTURE_WRAP_T,gg.CLAMP_TO_EDGE);
@@ -470,8 +487,10 @@ function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCan
   gg.uniform1f(GU.u_time,t||0); gg.uniform1f(GU.u_lpow,GLASS.lpow); gg.uniform1f(GU.u_lspd,GLASS.lspd);
   gg.uniform1f(GU.u_refract,1.0); gg.uniform1f(GU.u_frost,GLASS.frost); gg.uniform1f(GU.u_disp,GLASS.disp); gg.uniform1f(GU.u_tint,1.0);
   gg.uniform1f(GU.u_bgBlur,GLASS.bgBlur); gg.uniform1f(GU.u_spread,GLASS.spread); gg.uniform1f(GU.u_lmode,GLASS.lmode);
-  const lc1=hexToRGB(GLASS.lcol1),lc2=hexToRGB(GLASS.lcol2),ct=hexToRGB(GLASS.cardTint);
-  gg.uniform3f(GU.u_lcol1,lc1[0],lc1[1],lc1[2]); gg.uniform3f(GU.u_lcol2,lc2[0],lc2[1],lc2[2]); gg.uniform3f(GU.u_cardTint,ct[0],ct[1],ct[2]);
+  const lc1=hexToRGB(GLASS.lcol1),lc2=hexToRGB(GLASS.lcol2),k1=hexToRGB(GLASS.cardC1),k2=hexToRGB(GLASS.cardC2),k3=hexToRGB(GLASS.cardC3);
+  gg.uniform3f(GU.u_lcol1,lc1[0],lc1[1],lc1[2]); gg.uniform3f(GU.u_lcol2,lc2[0],lc2[1],lc2[2]);
+  gg.uniform1f(GU.u_cardType,GLASS.cardType); gg.uniform3f(GU.u_cardC1,k1[0],k1[1],k1[2]); gg.uniform3f(GU.u_cardC2,k2[0],k2[1],k2[2]); gg.uniform3f(GU.u_cardC3,k3[0],k3[1],k3[2]);
+  gg.uniform1f(GU.u_elBright,GLASS.elBright); gg.uniform1f(GU.u_elThick,GLASS.elThick); gg.uniform1f(GU.u_elBlur,GLASS.elBlur); gg.uniform1f(GU.u_elLayers,GLASS.elLayers); gg.uniform1f(GU.u_elSpeed,GLASS.elSpeed);
   gg.uniform2f(GU.u_cardC,0,(253-780)/S); gg.uniform2f(GU.u_cardH,340/S,233/S);
   gg.uniform1f(GU.u_cardRT,160/S); gg.uniform1f(GU.u_cardRB,120/S);
   const cxs=[126,282,438,594], arr=new Float32Array(8);
@@ -747,10 +766,35 @@ function buildGlassBlock(p){ p.appendChild(secTitle('#3 카드·아이콘 유리
     const l=document.createElement('label'); l.style.cssText='font-size:11px;color:#b9b9c0;display:block;margin-bottom:3px'; l.textContent=lab;
     const ci=document.createElement('input'); ci.type='color'; ci.value=GLASS[k]; ci.oninput=()=>{ GLASS[k]=ci.value; if(codeReady) refreshCode(); };
     w.appendChild(l); w.appendChild(ci); cwrap.appendChild(w); }); p.appendChild(cwrap);
-  // 카드/아이콘 틴트 색
+  // ===== 카드·아이콘 컬러 (솔리드/리니어/래디얼 + 칩세트) =====
   p.appendChild(secTitle('카드·아이콘 컬러'));
-  { const w=document.createElement('div'); const ci=document.createElement('input'); ci.type='color'; ci.value=GLASS.cardTint; ci.oninput=()=>{ GLASS.cardTint=ci.value; if(codeReady) refreshCode(); }; w.appendChild(ci); p.appendChild(w); }
-  const note=document.createElement('div'); note.className='note'; note.textContent='#3 카드·아이콘 유리와 빛 반영을 조절. 우측(1·4사분면) 배경은 더 강한 프로스트로 마스킹됩니다.'; p.appendChild(note); }
+  const ctb=document.createElement('div'); ctb.className='btns';
+  [['0','솔리드'],['1','리니어'],['2','래디얼']].forEach(([v,n])=>{ const b=document.createElement('button'); b.className='b'+(String(GLASS.cardType)===v?' on':''); b.textContent=n; b.dataset.ct=v;
+    b.onclick=()=>{ GLASS.cardType=+v; ctb.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.ct===v)); if(codeReady) refreshCode(); }; ctb.appendChild(b); }); p.appendChild(ctb);
+  const chipWrap=document.createElement('div'); chipWrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin:6px 0'; p.appendChild(chipWrap);
+  const cardPickers=[];
+  CARD_PRESETS.forEach(set=>{ const sw=document.createElement('button'); sw.title=set.join(' ');
+    sw.style.cssText='width:42px;height:24px;border-radius:6px;border:1px solid #3a3a44;cursor:pointer;padding:0;background:linear-gradient(135deg,'+set[0]+' 0%,'+set[1]+' 50%,'+set[2]+' 100%)';
+    sw.onclick=()=>{ GLASS.cardC1=set[0]; GLASS.cardC2=set[1]; GLASS.cardC3=set[2]; cardPickers.forEach((ci,i)=>ci.value=GLASS['cardC'+(i+1)]); if(codeReady) refreshCode(); }; chipWrap.appendChild(sw); });
+  const ccw=document.createElement('div'); ccw.style.cssText='display:flex;gap:8px';
+  [['cardC1','1듀오'],['cardC2','2듀오'],['cardC3','3보색']].forEach(([k,lab])=>{ const w=document.createElement('div');
+    const l=document.createElement('label'); l.style.cssText='font-size:11px;color:#b9b9c0;display:block;margin-bottom:3px'; l.textContent=lab;
+    const ci=document.createElement('input'); ci.type='color'; ci.value=GLASS[k]; ci.oninput=()=>{ GLASS[k]=ci.value; if(codeReady) refreshCode(); };
+    w.appendChild(l); w.appendChild(ci); ccw.appendChild(w); cardPickers.push(ci); }); p.appendChild(ccw);
+  // ===== 외곽을 따라 도는 빛 =====
+  p.appendChild(secTitle('외곽 따라 도는 빛'));
+  sl('빛 밝기','elBright',0,2,0.01);
+  sl('빛 두께','elThick',0.001,0.03,0.001);
+  sl('빛 블러','elBlur',0.05,2,0.01);
+  sl('빛 속도','elSpeed',0,4,0.05);
+  const lr=document.createElement('div'); lr.className='btns';
+  const lcount=document.createElement('button'); lcount.className='b'; const upd=()=>lcount.textContent='빛 레이어: '+GLASS.elLayers;
+  const minus=document.createElement('button'); minus.className='b'; minus.textContent='−';
+  const plus=document.createElement('button'); plus.className='b acc'; plus.textContent='＋ 레이어 추가';
+  minus.onclick=()=>{ GLASS.elLayers=Math.max(0,GLASS.elLayers-1); upd(); if(codeReady) refreshCode(); };
+  plus.onclick=()=>{ GLASS.elLayers=Math.min(4,GLASS.elLayers+1); upd(); if(codeReady) refreshCode(); };
+  upd(); lr.appendChild(minus); lr.appendChild(lcount); lr.appendChild(plus); p.appendChild(lr);
+  const note=document.createElement('div'); note.className='note'; note.textContent='카드 안 1·4사분면(우측)은 더 강한 프로스트. 빛은 카드·아이콘 외곽을 따라 돌며 레이어로 여러 줄 추가 가능.'; p.appendChild(note); }
 function buildCodeBlock(p){ const h=document.createElement('div'); h.className='sec-title'; h.textContent='코드 (저장 / 불러오기)'; p.appendChild(h);
   codeBox=document.createElement('textarea'); codeBox.id='codeBox'; codeBox.spellcheck=false; p.appendChild(codeBox);
   const bd=document.createElement('div'); bd.className='btns';
@@ -987,7 +1031,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.25.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.26.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
