@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.17</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.18</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -445,12 +445,13 @@ function renderGlass(){ if(!glassReady) return; const S=720;
   for(let i=0;i<4;i++){ arr[i*2]=(cxs[i]-360)/S; arr[i*2+1]=(1400-780)/S; }
   gg.uniform2fv(GU.u_circ,arr); gg.uniform1f(GU.u_circR,70/S);
   gg.drawArrays(gg.TRIANGLES,0,3); }
-// #3 카드 위 텍스트 — 상하좌우 20dp 패딩, 22pt, 흰색
-const CARD_TEXT='How would you I like to personalize your device';
+// #3 카드 위 텍스트 — 340x233 카드 내 상하좌우 20dp 패딩, 좌측정렬, 20pt, 흰색
+const CARD_TEXT="Welcome to Galaxy AI. How would you like to set up your device? Whatever you'd like to do first, I'll assist you get started.";
 function drawCardText(){ const DP=view.width/360, pad=20*DP;
   const cardX=10*DP, cardY=10*DP, cardW=340*DP, cardH=233*DP;
-  const tx=cardX+pad, ty=cardY+pad, tw=cardW-2*pad, px=22*2;   // 22pt → 44px(360dp=720px)
+  const tx=cardX+pad, ty=cardY+pad, tw=cardW-2*pad, th=cardH-2*pad, px=20*2;   // 20pt → 40px(360dp=720px)
   vctx.save();
+  vctx.beginPath(); vctx.rect(tx,ty,tw,th); vctx.clip();   // 카드 영역 밖으로 넘치지 않게
   vctx.font='500 '+px+'px '+famString('One UI Sans'); vctx.textAlign='left'; vctx.textBaseline='top'; vctx.fillStyle='#ffffff';
   vctx.shadowColor='rgba(0,0,0,0.30)'; vctx.shadowBlur=6; vctx.shadowOffsetY=1;
   const words=CARD_TEXT.split(' '); let line='', lines=[];
@@ -898,7 +899,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.17.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.18.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
