@@ -17,18 +17,25 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
   body{display:flex;align-items:center;justify-content:center}
 
-  /* portrait phone frame (9 : 19.5) — fills the screen on a real phone */
-  #wrap{position:relative;height:100vh;aspect-ratio:9/19.5;max-width:100vw;
-    overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.6)}
+  /* lock-screen frame — 360 x 800 dp, 93dp radius (scaled to fit) */
+  #wrap{
+    --scale: min(96vh / 800, 96vw / 360);
+    position:relative;
+    width:  calc(360 * var(--scale));
+    height: calc(800 * var(--scale));
+    border-radius: calc(93 * var(--scale));
+    overflow:hidden;
+    box-shadow:0 0 60px rgba(0,0,0,.6);
+  }
   canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 
-  /* lock-screen clock overlay */
-  #clockOv{position:absolute;left:0;right:0;top:8%;z-index:5;text-align:center;
-    color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.28);pointer-events:none;
-    transition:opacity .3s}
+  /* lock-screen clock overlay (sits below the card) */
+  #clockOv{position:absolute;left:0;right:0;top:calc(300 * var(--scale));z-index:5;
+    text-align:center;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.28);
+    pointer-events:none;transition:opacity .3s}
   #clockOv.off{opacity:0}
-  #clockOv .date{font-size:15px;font-weight:600;letter-spacing:.02em;opacity:.92}
-  #clockOv .time{font-size:74px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:2px}
+  #clockOv .date{font-size:calc(14 * var(--scale));font-weight:600;letter-spacing:.02em;opacity:.92}
+  #clockOv .time{font-size:calc(62 * var(--scale));font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:calc(2 * var(--scale))}
 
   /* control panel */
   #panel{
@@ -121,10 +128,6 @@
       <label>우유빛 틴트 <b id="vTint">1.00</b></label>
       <input type="range" id="tint" min="0" max="2" step="0.01" value="1.0">
     </div>
-    <div class="row">
-      <label>크기 <b id="vSize">0.26</b></label>
-      <input type="range" id="size" min="0.12" max="0.40" step="0.005" value="0.26">
-    </div>
 
     <div class="btns">
       <button id="play" class="active">⏸ 정지</button>
@@ -140,7 +143,7 @@
       <button id="clockBtn" class="active">시계 표시</button>
     </div>
 
-    <div class="hint">웜 라이트가 카드 뒤를 지나가며 투과광·림·글린트·배경 글로우를 만듭니다. ‘녹화’로 .webm 영상 추출.</div>
+    <div class="hint">잠금화면 360×800dp(r 93). 카드 340×233dp(r 상80/하60), 상단 20dp·가로 중앙. 빛이 카드 뒤를 지나가며 반영됩니다.</div>
   </div>
 
 <script>
@@ -162,19 +165,17 @@ uniform float u_disp;
 uniform float u_tint;
 uniform float u_lpow;       // light intensity
 uniform float u_lspd;       // light speed
-uniform float u_size;
 uniform int   u_bg;
 uniform sampler2D u_photo;
 uniform float u_hasPhoto;
 uniform float u_photoAspect;
 
-const float CORNER = 0.10;
-
-// sweeping light colour cycles softly through many hues over time
-vec3 lightTint(float t){
-  vec3 c = 0.5 + 0.5*cos(6.28318*(t + vec3(0.0,0.33,0.67)));
-  return mix(vec3(1.0), c, 0.72);            // kept gentle, pulled toward white
-}
+// ---- design space (dp) ----
+const vec2  DP       = vec2(360.0, 800.0);     // lock-screen size
+const vec2  CARD_MIN = vec2(10.0, 20.0);       // card rect (y from top): 340x233, 20dp top, centred
+const vec2  CARD_MAX = vec2(350.0, 253.0);
+const float R_TOP    = 80.0;                   // top corner radius (dp)
+const float R_BOT    = 60.0;                   // bottom corner radius (dp)
 
 float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
 float noise(vec2 p){
@@ -188,16 +189,18 @@ float fbm(vec2 p){
   for(int i=0;i<4;i++){ v+=amp*noise(p); p=p*2.0+vec2(11.3,7.1); amp*=0.5; }
   return v;
 }
-vec3 palette(float t){          // soft iridescent cosine palette
+vec3 palette(float t){
   vec3 a=vec3(0.80,0.74,0.70), b=vec3(0.22,0.20,0.22);
   vec3 c=vec3(1.0,1.0,1.0),    d=vec3(0.00,0.20,0.45);
   return a + b*cos(6.28318*(c*t + d));
 }
+// sweeping light colour cycles softly through many hues over time
+vec3 lightTint(float t){
+  vec3 c = 0.5 + 0.5*cos(6.28318*(t + vec3(0.0,0.33,0.67)));
+  return mix(vec3(1.0), c, 0.72);
+}
 
-// min-dimension normalised <-> screen-uv helpers
-vec2 mrVec(){ float m=min(u_res.x,u_res.y); return vec2(m/u_res.x, m/u_res.y); }
-
-// background colour (screen-uv) with the sweeping warm glow baked in
+// background colour (screen-uv) with the colour-shifting glow baked in
 vec3 bgColor(vec2 uv, vec2 lightUV, vec3 lcol){
   vec3 col;
   if(u_bg==2){                                   // checker
@@ -221,62 +224,71 @@ vec3 bgColor(vec2 uv, vec2 lightUV, vec3 lcol){
     float vig=distance(uv,vec2(0.5,0.6));
     col*=1.0-0.13*smoothstep(0.2,0.95,vig);
   }
-  // colour-shifting light sweeping behind everything (softened)
-  vec2 dd=(uv-lightUV)/mrVec();                  // isotropic distance
-  float g=exp(-dot(dd,dd)/0.11);
+  vec2 dd=(uv-lightUV)*DP;                        // dp-space delta (isotropic)
+  float g=exp(-dot(dd,dd)/(260.0*260.0));
   col+=lcol*g*0.30*u_lpow;
   return col;
 }
 
-// signed distance to a rounded square (negative inside)
-float sdBox(vec2 p){
-  vec2 b=vec2(u_size); float r=min(CORNER,u_size*0.98);
-  vec2 q=abs(p)-b+r;
-  return min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-r;
+// signed distance to the card: rounded rect with per-corner radius (dp, +y up)
+float sdCard(vec2 p){
+  vec2 b=(CARD_MAX-CARD_MIN)*0.5;
+  vec4 r=vec4(R_TOP,R_BOT,R_TOP,R_BOT);
+  r.xy=(p.x>0.0)?r.xy:r.zw;
+  r.x =(p.y>0.0)?r.x :r.y;
+  r.x =min(r.x, min(b.x,b.y));
+  vec2 q=abs(p)-b+r.x;
+  return min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-r.x;
+}
+vec2 cardLocal(vec2 dp){                          // dp(y-down) -> card-local(y-up)
+  vec2 c=(CARD_MIN+CARD_MAX)*0.5;
+  return vec2(dp.x-c.x, c.y-dp.y);
 }
 vec2 sdNormal(vec2 p){
-  float e=0.0015;
-  float dx=sdBox(p+vec2(e,0.0))-sdBox(p-vec2(e,0.0));
-  float dy=sdBox(p+vec2(0.0,e))-sdBox(p-vec2(0.0,e));
+  float e=0.5;
+  float dx=sdCard(p+vec2(e,0.0))-sdCard(p-vec2(e,0.0));
+  float dy=sdCard(p+vec2(0.0,e))-sdCard(p-vec2(0.0,e));
   return normalize(vec2(dx,dy)+1e-6);
 }
 
-// frosted (multi-tap blurred) background sample
-vec3 sampleFrost(vec2 uv, vec2 lightUV, vec3 lcol, vec2 mr){
+// frosted (multi-tap blurred) background sample (screen-space radius)
+vec3 sampleFrost(vec2 uv, vec2 lightUV, vec3 lcol){
+  float aspect=u_res.x/u_res.y;
   float rad=u_frost*0.012; vec3 acc=vec3(0.0);
   for(int i=0;i<12;i++){
     float a=float(i)*2.39996;
     float rr=rad*sqrt((float(i)+0.5)/12.0);
-    acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(mr.y/mr.x,1.0)*mr, lightUV, lcol);
+    acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(1.0/aspect,1.0), lightUV, lcol);
   }
   return acc/12.0;
 }
 
 void main(){
-  vec2 mr=mrVec();
   vec2 suv=gl_FragCoord.xy/u_res;
-  vec2 P=(gl_FragCoord.xy-0.5*u_res)/min(u_res.x,u_res.y);
+  vec2 dp =vec2(suv.x*DP.x,(1.0-suv.y)*DP.y);     // dp, y-down from top
+  vec2 P  =cardLocal(dp);                          // card-local, y-up
 
   // ---- moving, colour-shifting light behind the card ----
   float lt=u_time*u_lspd;
-  vec2 lightP=vec2(0.60*sin(lt*0.5), 0.30*sin(lt*0.31+0.7)+0.05);
-  vec2 lightUV=lightP*mr+0.5;
-  vec3 lcol=lightTint(u_time*0.06);            // slowly cycles through hues
+  vec2  lightUV=vec2(0.5+0.40*sin(lt*0.5), 0.83+0.07*sin(lt*0.31+0.7));
+  vec3  lcol=lightTint(u_time*0.06);
+  vec2  lightLocal=cardLocal(vec2(lightUV.x*DP.x,(1.0-lightUV.y)*DP.y));
 
-  float d=sdBox(P);
+  float d=sdCard(P);                               // dp signed distance
   vec2  n=sdNormal(P);
-  float inside=smoothstep(0.003,-0.003,d);
+  float inside=smoothstep(1.0,-1.0,d);
 
   // base background + soft contact shadow under the card
   vec3 base=bgColor(suv,lightUV,lcol);
-  float dsh=sdBox(P-vec2(0.0,-0.035));
-  float sh=smoothstep(0.11,-0.05,dsh)*smoothstep(-0.02,0.05,d);
+  float dsh=sdCard(P+vec2(0.0,30.0));              // silhouette shifted down
+  float sh=smoothstep(46.0,-18.0,dsh)*smoothstep(-8.0,18.0,d);
   base=mix(base,base*0.74,sh*0.55);
 
   // refraction: the bevel near the edge bends the background
-  float bevel=u_refract*exp(-pow(max(-d,0.0)/0.05,1.6));
-  vec2  ro=n*bevel*0.13*mr;                       // P-space offset -> screen-uv
-  vec3  body=sampleFrost(suv+ro,lightUV,lcol,mr);
+  float bevel=u_refract*exp(-pow(max(-d,0.0)/22.0,1.6));
+  vec2  roDP=n*bevel*16.0;                          // dp offset (y-up)
+  vec2  ro=vec2(roDP.x/DP.x, roDP.y/DP.y);          // -> screen-uv
+  vec3  body=sampleFrost(suv+ro,lightUV,lcol);
 
   // chromatic dispersion concentrated at the edge
   float disp=u_disp*0.012, edgeMix=clamp(bevel,0.0,1.0);
@@ -288,19 +300,19 @@ void main(){
   col=mix(vec3(dot(col,vec3(0.333))),col,0.84);
 
   // inner ambient occlusion -> glass thickness
-  col*=1.0-0.12*exp(-pow(max(-d,0.0)/0.020,2.0));
+  col*=1.0-0.12*exp(-pow(max(-d,0.0)/9.0,2.0));
 
   // subsurface transmission: soft coloured core glow where the light is behind
-  float ldist=length(P-lightP);
-  float trans=exp(-ldist*ldist/0.20)*u_lpow;
+  float ldist=length(P-lightLocal);
+  float trans=exp(-ldist*ldist/(170.0*170.0))*u_lpow;
   col+=lcol*trans*0.26;
 
   // ---- composite card over the background ----
   vec3 outc=mix(base,col,inside);
 
   // thin highlight band straddling the boundary
-  float edgeLine=exp(-pow(d/0.007,2.0));
-  vec2  toL=normalize(lightP-P+1e-5);
+  float edgeLine=exp(-pow(d/3.5,2.0));
+  vec2  toL=normalize(lightLocal-P+1e-5);
 
   // specular rim follows the moving light + a faint constant top light
   float spec=pow(max(dot(n,toL),0.0),3.0);
@@ -308,7 +320,7 @@ void main(){
   outc+=edgeLine*(spec*(0.30+0.4*u_lpow)+topSpec*0.16);
 
   // iridescent glints (tinted by the cycling light) where the bevel faces it
-  vec3 irid=palette(atan(n.y,n.x)/6.28318+0.25*fbm(P*3.0)+u_time*0.02);
+  vec3 irid=palette(atan(n.y,n.x)/6.28318+0.25*fbm(P*0.03)+u_time*0.02);
   irid=mix(irid,lcol,0.5);
   float glint=pow(max(dot(n,toL),0.0),2.0);
   outc+=irid*edgeLine*glint*u_lpow*0.5;
@@ -340,9 +352,8 @@ const U = {
   refract:gl.getUniformLocation(prog,'u_refract'), frost:gl.getUniformLocation(prog,'u_frost'),
   disp:gl.getUniformLocation(prog,'u_disp'), tint:gl.getUniformLocation(prog,'u_tint'),
   lpow:gl.getUniformLocation(prog,'u_lpow'), lspd:gl.getUniformLocation(prog,'u_lspd'),
-  size:gl.getUniformLocation(prog,'u_size'), bg:gl.getUniformLocation(prog,'u_bg'),
-  photo:gl.getUniformLocation(prog,'u_photo'), hasPhoto:gl.getUniformLocation(prog,'u_hasPhoto'),
-  photoAspect:gl.getUniformLocation(prog,'u_photoAspect'),
+  bg:gl.getUniformLocation(prog,'u_bg'), photo:gl.getUniformLocation(prog,'u_photo'),
+  hasPhoto:gl.getUniformLocation(prog,'u_hasPhoto'), photoAspect:gl.getUniformLocation(prog,'u_photoAspect'),
 };
 
 // photo texture (NPOT-safe)
@@ -367,7 +378,7 @@ window.addEventListener('resize', resize); resize();
 
 // state
 const state = { refract:1.0, frost:1.0, disp:1.0, tint:1.0, lpow:0.75, lspd:1.0,
-                size:0.26, bg:0, hasPhoto:0, photoAspect:1.0, playing:true };
+                bg:0, hasPhoto:0, photoAspect:1.0, playing:true };
 let simTime = 0, last = performance.now();
 
 function frame(now){
@@ -381,7 +392,6 @@ function frame(now){
   gl.uniform1f(U.tint, state.tint);
   gl.uniform1f(U.lpow, state.lpow);
   gl.uniform1f(U.lspd, state.lspd);
-  gl.uniform1f(U.size, state.size);
   gl.uniform1i(U.bg, state.bg);
   gl.uniform1f(U.hasPhoto, state.hasPhoto);
   gl.uniform1f(U.photoAspect, state.photoAspect);
@@ -412,7 +422,6 @@ bind('refract','refract','vRefract', v=>v.toFixed(2));
 bind('frost','frost','vFrost', v=>v.toFixed(2));
 bind('disp','disp','vDisp', v=>v.toFixed(2));
 bind('tint','tint','vTint', v=>v.toFixed(2));
-bind('size','size','vSize', v=>v.toFixed(3));
 
 const playBtn=$('play');
 playBtn.addEventListener('click', ()=>{
