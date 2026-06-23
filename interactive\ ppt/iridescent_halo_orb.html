@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.22</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.23</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -455,7 +455,7 @@ let glassReady=false; const GU={}; let gtex=null;
 function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCanvas;
   gg.viewport(0,0,gcv.width,gcv.height);
   gg.activeTexture(gg.TEXTURE0); gg.bindTexture(gg.TEXTURE_2D,gtex);
-  gg.pixelStorei(gg.UNPACK_FLIP_Y_WEBGL,false);
+  gg.pixelStorei(gg.UNPACK_FLIP_Y_WEBGL, src!==glCanvas);   // 2D 이미지 캔버스는 행 순서가 반대 → 상하 반전 방지
   gg.texImage2D(gg.TEXTURE_2D,0,gg.RGBA,gg.RGBA,gg.UNSIGNED_BYTE,src);
   gg.uniform2f(GU.u_res,gcv.width,gcv.height);
   gg.uniform1f(GU.u_time,t||0); gg.uniform1f(GU.u_lpow,0.85); gg.uniform1f(GU.u_lspd,1.0);
@@ -947,7 +947,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.22.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.23.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
