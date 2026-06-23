@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.21</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.22</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -452,11 +452,11 @@ let glassReady=false; const GU={}; let gtex=null;
   gg.texParameteri(gg.TEXTURE_2D,gg.TEXTURE_MIN_FILTER,gg.LINEAR); gg.texParameteri(gg.TEXTURE_2D,gg.TEXTURE_MAG_FILTER,gg.LINEAR);
   gg.uniform1i(GU.u_bg,0); glassReady=true; })();
 // #3 유리 렌더: 키스크린(360dp=720px) 기준 좌표 → P=(px-360)/720, (py-780)/720
-function renderGlass(t){ if(!glassReady) return; const S=720;
+function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCanvas;
   gg.viewport(0,0,gcv.width,gcv.height);
   gg.activeTexture(gg.TEXTURE0); gg.bindTexture(gg.TEXTURE_2D,gtex);
   gg.pixelStorei(gg.UNPACK_FLIP_Y_WEBGL,false);
-  gg.texImage2D(gg.TEXTURE_2D,0,gg.RGBA,gg.RGBA,gg.UNSIGNED_BYTE,glCanvas);
+  gg.texImage2D(gg.TEXTURE_2D,0,gg.RGBA,gg.RGBA,gg.UNSIGNED_BYTE,src);
   gg.uniform2f(GU.u_res,gcv.width,gcv.height);
   gg.uniform1f(GU.u_time,t||0); gg.uniform1f(GU.u_lpow,0.85); gg.uniform1f(GU.u_lspd,1.0);
   gg.uniform1f(GU.u_refract,1.0); gg.uniform1f(GU.u_frost,1.0); gg.uniform1f(GU.u_disp,1.0); gg.uniform1f(GU.u_tint,1.0);
@@ -806,7 +806,19 @@ function gotoScreen(i){ if(!screens.length||_switching) return; const target=((i
 const SCREEN_NAMES=['Welcome','Hello','Home'];
 function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){ el.innerHTML=''; screens.forEach((s,i)=>{ const d=document.createElement('div'); d.className='dot'+(i===activeScreen?' on':''); d.title='#'+(i+1); d.onclick=()=>gotoScreen(i); el.appendChild(d); }); }
   const bx=document.getElementById('screenBtns'); if(bx){ bx.innerHTML=''; screens.forEach((s,i)=>{ const b=document.createElement('button'); b.className=(i===activeScreen?'on':''); b.textContent='#'+(i+1)+(SCREEN_NAMES[i]?' '+SCREEN_NAMES[i]:''); b.onclick=()=>gotoScreen(i); bx.appendChild(b); }); }
-  const cx=document.getElementById('ctxCtrl'); if(cx) cx.innerHTML=''; }
+  const cx=document.getElementById('ctxCtrl'); if(cx){ cx.innerHTML='';
+    if(activeScreen===2){ const t=document.createElement('button'); t.className=bgImageOn?'on':''; t.textContent='🖼 배경이미지: '+(bgImageOn?'ON':'OFF'); t.onclick=()=>{ if(!bgImageReady){ bgImageInput.click(); return; } bgImageOn=!bgImageOn; refreshScreenUI(); }; cx.appendChild(t);
+      const u=document.createElement('button'); u.textContent='업로드'; u.onclick=()=>bgImageInput.click(); cx.appendChild(u); } } }
+// #3 배경 이미지(업로드) — 카드 유리/빛과의 상호작용 테스트용. OFF면 현재(오브) 배경
+const bgImageCanvas=document.createElement('canvas'); bgImageCanvas.width=720; bgImageCanvas.height=1560; const bgImageCtx=bgImageCanvas.getContext('2d');
+let bgImageReady=false, bgImageOn=false;
+function setBgImage(img){ const W=720,H=1560, iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+  const s=Math.max(W/iw,H/ih), dw=iw*s, dh=ih*s; bgImageCtx.clearRect(0,0,W,H); bgImageCtx.drawImage(img,(W-dw)/2,(H-dh)/2,dw,dh);
+  bgImageReady=true; bgImageOn=true; refreshScreenUI(); }
+const bgImageInput=document.createElement('input'); bgImageInput.type='file'; bgImageInput.accept='image/*'; bgImageInput.style.display='none'; document.body.appendChild(bgImageInput);
+bgImageInput.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const img=new Image(); img.onload=()=>{ setBgImage(img); URL.revokeObjectURL(img.src); }; img.src=URL.createObjectURL(f); };
+// 적응형 텍스트 효과(#2) — adaptive-text-kiosk 값, 폰트 패널에서 조절
+const ADAPT={strength:0.20, sat:1.75, mode:'lum'};
 (function buildFontUI(){ const p=document.getElementById('fontBody');
   // 페이지
   const tp=document.createElement('div'); tp.className='sec-title'; tp.textContent='페이지'; p.appendChild(tp);
@@ -865,6 +877,20 @@ function refreshScreenUI(){ const el=document.getElementById('pageind'); if(el){
   ap.onclick=()=>flash(ap,'✓ 적용됨');  // 텍스트는 매 프레임 실시간 반영됨
   nx.onclick=()=>{ if(codeReady){ refreshCode(); flash(nx,'✓ 반영됨'); } };
   bd.appendChild(ap); bd.appendChild(nx); p.appendChild(bd);
+  // ===== 적응형 텍스트 효과(#2) — 배경색에 따라 변하는 글자색 =====
+  const at=document.createElement('div'); at.className='sec-title'; at.textContent='적응형 텍스트 (#2)'; p.appendChild(at);
+  const mk=(label,key,min,max,step)=>{ const r=document.createElement('div'); r.className='row';
+    const l=document.createElement('label'); const b=document.createElement('b'); b.textContent=(+ADAPT[key]).toFixed(2); l.textContent=label; l.appendChild(b);
+    const s=document.createElement('input'); s.type='range'; s.min=min; s.max=max; s.step=step; s.value=ADAPT[key];
+    s.style.cssText='width:100%'; s.oninput=()=>{ ADAPT[key]=+s.value; b.textContent=(+s.value).toFixed(2); };
+    r.appendChild(l); r.appendChild(s); p.appendChild(r); };
+  mk('대비 강도','strength',0,1,0.01);
+  mk('채도 부스트','sat',0.6,2,0.01);
+  const mr=document.createElement('div'); mr.className='btns';
+  [['lum','Luminance'],['comp','Complement'],['white','Static White']].forEach(([v,n])=>{ const mb=document.createElement('button'); mb.className='b'+(ADAPT.mode===v?' on':''); mb.textContent=n; mb.dataset.am=v;
+    mb.onclick=()=>{ ADAPT.mode=v; mr.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.am===v)); }; mr.appendChild(mb); });
+  p.appendChild(mr);
+  const an=document.createElement('div'); an.className='note'; an.textContent='#2 글자색이 배경 색조를 따라가며 가독성 방향으로 밝기/채도 조절. (adaptive-text-kiosk 값)'; p.appendChild(an);
 })();
 function syncFontUI(){ Object.keys(fontInputs).forEach(k=>{ fontInputs[k].inp.value=FONT[k]; fontInputs[k].num.value=fmt(FONTP[k],FONT[k]); });
   document.querySelectorAll('#fontBody [data-al]').forEach(b=>b.classList.toggle('on',b.dataset.al===FONT.align));
@@ -921,7 +947,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.21.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.22.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
@@ -970,7 +996,6 @@ function drawTextScene(F,amul,typed,c){ c=c||vctx; if(!F||!F.text||amul<=0) retu
   c.restore(); }
 // ===== #2 적응형 텍스트(배경색에 따라 자연스럽게 변하는 색) — adaptive-text-kiosk 값 이식 =====
 const atxt=document.createElement('canvas'); atxt.width=720; atxt.height=1560; const actx=atxt.getContext('2d',{willReadFrequently:true});
-const ADAPT={strength:0.20, sat:1.75, mode:'lum'};   // 레퍼런스 기본값
 function _rgb2hsl(r,g,b){ const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2; let h=0,s=0;
   if(d>1e-6){ s=d/(1-Math.abs(2*l-1)+1e-6); if(mx===r)h=((g-b)/d)%6; else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; if(h<0)h+=1; } return [h,s,l]; }
 function _hsl2rgb(h,s,l){ if(s<1e-6) return [l,l,l]; const q=l<0.5?l*(1+s):l+s-l*s, p=2*l-q;
@@ -1068,7 +1093,7 @@ function frame(now){
   if(activeScreen===1){ drawAdaptiveText(tSec,seqText); if(seqText) seqRestore(); }   // #2: 배경 적응형 텍스트
   else if(seqText){ drawTextScene(seqText.A,1-seqText.f,seqText.typedA); drawTextScene(seqText.B,seqText.f,seqText.typedB); seqRestore(); }
   else drawText(tSec);
-  if(activeScreen===2 && glassReady){ renderGlass(tSec);    // #3 유리 굴절 패스(카드+아이콘4) — 즉시 합성(크로스페이드가 전환을 가림)
+  if(activeScreen===2 && glassReady){ renderGlass(tSec,(bgImageOn&&bgImageReady)?bgImageCanvas:glCanvas);  // #3 유리 패스 — 배경이미지 ON이면 그 이미지를 카드가 굴절/조명
     vctx.drawImage(gcv,0,0,view.width,view.height); drawCardText(); }
   requestAnimationFrame(frame);
 }
@@ -1078,6 +1103,8 @@ const CFG={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"artboard":{"type"
 INIT.screens=CFG.screens; INIT.activeScreen=CFG.activeScreen; if(CFG.artboard) Object.assign(artboard,CFG.artboard);
 // 모든 텍스트 흰색
 INIT.screens.forEach(s=>s.pages.forEach(p=>{ if(p.font){ p.font.color='#ffffff'; p.font.shadowOn=false; } }));
+// #2 텍스트 두께 BOLD
+if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ if(p.font) p.font.weight='700'; });
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
 // 임베드 폰트 로드 보장 후 렌더 시작
 if(document.fonts && document.fonts.load){ Promise.all([document.fonts.load('700 60px "Samsung Sharp Sans"'),document.fonts.load('500 60px "One UI Sans"')]).catch(()=>{}).finally(()=>requestAnimationFrame(frame)); }
