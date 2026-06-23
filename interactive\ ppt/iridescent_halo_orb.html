@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.31</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.32</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -211,6 +211,7 @@ const PALETTES=[
   { name:'Sunset', stops:['#FFC24B','#FF9A56','#FF6F61','#FF5C8A','#E85BA0','#C45BD0','#F06C8A','#FFB347','#FF8C69','#FF5E78','#D45BC0','#FF7E5F'] },
   { name:'Aurora', stops:['#7CF5C2','#5CE0E8','#5AB0F0','#7E8CF0','#A86CF0','#D06CE0','#6CE0B0','#9CF0A0','#C8F08C','#7CE0D0','#5CC8E8','#8C9CF0'] },
   { name:'Ocean', stops:['#5AD2F0','#56B8E8','#4F9AE0','#6C8CF0','#5CC8C0','#7CE0D8','#9CE8F0','#5AB0E8','#4F86D0','#6CA8F0','#5CD0D8','#8CD8F0'] },
+  { name:'Lime', stops:['#e6f0a8','#d2e87e','#b9de5e','#a7d85a','#c2e88c','#dcf0a8','#cfe884','#b4dd6a','#9ed05e','#c8e892','#e2f0b0','#d6e88a'] },
 ];
 let palIdx=0;
 // 배경 색상 프리셋(듀오톤 2색 + 보색 1색)
@@ -1074,7 +1075,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.31.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.32.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
@@ -1236,8 +1237,9 @@ INIT.screens=CFG.screens; INIT.activeScreen=CFG.activeScreen; if(CFG.artboard) O
 INIT.screens.forEach(s=>s.pages.forEach(p=>{ if(p.font){ p.font.color='#ffffff'; p.font.shadowOn=false; } }));
 // #2 텍스트 두께 MEDIUM
 if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ if(p.font) p.font.weight='500'; });
-// #2 배경 톤(IMG_9906, 그린 계열 강조): 연그린 + 라임 + 민트
-if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ p.bg=["#dbe2a6","#bcd863","#c9dcb2"]; p.blankBg="#dbe2a6"; p.bgType=0; p.bgSize=100; p.bgAlpha=1; });
+// #2 전체(Hello~To better) 연두 그린 통일: 배경 + 빛(Lime 팔레트) + 오브색
+if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ p.bg=["#dbe2a6","#bcd863","#c9dcb2"]; p.blankBg="#dbe2a6"; p.bgType=0; p.bgSize=100; p.bgAlpha=1;
+  p.palette='Lime'; if(p.params){ p.params.hue=0; } p.orbFill='#d2e89a'; p.orbFill2='#aad65e'; p.orbFill3='#e0ecb4'; p.orbFillType=1; });
 // #1 중앙 Y 위치 0.50
 if(INIT.screens[0]) INIT.screens[0].pages.forEach(p=>{ if(p.params) p.params.centerY=0.50; });
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
