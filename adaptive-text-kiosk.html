@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adaptive Text · Mobile Kiosk 360×800</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#0c0d10;color:#e8e8ea;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  body{display:flex;gap:34px;align-items:center;justify-content:center;flex-wrap:wrap;padding:30px}
+
+  /* ---- mobile kiosk device ---- */
+  .device{position:relative;width:360px;height:800px;border-radius:46px;
+    background:#000;padding:0;box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 0 11px #111,0 0 0 12px #2a2a2e;
+    overflow:hidden}
+  .screen{position:absolute;inset:0;border-radius:46px;overflow:hidden}
+  canvas{position:absolute;inset:0;width:360px;height:800px;display:block}
+
+  /* kiosk chrome */
+  .statusbar{position:absolute;top:0;left:0;right:0;height:46px;display:flex;
+    align-items:center;justify-content:space-between;padding:0 22px;
+    font-size:13px;font-weight:600;color:rgba(255,255,255,.95);
+    text-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none;z-index:3}
+  .statusbar .right{display:flex;align-items:center;gap:6px}
+  .bat{width:23px;height:12px;border:1px solid rgba(255,255,255,.85);border-radius:3px;position:relative}
+  .bat::after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:6px;background:rgba(255,255,255,.85);border-radius:0 1px 1px 0}
+  .bat::before{content:"";position:absolute;inset:1.5px;background:rgba(255,255,255,.9);border-radius:1px}
+  .sub{position:absolute;left:0;right:0;top:62%;text-align:center;font-size:12px;
+    color:rgba(255,255,255,.55);letter-spacing:.04em;z-index:3;pointer-events:none}
+  .home{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
+    width:110px;height:5px;border-radius:3px;background:rgba(255,255,255,.7);z-index:3}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;
+    background:#000;border-radius:0 0 16px 16px;z-index:4}
+
+  /* ---- controls ---- */
+  .panel{width:300px;max-width:90vw}
+  .panel h1{font-size:15px;font-weight:700;letter-spacing:.02em;margin-bottom:4px}
+  .panel p.lead{font-size:12px;color:#9a9aa2;line-height:1.6;margin-bottom:18px}
+  .row{margin:14px 0}
+  .row label{display:flex;justify-content:space-between;font-size:11px;color:#9a9aa2;margin-bottom:7px;letter-spacing:.02em}
+  .row label b{color:#c9b8ff;font-weight:700}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:rgba(255,255,255,.16);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:15px;height:15px;
+    border-radius:50%;background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0);box-shadow:0 1px 6px rgba(0,0,0,.4)}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border:none;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0)}
+  .txtin{width:100%;margin-top:6px;padding:9px 11px;font-size:13px;color:#fff;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;outline:none}
+  .modes{display:flex;gap:7px;margin-top:8px}
+  .modes button{flex:1;padding:9px 0;font-size:11px;font-weight:600;color:#e8e8ea;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;cursor:pointer}
+  .modes button.active{border-color:#c9b8ff;color:#fff;background:rgba(201,184,255,.12)}
+  .note{font-size:10.5px;color:#75757e;line-height:1.6;margin-top:16px;
+    border-top:1px solid rgba(255,255,255,.08);padding-top:14px}
+</style>
+</head>
+<body>
+  <div class="device">
+    <div class="screen">
+      <canvas id="cv" width="720" height="1600"></canvas>
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="right">
+          <svg width="17" height="12" viewBox="0 0 17 12"><g fill="#fff">
+            <rect x="0" y="8" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/>
+            <rect x="9" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/>
+          </g></svg>
+          <span class="bat"></span>
+        </span>
+      </div>
+      <div class="sub">Tap to begin</div>
+      <div class="home"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h1>Adaptive Text · 적응형 폰트 컬러</h1>
+    <p class="lead">배경 색상에 따라 텍스트가 <b style="color:#c9b8ff">배경의 색조(Hue)를 따라가되 밝기를 가독성 방향으로 밀어내는</b> 효과를 360×800 모바일 키오스크에 재현했습니다. 글자마다 뒤 배경이 달라 한 단어 안에서도 톤이 갈립니다.</p>
+
+    <div class="row">
+      <label>문구</label>
+      <input class="txtin" id="text" value="A new dawn" maxlength="22">
+    </div>
+    <div class="row">
+      <label>대비 강도 <b id="vStrength">0.55</b></label>
+      <input type="range" id="strength" min="0" max="1" step="0.01" value="0.55">
+    </div>
+    <div class="row">
+      <label>채도 부스트 <b id="vSat">1.25</b></label>
+      <input type="range" id="sat" min="0.6" max="2" step="0.01" value="1.25">
+    </div>
+    <div class="row">
+      <label>배경 속도 <b id="vSpeed">1.0</b></label>
+      <input type="range" id="speed" min="0" max="2.5" step="0.05" value="1.0">
+    </div>
+    <div class="row">
+      <label>적응 방식</label>
+      <div class="modes">
+        <button data-mode="lum" class="active">Luminance</button>
+        <button data-mode="comp">Complement</button>
+        <button data-mode="white">Static White</button>
+      </div>
+    </div>
+
+    <p class="note">
+      <b>분석 (원본 영상 기준):</b><br>
+      • 텍스트 색 = 배경 색조(H) 유지 + 밝기(L)를 반대편 가독 극값으로 이동.<br>
+      • 어두운 배경 → 흰색 쪽, 밝은 배경 → 같은 색조의 어두운 톤(tone-on-tone).<br>
+      • 텍스트는 배경보다 채도가 약간 높음(측정값).<br>
+      • 픽셀 단위 적응이라 글자별로 색이 다름.<br>
+      • 아래 작은 아이콘은 보색(Complement) 방식으로 더 또렷하게 반전.
+    </p>
+  </div>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d', {willReadFrequently:true});
+const W = cv.width, H = cv.height;            // 720 x 1600 (2x of 360x800)
+
+// vivid palette: blue / navy / gold / orange / red / bright-blue
+const PAL = [
+  [0.07,0.22,0.85],[0.02,0.10,0.45],[1.00,0.78,0.10],
+  [0.98,0.45,0.06],[0.85,0.16,0.10],[0.20,0.40,0.95]
+];
+
+// ---- color helpers ----
+function rgb2hsl(r,g,b){
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2;
+  let h=0,s=0;
+  if(d>1e-6){ s=d/(1-Math.abs(2*l-1)+1e-6);
+    if(mx===r)h=((g-b)/d)%6; else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4;
+    h/=6; if(h<0)h+=1; }
+  return [h,s,l];
+}
+function hsl2rgb(h,s,l){
+  if(s<1e-6) return [l,l,l];
+  const q=l<0.5?l*(1+s):l+s-l*s, p=2*l-q;
+  const f=t=>{t=(t%1+1)%1;
+    if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q;
+    if(t<2/3)return p+(q-p)*(2/3-t)*6; return p;};
+  return [f(h+1/3),f(h),f(h-1/3)];
+}
+const lum=(r,g,b)=>0.2126*r+0.7152*g+0.0722*b;
+
+// ---- params ----
+let P={strength:0.55, sat:1.25, speed:1.0, mode:'lum', text:'A new dawn'};
+
+// ---- background field (mirrors the Python renderer) ----
+const bgImg = ctx.createImageData(W,H);
+function renderBG(t){
+  const data=bgImg.data, NP=PAL.length;
+  // [baseX, ampX, freqX, phaseX,  baseY, ampY, freqY, phaseY,  palPhase]
+  const def=[
+    [0.18,0.22,0.40,0.0,  0.20,0.18,0.31,1.0,  0.0],
+    [0.85,0.16,0.34,2.1,  0.28,0.20,0.47,0.4,  1.7],
+    [0.30,0.20,0.27,3.4,  0.82,0.16,0.38,2.7,  3.1],
+    [0.78,0.18,0.45,1.7,  0.80,0.16,0.29,0.9,  4.5]
+  ];
+  const cs=def.map(d=>[ d[0]+d[1]*Math.sin(t*d[2]+d[3]),
+                        d[4]+d[5]*Math.cos(t*d[6]+d[7]), d[8] ]);
+  const rad=0.42, inv=1/(2*rad*rad);
+  for(let y=0;y<H;y++){
+    const ny=y/H;
+    for(let x=0;x<W;x++){
+      const nx=x/W; let ar=0,ag=0,ab=0,ws=0;
+      for(let i=0;i<cs.length;i++){
+        const dx=nx-cs[i][0], dy=ny-cs[i][1];
+        let w=Math.exp(-(dx*dx+dy*dy)*inv); w*=w;
+        let f=(t*0.13+cs[i][2])%NP; if(f<0)f+=NP;
+        const i0=Math.floor(f)%NP, i1=(i0+1)%NP, fr=f-Math.floor(f);
+        const c0=PAL[i0],c1=PAL[i1];
+        ar+=w*(c0[0]*(1-fr)+c1[0]*fr); ag+=w*(c0[1]*(1-fr)+c1[1]*fr); ab+=w*(c0[2]*(1-fr)+c1[2]*fr);
+        ws+=w;
+      }
+      let r=ar/ws,g=ag/ws,b=ab/ws;
+      let [h,s,l]=rgb2hsl(r,g,b);
+      [r,g,b]=hsl2rgb(h,Math.min(s*1.35+0.05,1),Math.min(l*0.97+0.02,1));
+      const sh=0.94+0.12*ny;
+      const idx=(y*W+x)*4;
+      data[idx]=Math.min(r*sh,1)*255; data[idx+1]=Math.min(g*sh,1)*255;
+      data[idx+2]=Math.min(b*sh,1)*255; data[idx+3]=255;
+    }
+  }
+}
+
+// ---- adaptive text color from a bg pixel ----
+function adapt(r,g,b){
+  const Lb=lum(r,g,b);
+  if(P.mode==='white'){ const v=Lb<0.5?0.97:0.12; return [v,v,v]; }
+  let [h,s,l]=rgb2hsl(r,g,b);
+  if(P.mode==='comp'){
+    const tL=Lb<0.5?0.88:0.30;
+    return hsl2rgb((h+0.5)%1, Math.min(s*1.3+0.2,1), tL);
+  }
+  const target=Lb<0.5?1.0:0.18;
+  const strength=P.strength*(0.7+0.6*Math.abs(Lb-0.5)*2);
+  const tL=Math.max(0.05,Math.min(0.97, l*(1-strength)+target*strength));
+  const tS=Math.min(s*P.sat+0.12,1);
+  return hsl2rgb(h,tS,tL);
+}
+
+// ---- text mask (offscreen) ----
+const mc=document.createElement('canvas'); mc.width=W; mc.height=H;
+const mx=mc.getContext('2d');
+function buildMask(){
+  mx.clearRect(0,0,W,H);
+  mx.fillStyle='#fff'; mx.textAlign='center'; mx.textBaseline='middle';
+  mx.font='700 92px -apple-system,Helvetica,Arial,sans-serif';
+  mx.fillText(P.text, W/2, H*0.46);
+  // small ring icon below
+  mx.lineWidth=6; mx.strokeStyle='#fff';
+  mx.beginPath(); mx.arc(W/2,H*0.55,26,0,7); mx.stroke();
+  mx.beginPath(); mx.arc(W/2,H*0.55,6,0,7); mx.fill();
+  return mx.getImageData(0,0,W,H);
+}
+let mask=buildMask();
+
+// ---- compose ----
+function frame(now){
+  const t=(P.speed)*(now/1000);
+  renderBG(t);
+  const out=ctx.createImageData(W,H);
+  const o=out.data, bg=bgImg.data, m=mask.data;
+  // icon region uses complement always; detect by y band
+  for(let i=0;i<o.length;i+=4){
+    const a=m[i+3]/255;
+    if(a<0.004){ o[i]=bg[i]; o[i+1]=bg[i+1]; o[i+2]=bg[i+2]; o[i+3]=255; continue; }
+    const r=bg[i]/255,g=bg[i+1]/255,b=bg[i+2]/255;
+    const px=(i/4)%W, py=Math.floor((i/4)/W);
+    let tc;
+    if(py>H*0.52){ // small icon -> always complement for pop
+      const [h,s,l]=rgb2hsl(r,g,b); const Lb=lum(r,g,b);
+      tc=hsl2rgb((h+0.5)%1,Math.min(s*1.3+0.2,1),Lb<0.5?0.9:0.28);
+    } else tc=adapt(r,g,b);
+    o[i]=(r*(1-a)+tc[0]*a)*255; o[i+1]=(g*(1-a)+tc[1]*a)*255;
+    o[i+2]=(b*(1-a)+tc[2]*a)*255; o[i+3]=255;
+  }
+  ctx.putImageData(out,0,0);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- UI ----
+const $=id=>document.getElementById(id);
+$('strength').oninput=e=>{P.strength=+e.target.value; $('vStrength').textContent=(+e.target.value).toFixed(2);};
+$('sat').oninput=e=>{P.sat=+e.target.value; $('vSat').textContent=(+e.target.value).toFixed(2);};
+$('speed').oninput=e=>{P.speed=+e.target.value; $('vSpeed').textContent=(+e.target.value).toFixed(2);};
+$('text').oninput=e=>{P.text=e.target.value||' '; mask=buildMask();};
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.modes button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); P.mode=b.dataset.mode;
+});
+</script>
+</body>
+</html>
