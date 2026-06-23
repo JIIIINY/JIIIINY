@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.29</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.30</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -1074,7 +1074,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.29.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.30.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
@@ -1232,6 +1232,8 @@ INIT.screens=CFG.screens; INIT.activeScreen=CFG.activeScreen; if(CFG.artboard) O
 INIT.screens.forEach(s=>s.pages.forEach(p=>{ if(p.font){ p.font.color='#ffffff'; p.font.shadowOn=false; } }));
 // #2 텍스트 두께 MEDIUM
 if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ if(p.font) p.font.weight='500'; });
+// #2 배경 톤(IMG_9906): 크림 + 샤르트뢰즈 + 연분홍
+if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ p.bg=["#e6dcb6","#dfdd84","#ddbcc4"]; p.blankBg="#e6dcb6"; p.bgType=0; p.bgSize=100; p.bgAlpha=1; });
 // #1 중앙 Y 위치 0.50
 if(INIT.screens[0]) INIT.screens[0].pages.forEach(p=>{ if(p.params) p.params.centerY=0.50; });
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
