@@ -54,6 +54,15 @@
   .modes button.active{border-color:#c9b8ff;color:#fff;background:rgba(201,184,255,.12)}
   .note{font-size:10.5px;color:#75757e;line-height:1.6;margin-top:16px;
     border-top:1px solid rgba(255,255,255,.08);padding-top:14px}
+  .copybtn{width:100%;padding:11px 0;font-size:12.5px;font-weight:700;letter-spacing:.02em;
+    color:#0c0d10;cursor:pointer;border:none;border-radius:11px;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0);
+    box-shadow:0 4px 16px rgba(201,184,255,.3);transition:transform .12s,box-shadow .12s}
+  .copybtn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(201,184,255,.4)}
+  .copybtn:active{transform:translateY(0)}
+  .copybtn.done{background:linear-gradient(135deg,#9ff0c2,#6fe0a0)}
+  .copyhint{font-size:10.5px;color:#75757e;line-height:1.6;margin-top:9px}
+  .copyhint code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px;color:#c9b8ff}
 </style>
 </head>
 <body>
@@ -103,6 +112,11 @@
         <button data-mode="comp">Complement</button>
         <button data-mode="white">Static White</button>
       </div>
+    </div>
+
+    <div class="row">
+      <button id="copyBtn" class="copybtn">⧉ 코드 복사 (다른 HTML에 붙여넣기)</button>
+      <p class="copyhint" id="copyHint">현재 문구·강도·채도·속도·모드가 반영된 <b>자기완결형 코드</b>를 복사합니다. 다른 HTML의 <code>&lt;body&gt;</code> 안에 붙여넣으면 그대로 동작합니다.</p>
     </div>
 
     <p class="note">
@@ -253,6 +267,92 @@ document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.modes button').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); P.mode=b.dataset.mode;
 });
+
+// ---- export: build a self-contained snippet with current params baked in ----
+function genCode(){
+  const esc=s=>String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"');
+  const W2=360, H2=800;                       // CSS size of the widget
+  const head =
+'<!-- ===== Adaptive Text widget (배경색에 따라 변하는 텍스트) ===== -->\n'+
+'<canvas id="adaptiveText" width="'+(W2*2)+'" height="'+(H2*2)+'"\n'+
+'        style="width:'+W2+'px;height:'+H2+'px;display:block;border-radius:24px"></canvas>\n'+
+'<script>\n'+
+'(function(){\n'+
+'  // --- 설정 (데모에서 가져온 값) ---\n'+
+'  var TEXT    = "'+esc(P.text)+'";\n'+
+'  var STRENGTH= '+(+P.strength)+';   // 대비 강도 0~1\n'+
+'  var SAT     = '+(+P.sat)+';        // 채도 부스트\n'+
+'  var SPEED   = '+(+P.speed)+';      // 배경 속도\n'+
+'  var MODE    = "'+P.mode+'";        // "lum" | "comp" | "white"\n'+
+ENGINE_SRC+
+'})();\n'+
+'<\/script>\n';
+  return head;
+}
+
+// the portable engine (no external deps; uses only the canvas above)
+const ENGINE_SRC = [
+'  var cv=document.getElementById("adaptiveText");',
+'  var ctx=cv.getContext("2d",{willReadFrequently:true});',
+'  var W=cv.width,H=cv.height;',
+'  var PAL=[[0.07,0.22,0.85],[0.02,0.10,0.45],[1.00,0.78,0.10],[0.98,0.45,0.06],[0.85,0.16,0.10],[0.20,0.40,0.95]];',
+'  function rgb2hsl(r,g,b){var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2,h=0,s=0;',
+'    if(d>1e-6){s=d/(1-Math.abs(2*l-1)+1e-6); if(mx===r)h=((g-b)/d)%6; else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; if(h<0)h+=1;} return [h,s,l];}',
+'  function hsl2rgb(h,s,l){if(s<1e-6)return [l,l,l]; var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;',
+'    var f=function(t){t=(t%1+1)%1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p;};',
+'    return [f(h+1/3),f(h),f(h-1/3)];}',
+'  function lum(r,g,b){return 0.2126*r+0.7152*g+0.0722*b;}',
+'  var bgImg=ctx.createImageData(W,H);',
+'  function renderBG(t){var data=bgImg.data,NP=PAL.length;',
+'    var def=[[0.18,0.22,0.40,0.0,0.20,0.18,0.31,1.0,0.0],[0.85,0.16,0.34,2.1,0.28,0.20,0.47,0.4,1.7],[0.30,0.20,0.27,3.4,0.82,0.16,0.38,2.7,3.1],[0.78,0.18,0.45,1.7,0.80,0.16,0.29,0.9,4.5]];',
+'    var cs=def.map(function(d){return [d[0]+d[1]*Math.sin(t*d[2]+d[3]),d[4]+d[5]*Math.cos(t*d[6]+d[7]),d[8]];});',
+'    var rad=0.42,inv=1/(2*rad*rad);',
+'    for(var y=0;y<H;y++){var ny=y/H; for(var x=0;x<W;x++){var nx=x/W,ar=0,ag=0,ab=0,ws=0;',
+'      for(var i=0;i<cs.length;i++){var dx=nx-cs[i][0],dy=ny-cs[i][1],w=Math.exp(-(dx*dx+dy*dy)*inv); w*=w;',
+'        var f=(t*0.13+cs[i][2])%NP; if(f<0)f+=NP; var i0=Math.floor(f)%NP,i1=(i0+1)%NP,fr=f-Math.floor(f),c0=PAL[i0],c1=PAL[i1];',
+'        ar+=w*(c0[0]*(1-fr)+c1[0]*fr); ag+=w*(c0[1]*(1-fr)+c1[1]*fr); ab+=w*(c0[2]*(1-fr)+c1[2]*fr); ws+=w;}',
+'      var r=ar/ws,g=ag/ws,b=ab/ws,hsl=rgb2hsl(r,g,b),rgb=hsl2rgb(hsl[0],Math.min(hsl[1]*1.35+0.05,1),Math.min(hsl[2]*0.97+0.02,1));',
+'      var sh=0.94+0.12*ny,idx=(y*W+x)*4;',
+'      data[idx]=Math.min(rgb[0]*sh,1)*255; data[idx+1]=Math.min(rgb[1]*sh,1)*255; data[idx+2]=Math.min(rgb[2]*sh,1)*255; data[idx+3]=255;}}}',
+'  function adapt(r,g,b){var Lb=lum(r,g,b);',
+'    if(MODE==="white"){var v=Lb<0.5?0.97:0.12; return [v,v,v];}',
+'    var hsl=rgb2hsl(r,g,b),h=hsl[0],s=hsl[1],l=hsl[2];',
+'    if(MODE==="comp"){return hsl2rgb((h+0.5)%1,Math.min(s*1.3+0.2,1),Lb<0.5?0.88:0.30);}',
+'    var target=Lb<0.5?1.0:0.18, st=STRENGTH*(0.7+0.6*Math.abs(Lb-0.5)*2);',
+'    var tL=Math.max(0.05,Math.min(0.97,l*(1-st)+target*st)), tS=Math.min(s*SAT+0.12,1);',
+'    return hsl2rgb(h,tS,tL);}',
+'  var mc=document.createElement("canvas"); mc.width=W; mc.height=H; var mctx=mc.getContext("2d");',
+'  function buildMask(){mctx.clearRect(0,0,W,H); mctx.fillStyle="#fff"; mctx.textAlign="center"; mctx.textBaseline="middle";',
+'    mctx.font="700 92px -apple-system,Helvetica,Arial,sans-serif"; mctx.fillText(TEXT,W/2,H*0.46);',
+'    mctx.lineWidth=6; mctx.strokeStyle="#fff"; mctx.beginPath(); mctx.arc(W/2,H*0.55,26,0,7); mctx.stroke();',
+'    mctx.beginPath(); mctx.arc(W/2,H*0.55,6,0,7); mctx.fill(); return mctx.getImageData(0,0,W,H);}',
+'  var mask=buildMask();',
+'  function frame(now){var t=SPEED*(now/1000); renderBG(t);',
+'    var out=ctx.createImageData(W,H),o=out.data,bg=bgImg.data,m=mask.data;',
+'    for(var i=0;i<o.length;i+=4){var a=m[i+3]/255;',
+'      if(a<0.004){o[i]=bg[i];o[i+1]=bg[i+1];o[i+2]=bg[i+2];o[i+3]=255;continue;}',
+'      var r=bg[i]/255,g=bg[i+1]/255,b=bg[i+2]/255,py=Math.floor((i/4)/W),tc;',
+'      if(py>H*0.52){var hsl=rgb2hsl(r,g,b),Lb=lum(r,g,b); tc=hsl2rgb((hsl[0]+0.5)%1,Math.min(hsl[1]*1.3+0.2,1),Lb<0.5?0.9:0.28);}',
+'      else tc=adapt(r,g,b);',
+'      o[i]=(r*(1-a)+tc[0]*a)*255; o[i+1]=(g*(1-a)+tc[1]*a)*255; o[i+2]=(b*(1-a)+tc[2]*a)*255; o[i+3]=255;}',
+'    ctx.putImageData(out,0,0); requestAnimationFrame(frame);}',
+'  requestAnimationFrame(frame);'
+].join('\n')+'\n';
+
+$('copyBtn').onclick=async()=>{
+  const code=genCode(); const btn=$('copyBtn');
+  let ok=false;
+  try{ await navigator.clipboard.writeText(code); ok=true; }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=code;
+    ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+    ta.select(); try{ ok=document.execCommand('copy'); }catch(_){ } ta.remove();
+  }
+  btn.textContent= ok ? '✓ 복사됨! 다른 HTML에 붙여넣으세요' : '복사 실패 — 콘솔에 출력됨';
+  btn.classList.add('done');
+  if(!ok) console.log(code);
+  setTimeout(()=>{ btn.textContent='⧉ 코드 복사 (다른 HTML에 붙여넣기)'; btn.classList.remove('done'); },2200);
+};
 </script>
 </body>
 </html>
