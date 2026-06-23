@@ -98,8 +98,8 @@
       <input type="range" id="strength" min="0" max="1" step="0.01" value="0.2">
     </div>
     <div class="row">
-      <label>채도 부스트 <b id="vSat">1.75</b></label>
-      <input type="range" id="sat" min="0.6" max="2" step="0.01" value="1.75">
+      <label>채도 부스트 <b id="vSat">2.00</b></label>
+      <input type="range" id="sat" min="0.6" max="2" step="0.01" value="2.0">
     </div>
     <div class="row">
       <label>배경 속도 <b id="vSpeed">1.0</b></label>
@@ -160,7 +160,7 @@ function hsl2rgb(h,s,l){
 const lum=(r,g,b)=>0.2126*r+0.7152*g+0.0722*b;
 
 // ---- params ----
-let P={strength:0.2, sat:1.75, speed:1.0, mode:'lum', text:'A new dawn'};
+let P={strength:0.2, sat:2.0, speed:1.0, mode:'lum', text:'A new dawn'};
 
 // ---- background field (mirrors the Python renderer) ----
 const bgImg = ctx.createImageData(W,H);
@@ -222,7 +222,7 @@ const mx=mc.getContext('2d');
 function buildMask(){
   mx.clearRect(0,0,W,H);
   mx.fillStyle='#fff'; mx.textAlign='center'; mx.textBaseline='middle';
-  mx.font='700 92px -apple-system,Helvetica,Arial,sans-serif';
+  mx.font='500 92px -apple-system,Helvetica,Arial,sans-serif';
   mx.fillText(P.text, W/2, H*0.46);
   // small ring icon below
   mx.lineWidth=6; mx.strokeStyle='#fff';
@@ -323,7 +323,7 @@ const ENGINE_SRC = [
 '    return hsl2rgb(h,tS,tL);}',
 '  var mc=document.createElement("canvas"); mc.width=W; mc.height=H; var mctx=mc.getContext("2d");',
 '  function buildMask(){mctx.clearRect(0,0,W,H); mctx.fillStyle="#fff"; mctx.textAlign="center"; mctx.textBaseline="middle";',
-'    mctx.font="700 92px -apple-system,Helvetica,Arial,sans-serif"; mctx.fillText(TEXT,W/2,H*0.46);',
+'    mctx.font="500 92px -apple-system,Helvetica,Arial,sans-serif"; mctx.fillText(TEXT,W/2,H*0.46);',
 '    mctx.lineWidth=6; mctx.strokeStyle="#fff"; mctx.beginPath(); mctx.arc(W/2,H*0.55,26,0,7); mctx.stroke();',
 '    mctx.beginPath(); mctx.arc(W/2,H*0.55,6,0,7); mctx.fill(); return mctx.getImageData(0,0,W,H);}',
 '  var mask=buildMask();',
