@@ -98,8 +98,8 @@
     </div>
 
     <div class="row">
-      <label>라이트 세기 <b id="vLpow">1.00</b></label>
-      <input type="range" id="lpow" min="0" max="2" step="0.01" value="1.0">
+      <label>라이트 세기 <b id="vLpow">0.75</b></label>
+      <input type="range" id="lpow" min="0" max="2" step="0.01" value="0.75">
     </div>
     <div class="row">
       <label>라이트 속도 <b id="vLspd">1.00</b></label>
@@ -169,7 +169,12 @@ uniform float u_hasPhoto;
 uniform float u_photoAspect;
 
 const float CORNER = 0.10;
-const vec3  WARM   = vec3(1.0,0.66,0.34);   // sweeping light colour
+
+// sweeping light colour cycles softly through many hues over time
+vec3 lightTint(float t){
+  vec3 c = 0.5 + 0.5*cos(6.28318*(t + vec3(0.0,0.33,0.67)));
+  return mix(vec3(1.0), c, 0.72);            // kept gentle, pulled toward white
+}
 
 float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
 float noise(vec2 p){
@@ -193,7 +198,7 @@ vec3 palette(float t){          // soft iridescent cosine palette
 vec2 mrVec(){ float m=min(u_res.x,u_res.y); return vec2(m/u_res.x, m/u_res.y); }
 
 // background colour (screen-uv) with the sweeping warm glow baked in
-vec3 bgColor(vec2 uv, vec2 lightUV){
+vec3 bgColor(vec2 uv, vec2 lightUV, vec3 lcol){
   vec3 col;
   if(u_bg==2){                                   // checker
     vec2 g=floor(uv*u_res/30.0);
@@ -216,10 +221,10 @@ vec3 bgColor(vec2 uv, vec2 lightUV){
     float vig=distance(uv,vec2(0.5,0.6));
     col*=1.0-0.13*smoothstep(0.2,0.95,vig);
   }
-  // warm light sweeping behind everything
+  // colour-shifting light sweeping behind everything (softened)
   vec2 dd=(uv-lightUV)/mrVec();                  // isotropic distance
   float g=exp(-dot(dd,dd)/0.11);
-  col+=WARM*g*0.55*u_lpow;
+  col+=lcol*g*0.30*u_lpow;
   return col;
 }
 
@@ -237,12 +242,12 @@ vec2 sdNormal(vec2 p){
 }
 
 // frosted (multi-tap blurred) background sample
-vec3 sampleFrost(vec2 uv, vec2 lightUV, vec2 mr){
+vec3 sampleFrost(vec2 uv, vec2 lightUV, vec3 lcol, vec2 mr){
   float rad=u_frost*0.012; vec3 acc=vec3(0.0);
   for(int i=0;i<12;i++){
     float a=float(i)*2.39996;
     float rr=rad*sqrt((float(i)+0.5)/12.0);
-    acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(mr.y/mr.x,1.0)*mr, lightUV);
+    acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(mr.y/mr.x,1.0)*mr, lightUV, lcol);
   }
   return acc/12.0;
 }
@@ -252,17 +257,18 @@ void main(){
   vec2 suv=gl_FragCoord.xy/u_res;
   vec2 P=(gl_FragCoord.xy-0.5*u_res)/min(u_res.x,u_res.y);
 
-  // ---- moving light behind the card ----
+  // ---- moving, colour-shifting light behind the card ----
   float lt=u_time*u_lspd;
   vec2 lightP=vec2(0.60*sin(lt*0.5), 0.30*sin(lt*0.31+0.7)+0.05);
   vec2 lightUV=lightP*mr+0.5;
+  vec3 lcol=lightTint(u_time*0.06);            // slowly cycles through hues
 
   float d=sdBox(P);
   vec2  n=sdNormal(P);
   float inside=smoothstep(0.003,-0.003,d);
 
   // base background + soft contact shadow under the card
-  vec3 base=bgColor(suv,lightUV);
+  vec3 base=bgColor(suv,lightUV,lcol);
   float dsh=sdBox(P-vec2(0.0,-0.035));
   float sh=smoothstep(0.11,-0.05,dsh)*smoothstep(-0.02,0.05,d);
   base=mix(base,base*0.74,sh*0.55);
@@ -270,12 +276,12 @@ void main(){
   // refraction: the bevel near the edge bends the background
   float bevel=u_refract*exp(-pow(max(-d,0.0)/0.05,1.6));
   vec2  ro=n*bevel*0.13*mr;                       // P-space offset -> screen-uv
-  vec3  body=sampleFrost(suv+ro,lightUV,mr);
+  vec3  body=sampleFrost(suv+ro,lightUV,lcol,mr);
 
   // chromatic dispersion concentrated at the edge
   float disp=u_disp*0.012, edgeMix=clamp(bevel,0.0,1.0);
-  body.r=mix(body.r,bgColor(suv+ro*(1.0+disp),lightUV).r,edgeMix);
-  body.b=mix(body.b,bgColor(suv+ro*(1.0-disp),lightUV).b,edgeMix);
+  body.r=mix(body.r,bgColor(suv+ro*(1.0+disp),lightUV,lcol).r,edgeMix);
+  body.b=mix(body.b,bgColor(suv+ro*(1.0-disp),lightUV,lcol).b,edgeMix);
 
   // milky frost tint + slight desaturation
   vec3 col=mix(body,vec3(1.0),0.18*u_tint);
@@ -284,10 +290,10 @@ void main(){
   // inner ambient occlusion -> glass thickness
   col*=1.0-0.12*exp(-pow(max(-d,0.0)/0.020,2.0));
 
-  // subsurface transmission: warm core glow where the light is behind
+  // subsurface transmission: soft coloured core glow where the light is behind
   float ldist=length(P-lightP);
   float trans=exp(-ldist*ldist/0.20)*u_lpow;
-  col+=WARM*trans*0.45;
+  col+=lcol*trans*0.26;
 
   // ---- composite card over the background ----
   vec3 outc=mix(base,col,inside);
@@ -299,13 +305,13 @@ void main(){
   // specular rim follows the moving light + a faint constant top light
   float spec=pow(max(dot(n,toL),0.0),3.0);
   float topSpec=pow(max(dot(n,normalize(vec2(-0.3,1.0))),0.0),2.0);
-  outc+=edgeLine*(spec*(0.45+0.6*u_lpow)+topSpec*0.18);
+  outc+=edgeLine*(spec*(0.30+0.4*u_lpow)+topSpec*0.16);
 
-  // warm iridescent glints where the bevel faces the light
+  // iridescent glints (tinted by the cycling light) where the bevel faces it
   vec3 irid=palette(atan(n.y,n.x)/6.28318+0.25*fbm(P*3.0)+u_time*0.02);
-  irid=mix(irid,WARM,0.5);
+  irid=mix(irid,lcol,0.5);
   float glint=pow(max(dot(n,toL),0.0),2.0);
-  outc+=irid*edgeLine*glint*u_lpow*0.8;
+  outc+=irid*edgeLine*glint*u_lpow*0.5;
 
   gl_FragColor=vec4(outc,1.0);
 }`;
@@ -360,7 +366,7 @@ function resize(){
 window.addEventListener('resize', resize); resize();
 
 // state
-const state = { refract:1.0, frost:1.0, disp:1.0, tint:1.0, lpow:1.0, lspd:1.0,
+const state = { refract:1.0, frost:1.0, disp:1.0, tint:1.0, lpow:0.75, lspd:1.0,
                 size:0.26, bg:0, hasPhoto:0, photoAspect:1.0, playing:true };
 let simTime = 0, last = performance.now();
 
