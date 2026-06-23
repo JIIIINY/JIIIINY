@@ -29,14 +29,6 @@
   }
   canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 
-  /* lock-screen clock overlay (sits below the card) */
-  #clockOv{position:absolute;left:0;right:0;top:calc(300 * var(--scale));z-index:5;
-    text-align:center;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.28);
-    pointer-events:none;transition:opacity .3s}
-  #clockOv.off{opacity:0}
-  #clockOv .date{font-size:calc(14 * var(--scale));font-weight:600;letter-spacing:.02em;opacity:.92}
-  #clockOv .time{font-size:calc(62 * var(--scale));font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:calc(2 * var(--scale))}
-
   /* control panel */
   #panel{
     position:fixed;left:18px;bottom:18px;z-index:10;
@@ -91,10 +83,6 @@
 <body>
   <div id="wrap">
     <canvas id="gl"></canvas>
-    <div id="clockOv">
-      <div class="date" id="ovDate"></div>
-      <div class="time" id="ovTime"></div>
-    </div>
   </div>
   <input type="file" id="file" accept="image/*" style="display:none">
 
@@ -139,11 +127,8 @@
       <button data-bg="1">사진</button>
       <button data-bg="2">체커</button>
     </div>
-    <div class="bgrow">
-      <button id="clockBtn" class="active">시계 표시</button>
-    </div>
 
-    <div class="hint">잠금화면 360×800dp(r 93). 카드 340×233dp(r 상80/하60), 상단 20dp·가로 중앙. 빛이 카드 뒤를 지나가며 반영됩니다.</div>
+    <div class="hint">잠금화면 360×800dp(r 93). 카드 340×233dp(r 상80/하60), 상단 10dp·가로 중앙. 빛이 카드 뒤를 지나가며 반영됩니다.</div>
   </div>
 
 <script>
@@ -172,8 +157,8 @@ uniform float u_photoAspect;
 
 // ---- design space (dp) ----
 const vec2  DP       = vec2(360.0, 800.0);     // lock-screen size
-const vec2  CARD_MIN = vec2(10.0, 20.0);       // card rect (y from top): 340x233, 20dp top, centred
-const vec2  CARD_MAX = vec2(350.0, 253.0);
+const vec2  CARD_MIN = vec2(10.0, 10.0);       // card rect (y from top): 340x233, 10dp top, centred
+const vec2  CARD_MAX = vec2(350.0, 243.0);
 const float R_TOP    = 80.0;                   // top corner radius (dp)
 const float R_BOT    = 60.0;                   // bottom corner radius (dp)
 
@@ -400,16 +385,6 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
-// ---- clock overlay ----
-const ovDate=document.getElementById('ovDate'), ovTime=document.getElementById('ovTime');
-const DOW=['일','월','화','수','목','금','토'];
-function tick(){
-  const n=new Date();
-  ovDate.textContent=`${n.getMonth()+1}월 ${n.getDate()}일 ${DOW[n.getDay()]}요일`;
-  ovTime.textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
-}
-tick(); setInterval(tick,1000);
-
 // ---- UI ----
 const $ = id => document.getElementById(id);
 function bind(id, key, label, fmt){
@@ -451,13 +426,6 @@ fileInput.addEventListener('change', e=>{
     URL.revokeObjectURL(img.src);
   };
   img.src=URL.createObjectURL(f);
-});
-
-// clock toggle
-const clockBtn=$('clockBtn'), clockOv=$('clockOv');
-clockBtn.addEventListener('click', ()=>{
-  const on=clockOv.classList.toggle('off')===false;
-  clockBtn.classList.toggle('active', on);
 });
 
 // collapse panel
