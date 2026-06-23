@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.28</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.29</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -527,7 +527,7 @@ function generateBg(){ const H=Math.random()*360, s=0.32+Math.random()*0.23, l=0
 
 /* ===================== UI 빌드 ===================== */
 const inputs={};
-let swatchEl, palNameEl, codeBox, bgSwatchEl, bgInputs=null, bgSizeSl=null, bgAlphaSl=null, bgTypeWrap=null, blankInput=null, orbFillInput=null;
+let swatchEl, palNameEl, codeBox, bgSwatchEl, bgInputs=null, bgSizeSl=null, bgAlphaSl=null, bgTypeWrap=null, blankInput=null, orbFillInput=null, keyBgPagesEl=null;
 let orbTypeWrap=null, orbColInputs=null, orbSizeSl=null, orbAlphaSl=null, orbBlurSl=null;
 const BLANK_PRESETS=['#000000','#0d0f14','#15171d','#8a8a90','#1a1430','#0f2230','#241a14','#e9e4f5','#1b2a22','#2a0d1d'];
 let seqChipsEl, seqTabArr=null;
@@ -654,7 +654,11 @@ function refreshPaletteUI(){ refreshOrbUI();
   if(!swatchEl) return; const pal=PALETTES[palIdx]; palNameEl.textContent='팔레트: '+pal.name;
   swatchEl.innerHTML=''; [0,2,4,6,8,10].forEach(i=>{ const s=document.createElement('i'); s.style.background=pal.stops[i]; swatchEl.appendChild(s); }); }
 // 키스크린 배경 — 화면별 / ① 최하단 blank(솔리드) ② 그 위 iridescent(엣지·라이팅 팔레트)
-function buildKeyBgBlock(p){ p.appendChild(secTitle('① 최하단 Blank 배경 (솔리드 · 화면별)'));
+function buildKeyBgBlock(p){
+  // 페이지 선택(여러 페이지인 화면: 페이지별 배경 편집) — 예: #2 Hello Camila / To better
+  p.appendChild(secTitle('편집할 페이지'));
+  keyBgPagesEl=document.createElement('div'); keyBgPagesEl.className='btns'; keyBgPagesEl.style.flexWrap='wrap'; p.appendChild(keyBgPagesEl);
+  p.appendChild(secTitle('① 최하단 Blank 배경 (솔리드 · 화면별)'));
   // blank 솔리드 색
   { const w=document.createElement('div'); w.style.marginBottom='6px';
     const l=document.createElement('label'); l.style.cssText='font-size:12px;color:#b9b9c0;display:block;margin-bottom:4px'; l.textContent='Blank 배경색 (바닥)';
@@ -702,6 +706,7 @@ function buildKeyBgBlock(p){ p.appendChild(secTitle('① 최하단 Blank 배경 
   const note=document.createElement('div'); note.className='note'; note.textContent='iridescent(엣지·라이팅이 비치는 팔레트)는 ① blank 위에 올라갑니다. 알파=iridescent 세기. 화면(#1/#2/#3)마다 따로 저장.'; p.appendChild(note);
   refreshBgUI(); }
 function refreshBgUI(){ if(blankInput) blankInput.value=state.blankBg;
+  if(keyBgPagesEl){ keyBgPagesEl.innerHTML=''; if(pages.length>1){ pages.forEach((pg,i)=>{ const b=document.createElement('button'); b.className='b'+(i===activePage?' on':''); const tx=((i===activePage?FONT.text:(pg.font&&pg.font.text))||'(빈)').replace(/\n/g,' ').slice(0,9); b.textContent=(i+1)+'. '+tx; b.onclick=()=>{ gotoPage(i); if(codeReady) refreshCode(); }; keyBgPagesEl.appendChild(b); }); } else { const s=document.createElement('div'); s.className='note'; s.textContent='이 화면은 단일 페이지입니다.'; keyBgPagesEl.appendChild(s); } }
   if(bgInputs){ const v=[state.bg1,state.bg2,state.bg3]; bgInputs.forEach((ci,i)=>ci.value=v[i]);
     if(bgSwatchEl){ bgSwatchEl.innerHTML=''; v.forEach(c=>{ const s=document.createElement('i'); s.style.background=c; bgSwatchEl.appendChild(s); }); } }
   if(bgTypeWrap) bgTypeWrap.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.bt===String(state.bgType)));
@@ -1069,7 +1074,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.28.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.29.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
