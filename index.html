@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.23</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.24</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -818,7 +818,7 @@ function setBgImage(img){ const W=720,H=1560, iw=img.naturalWidth||img.width, ih
 const bgImageInput=document.createElement('input'); bgImageInput.type='file'; bgImageInput.accept='image/*'; bgImageInput.style.display='none'; document.body.appendChild(bgImageInput);
 bgImageInput.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const img=new Image(); img.onload=()=>{ setBgImage(img); URL.revokeObjectURL(img.src); }; img.src=URL.createObjectURL(f); };
 // 적응형 텍스트 효과(#2) — adaptive-text-kiosk 값, 폰트 패널에서 조절
-const ADAPT={strength:0.20, sat:1.75, mode:'lum'};
+const ADAPT={strength:0.20, sat:2.0, mode:'lum'};
 (function buildFontUI(){ const p=document.getElementById('fontBody');
   // 페이지
   const tp=document.createElement('div'); tp.className='sec-title'; tp.textContent='페이지'; p.appendChild(tp);
@@ -947,7 +947,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.23.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.24.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
@@ -1103,8 +1103,8 @@ const CFG={"app":"iridescent-halo-orb","v":9,"activeScreen":2,"artboard":{"type"
 INIT.screens=CFG.screens; INIT.activeScreen=CFG.activeScreen; if(CFG.artboard) Object.assign(artboard,CFG.artboard);
 // 모든 텍스트 흰색
 INIT.screens.forEach(s=>s.pages.forEach(p=>{ if(p.font){ p.font.color='#ffffff'; p.font.shadowOn=false; } }));
-// #2 텍스트 두께 BOLD
-if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ if(p.font) p.font.weight='700'; });
+// #2 텍스트 두께 MEDIUM
+if(INIT.screens[1]) INIT.screens[1].pages.forEach(p=>{ if(p.font) p.font.weight='500'; });
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
 // 임베드 폰트 로드 보장 후 렌더 시작
 if(document.fonts && document.fonts.load){ Promise.all([document.fonts.load('700 60px "Samsung Sharp Sans"'),document.fonts.load('500 60px "One UI Sans"')]).catch(()=>{}).finally(()=>requestAnimationFrame(frame)); }
