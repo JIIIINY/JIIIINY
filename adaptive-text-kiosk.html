@@ -94,12 +94,12 @@
       <input class="txtin" id="text" value="A new dawn" maxlength="22">
     </div>
     <div class="row">
-      <label>대비 강도 <b id="vStrength">0.55</b></label>
-      <input type="range" id="strength" min="0" max="1" step="0.01" value="0.55">
+      <label>대비 강도 <b id="vStrength">0.20</b></label>
+      <input type="range" id="strength" min="0" max="1" step="0.01" value="0.2">
     </div>
     <div class="row">
-      <label>채도 부스트 <b id="vSat">1.25</b></label>
-      <input type="range" id="sat" min="0.6" max="2" step="0.01" value="1.25">
+      <label>채도 부스트 <b id="vSat">1.75</b></label>
+      <input type="range" id="sat" min="0.6" max="2" step="0.01" value="1.75">
     </div>
     <div class="row">
       <label>배경 속도 <b id="vSpeed">1.0</b></label>
@@ -160,7 +160,7 @@ function hsl2rgb(h,s,l){
 const lum=(r,g,b)=>0.2126*r+0.7152*g+0.0722*b;
 
 // ---- params ----
-let P={strength:0.55, sat:1.25, speed:1.0, mode:'lum', text:'A new dawn'};
+let P={strength:0.2, sat:1.75, speed:1.0, mode:'lum', text:'A new dawn'};
 
 // ---- background field (mirrors the Python renderer) ----
 const bgImg = ctx.createImageData(W,H);
