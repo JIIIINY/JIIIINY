@@ -100,7 +100,7 @@
 </head>
 <body class="lp-open rp-open">
   <div class="topbar">
-    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.27</span></div>
+    <div class="brand"><span class="name">Iridescent Halo Orb</span><span class="ver">v0.28</span></div>
     <div class="topbtns">
       <button id="rndBtn" class="rnd">🎲 전체 랜덤</button>
       <button id="pngBtn">PNG</button>
@@ -228,11 +228,11 @@ state.edgeAOn=1; state.edgeBOn=1; state.genArcs=[];
 state.bg1='#E9E4F5'; state.bg2='#E2EEF6'; state.bg3='#F7E8E2';
 state.bgType=0; state.bgSize=100; state.bgAlpha=1;   // iridescent 배경 타입/사이즈/알파
 // #3 카드/아이콘 유리·빛 파라미터(패널에서 조절)
-const GLASS={ frost:1.0, disp:1.0, bgBlur:0.0, quad:0.6,                // 프로스트 / 1·4사분면 추가블러
+const GLASS={ frost:1.0, disp:1.0, bgBlur:0.0, quad:0.6, cardWarp:0.0, cardWarpFreq:6,   // 프로스트 / 1·4사분면 / 카드뒤 배경 왜곡
   cardType:0, cardC1:'#ffffff', cardC2:'#c9b8ff', cardC3:'#bdeef0',     // 카드 색(솔리드/리니어/래디얼)
   layers:[ {type:0,bright:0.5,thick:0.006,blur:0.5,speed:1.0,col:'#ffffff'},   // 외곽 빛
            {type:1,bright:0.85,thick:0.006,blur:1.0,speed:1.0,col:'#88bbff'} ] };  // 내부 빛
-function randomCard(){ const rnd=(a,b)=>a+Math.random()*(b-a); GLASS.frost=rnd(0,2); GLASS.disp=rnd(0,2); GLASS.bgBlur=rnd(0,1.5); GLASS.quad=rnd(0,1);
+function randomCard(){ const rnd=(a,b)=>a+Math.random()*(b-a); GLASS.frost=rnd(0,2); GLASS.disp=rnd(0,2); GLASS.bgBlur=rnd(0,1.5); GLASS.quad=rnd(0,1); GLASS.cardWarp=rnd(0,1.5); GLASS.cardWarpFreq=rnd(2,16);
   GLASS.cardType=Math.floor(rnd(0,3)); const set=CARD_PRESETS[Math.floor(rnd(0,CARD_PRESETS.length))]; GLASS.cardC1=set[0]; GLASS.cardC2=set[1]; GLASS.cardC3=set[2];
   const rc=()=>'#'+[0,0,0].map(()=>Math.floor(rnd(80,255)).toString(16).padStart(2,'0')).join('');
   GLASS.layers.forEach(L=>{ L.bright=rnd(0.2,1.2); L.thick=rnd(0.003,0.02); L.blur=rnd(0.1,1.2); L.speed=rnd(0.2,2.5); L.col=rc(); }); }
@@ -389,6 +389,7 @@ uniform vec2 u_cardC,u_cardH; uniform float u_cardRT,u_cardRB;
 uniform vec2 u_circ[4]; uniform float u_circR;
 uniform float u_time,u_lpow,u_lspd;   // 이동하는 컬러 라이트(카드 반영)
 uniform float u_bgBlur,u_quad,u_cardType;        // bg블러 / 1·4사분면 추가 프로스트 / 카드색 타입
+uniform float u_cardWarp,u_cardWarpFreq;          // 카드 뒤 배경 형태 왜곡(세기/빈도)
 uniform vec3 u_cardC1,u_cardC2,u_cardC3;          // 카드색 1·2·3
 uniform float u_lN; uniform float u_lType[6],u_lBright[6],u_lThick[6],u_lBlur[6],u_lSpeed[6]; uniform vec3 u_lCol[6];  // 빛 레이어(0=외곽,1=내부)
 vec3 cardTintCol(vec2 lp){ if(u_cardType<0.5) return u_cardC1;
@@ -428,8 +429,11 @@ void main(){
   float cardRight=(dCard<0.0)?smoothstep(u_cardC.x-0.03,u_cardC.x+0.03,P.x):0.0;
   float bevel=u_refract*exp(-pow(max(-d,0.0)/0.05,1.6));
   vec2 roP=n*bevel*0.13; vec2 ro=vec2(roP.x, roP.y*u_res.x/u_res.y);
+  // 카드 뒤 배경 형태 왜곡(카드 영역으로 마스킹)
+  float cardMask=smoothstep(0.004,-0.004,dCard); float wt=u_time*0.4; float wf=u_cardWarpFreq;
+  vec2 warp=vec2(sin(P.y*wf+wt)+0.5*sin(P.x*wf*1.7-wt), cos(P.x*wf-wt)+0.5*cos(P.y*wf*1.6+wt))*u_cardWarp*0.012*cardMask;
   float bodyRad=u_frost*0.012 + cardRight*u_quad*0.05;       // 카드 우측 더 blurly(조절)
-  vec3 body=frost(uvT+ro, bodyRad);
+  vec3 body=frost(uvT+ro+warp, bodyRad);
   // 색분산
   float disp=u_disp*0.012, em=clamp(bevel,0.0,1.0);
   body.r=mix(body.r, smp(uvT+ro*(1.0+disp)).r, em);
@@ -473,7 +477,7 @@ let glassReady=false; const GU={}; let gtex=null;
   gg.useProgram(gp);
   const gvb=gg.createBuffer(); gg.bindBuffer(gg.ARRAY_BUFFER,gvb); gg.bufferData(gg.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gg.STATIC_DRAW);
   const ga=gg.getAttribLocation(gp,'a_pos'); gg.enableVertexAttribArray(ga); gg.vertexAttribPointer(ga,2,gg.FLOAT,false,0,0);
-  ['u_res','u_bg','u_refract','u_frost','u_disp','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_bgBlur','u_quad','u_cardType','u_cardC1','u_cardC2','u_cardC3','u_lN','u_lType','u_lBright','u_lThick','u_lBlur','u_lSpeed','u_lCol'].forEach(n=>GU[n]=gg.getUniformLocation(gp,n+(['u_lType','u_lBright','u_lThick','u_lBlur','u_lSpeed','u_lCol'].indexOf(n)>=0?'[0]':'')));
+  ['u_res','u_bg','u_refract','u_frost','u_disp','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_bgBlur','u_quad','u_cardType','u_cardWarp','u_cardWarpFreq','u_cardC1','u_cardC2','u_cardC3','u_lN','u_lType','u_lBright','u_lThick','u_lBlur','u_lSpeed','u_lCol'].forEach(n=>GU[n]=gg.getUniformLocation(gp,n+(['u_lType','u_lBright','u_lThick','u_lBlur','u_lSpeed','u_lCol'].indexOf(n)>=0?'[0]':'')));
   GU.u_circ=gg.getUniformLocation(gp,'u_circ[0]');
   gtex=gg.createTexture(); gg.bindTexture(gg.TEXTURE_2D,gtex);
   gg.texParameteri(gg.TEXTURE_2D,gg.TEXTURE_WRAP_S,gg.CLAMP_TO_EDGE); gg.texParameteri(gg.TEXTURE_2D,gg.TEXTURE_WRAP_T,gg.CLAMP_TO_EDGE);
@@ -488,7 +492,7 @@ function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCan
   gg.uniform2f(GU.u_res,gcv.width,gcv.height);
   gg.uniform1f(GU.u_time,t||0);
   gg.uniform1f(GU.u_refract,1.0); gg.uniform1f(GU.u_frost,GLASS.frost); gg.uniform1f(GU.u_disp,GLASS.disp); gg.uniform1f(GU.u_tint,1.0);
-  gg.uniform1f(GU.u_bgBlur,GLASS.bgBlur); gg.uniform1f(GU.u_quad,GLASS.quad);
+  gg.uniform1f(GU.u_bgBlur,GLASS.bgBlur); gg.uniform1f(GU.u_quad,GLASS.quad); gg.uniform1f(GU.u_cardWarp,GLASS.cardWarp); gg.uniform1f(GU.u_cardWarpFreq,GLASS.cardWarpFreq);
   const k1=hexToRGB(GLASS.cardC1),k2=hexToRGB(GLASS.cardC2),k3=hexToRGB(GLASS.cardC3);
   gg.uniform1f(GU.u_cardType,GLASS.cardType); gg.uniform3f(GU.u_cardC1,k1[0],k1[1],k1[2]); gg.uniform3f(GU.u_cardC2,k2[0],k2[1],k2[2]); gg.uniform3f(GU.u_cardC3,k3[0],k3[1],k3[2]);
   // 빛 레이어 배열 업로드(최대 6)
@@ -777,6 +781,9 @@ function buildGlassBlock(p){
   sl('1·4사분면 추가 프로스트','quad',0,1,0.01);
   sl('bg 블러 강도','bgBlur',0,3,0.01);
   sl('색분산','disp',0,3,0.01);
+  p.appendChild(secTitle('카드 뒤 배경 형태 왜곡'));
+  sl('왜곡 세기','cardWarp',0,3,0.01);
+  sl('왜곡 빈도','cardWarpFreq',1,24,0.5);
   // 카드 컬러
   p.appendChild(secTitle('카드 컬러 (솔리드/리니어/래디얼)'));
   const ctb=document.createElement('div'); ctb.className='btns';
@@ -1062,7 +1069,7 @@ document.getElementById('rndBtn').onclick=()=>{
   applyPalette(Math.floor(rand(0,PALETTES.length))); syncUI();
 };
 document.getElementById('pngBtn').onclick=()=>{ const a=document.createElement('a'); a.href=view.toDataURL('image/png'); a.download='iridescent-halo-orb.png'; a.click(); };
-document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.27.html'; a.click(); };
+document.getElementById('htmlBtn').onclick=async()=>{ let html; try{ html=await (await fetch(location.href)).text(); }catch(e){ html='<!DOCTYPE html>\n'+document.documentElement.outerHTML; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download='iridescent-halo-orb-v0.28.html'; a.click(); };
 document.getElementById('copyBtn').onclick=()=>{ const txt=exportConfig(); if(codeBox){ codeBox.value=txt; } if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}); flash(document.getElementById('copyBtn'),'✓ 복사'); };
 // 녹화
 let recorder=null,chunks=[]; const recBtn=document.getElementById('recBtn'),recDot=document.getElementById('recDot');
