@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<title>Wallpaper Maker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:#000;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+  font-family:"Geist","Inter",-apple-system,sans-serif;color:#EDEAF6;overflow:hidden;}
+/* phone frame — only visual clip; canvas itself is full-bleed for export */
+.frame{position:relative;width:360px;height:780px;border-radius:92px;overflow:hidden;background:#02020A;
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.9);-webkit-mask-image:-webkit-radial-gradient(white,black);}
+canvas{display:block;width:360px;height:780px;}
+.bar{display:flex;gap:10px;align-items:center;}
+.btn{appearance:none;cursor:pointer;font-family:inherit;font-weight:700;color:#fff;
+  border:1px solid rgba(159,231,255,.45);
+  background:linear-gradient(135deg,rgba(159,231,255,.20),rgba(220,196,255,.16));
+  padding:12px 22px;border-radius:13px;font-size:14px;transition:all .15s;}
+.btn:hover{background:linear-gradient(135deg,rgba(159,231,255,.30),rgba(220,196,255,.24));transform:translateY(-1px);}
+.btn:active{transform:translateY(0);}
+.btn.sec{border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.06);font-weight:600;}
+.btn.sec:hover{background:rgba(255,255,255,.12);}
+.hint{font-size:11px;color:rgba(237,234,246,.45);}
+</style></head>
+<body>
+<div class="frame"><canvas id="gl"></canvas></div>
+<div class="bar">
+  <button class="btn" id="rndBtn">🎲 랜덤</button>
+  <button class="btn sec" id="saveBtn">💾 저장</button>
+</div>
+<div class="hint">랜덤 버튼을 누르면 배경(컬러 · 크기 · 위치)이 적용됩니다.</div>
+
+<script>
+const canvas=document.getElementById('gl');
+const gl=canvas.getContext('webgl',{antialias:false,premultipliedAlpha:false,preserveDrawingBuffer:true});
+const DPR=Math.min(devicePixelRatio||1,2),CW=360,CH=780;
+canvas.width=Math.round(CW*DPR);canvas.height=Math.round(CH*DPR);gl.viewport(0,0,canvas.width,canvas.height);
+
+const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}';
+const FRAG=`precision highp float;
+uniform vec2 u_res;
+uniform vec2 uB1Pos,uB1Scl; uniform vec3 uB1Col; uniform float uB1Br,uB1A;
+uniform vec2 uB2Pos,uB2Scl; uniform vec3 uB2Col; uniform float uB2Br,uB2A;
+uniform vec2 uB3Pos,uB3Scl; uniform vec3 uB3Col; uniform float uB3Br,uB3A;
+uniform vec3 uBaseBg;
+void main(){
+  vec2 res=u_res; vec2 uv=gl_FragCoord.xy/res; float aspc=res.x/res.y;
+  vec3 gc=uBaseBg;
+  // volume 1
+  vec2 b1=(uv-uB1Pos)/uB1Scl; b1.x*=aspc;
+  gc+=uB1Col*min(exp(-dot(b1,b1)*1.8)*uB1Br,1.0)*uB1A;
+  // volume 2
+  vec2 b2=(uv-uB2Pos)/uB2Scl; b2.x*=aspc;
+  gc+=uB2Col*min(exp(-dot(b2,b2)*2.2)*uB2Br,1.0)*uB2A;
+  // volume 3
+  vec2 b3=(uv-uB3Pos)/uB3Scl; b3.x*=aspc;
+  gc+=uB3Col*min(exp(-dot(b3,b3)*2.0)*uB3Br,1.0)*uB3A;
+  gl_FragColor=vec4(clamp(gc,0.0,1.0),1.0);
+}`;
+function compile(t,s){const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(sh));throw new Error('GLSL');}return sh;}
+const prog=gl.createProgram();
+gl.attachShader(prog,compile(gl.VERTEX_SHADER,VERT));
+gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,FRAG));
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+const U={};['u_res','uB1Pos','uB1Scl','uB1Col','uB1Br','uB1A','uB2Pos','uB2Scl','uB2Col','uB2Br','uB2A',
+  'uB3Pos','uB3Scl','uB3Col','uB3Br','uB3A','uBaseBg'].forEach(k=>U[k]=gl.getUniformLocation(prog,k));
+
+// ---- helpers ----
+function hexToRgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255];}
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function hslToHex(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l);
+  const f=n=>Math.round((l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1))))*255).toString(16).padStart(2,'0');
+  return'#'+f(0)+f(8)+f(4);}
+function rndColorHex(){return hslToHex(Math.random()*360,55+Math.random()*40,52+Math.random()*22);}
+
+// ---- background state (3 volumes: color + size x/y + position x/y) ----
+// alpha starts at 0 → only the dark base shows until the random button is pressed.
+const baseBg=hexToRgb('#02020A');
+const S={
+  b1:{col:hexToRgb('#34D399'),x:0.50,y:0.68,sx:0.44,sy:0.45,br:1.0,a:0},
+  b2:{col:hexToRgb('#67E8F9'),x:0.50,y:0.20,sx:0.44,sy:0.37,br:0.9,a:0},
+  b3:{col:hexToRgb('#F472B6'),x:0.50,y:0.43,sx:0.50,sy:0.24,br:0.8,a:0}
+};
+
+// static render — no loop. draws exactly one frame when called.
+function render(){
+  gl.uniform2f(U.u_res,canvas.width,canvas.height);
+  gl.uniform3fv(U.uBaseBg,baseBg);
+  const v=(n,b)=>{gl.uniform2f(U['uB'+n+'Pos'],b.x,b.y);gl.uniform2f(U['uB'+n+'Scl'],b.sx,b.sy);
+    gl.uniform3fv(U['uB'+n+'Col'],b.col);gl.uniform1f(U['uB'+n+'Br'],b.br);gl.uniform1f(U['uB'+n+'A'],b.a);};
+  v(1,S.b1);v(2,S.b2);v(3,S.b3);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+
+// ---- random button: color, size(x,y), position(x,y) for every volume ----
+function randomizeBg(){
+  S.b1.col=hexToRgb(rndColorHex());
+  S.b1.x=+rnd(.20,.80).toFixed(3);S.b1.y=+rnd(.40,.85).toFixed(3);
+  S.b1.sx=+rnd(.25,1.00).toFixed(3);S.b1.sy=+rnd(.18,.80).toFixed(3);
+  S.b1.br=+rnd(.7,1.3).toFixed(2);S.b1.a=+rnd(.80,.95).toFixed(2);
+
+  S.b2.col=hexToRgb(rndColorHex());
+  S.b2.x=+rnd(.20,.80).toFixed(3);S.b2.y=+rnd(.10,.50).toFixed(3);
+  S.b2.sx=+rnd(.18,.85).toFixed(3);S.b2.sy=+rnd(.12,.60).toFixed(3);
+  S.b2.br=+rnd(.6,1.2).toFixed(2);S.b2.a=+rnd(.80,.95).toFixed(2);
+
+  S.b3.col=hexToRgb(rndColorHex());
+  S.b3.x=+rnd(.20,.80).toFixed(3);S.b3.y=+rnd(.25,.65).toFixed(3);
+  S.b3.sx=+rnd(.30,.95).toFixed(3);S.b3.sy=+rnd(.08,.40).toFixed(3);
+  S.b3.br=+rnd(.6,1.1).toFixed(2);S.b3.a=+rnd(.80,.95).toFixed(2);
+
+  render(); // apply only on button press
+}
+document.getElementById('rndBtn').addEventListener('click',randomizeBg);
+
+// ---- save current wallpaper as PNG ----
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  render(); // make sure latest frame is in the buffer
+  canvas.toBlob(b=>{
+    const u=URL.createObjectURL(b);const a=document.createElement('a');
+    const d=new Date(),p=n=>String(n).padStart(2,'0');
+    a.href=u;a.download='wallpaper_'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+'.png';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
+  },'image/png');
+});
+
+// initial frame: dark base only (background color applied on first button press)
+render();
+</script>
+</body></html>
