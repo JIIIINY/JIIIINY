@@ -257,6 +257,9 @@ function newLight(type){ return { type:type||0, mode:0, sweep:0, dir:3, spin:0,
 function newCardLayer(){ return { type:1, c1:'#ffffff', c2:'#c9b8ff', c3:'#bdeef0', intensity:0.6, width:0.35 }; }
 // 형태 opacity 마스크 레이어: type 0 Linear/1 Radial/2 Ellipse, cx/cy 중심, sx/sy 반경, invert 안팎 반전
 function newShapeMask(type){ return { type:type||0, opacity:0.6, blur:0.3, angle:135, cx:0, cy:0, sx:0.7, sy:0.5, invert:0 }; }
+// SurfaceFX Rim/Sweep 레이어 — 속도(speed)차로 단차감
+function newRim(){ return { int:0.5, color:'#ffffff', width:0.3, size:1.0, speed:0.5 }; }
+function newSweep(){ return { int:0.5, color:'#cfe0ff', width:0.3, size:1.0, speed:1.0 }; }
 const GLASS={ frost:1.0, bgBlur:0.0, quad:0.6, solid:0.7,   // 면 블러 / 배경 블러 / 우측 추가블러 / 고체감(기체→고체)
   icons:0, cardAlpha:1.0, cardTextColor:'#ffffff',            // 하단 아이콘 표시(기본 off) / 카드 알파(투명도) / (구)카드 텍스트색
   cardSize:1.0, cardRound:1.0,                                // 카드 사이즈 / 모서리 둥글기
@@ -274,9 +277,9 @@ const GLASS={ frost:1.0, bgBlur:0.0, quad:0.6, solid:0.7,   // 면 블러 / 배�
     transition:{ on:1 },   // 라이트 레이어(Lighting 내부/외부) — 실제 레이어는 GLASS.layers
     iridescent:{ on:0, intensity:0.5, hue:0, hueShift:0.2, sat:1.0, sharpness:0.5, wobble:0.3, direction:0 },
     surface:{ on:0,
-      rim:  { int:0.5, color:'#ffffff', width:0.3, size:1.0 },
+      rims:  [ newRim() ],                            // Rim 레이어(여러 개, 속도차로 단차)
       glint:{ int:0.4, color:'#ffffff', width:0.3, size:1.0 },
-      sweep:{ int:0.5, color:'#cfe0ff', width:0.3, size:1.0 },
+      sweeps:[ newSweep() ],                           // Sweep 레이어(여러 개, 속도차로 단차)
       eyes: { int:0.4, color:'#ffffff', width:0.3, size:1.0 } },
     inner:{ on:0, pulse:0.4, caustics:0.4, edgeFlare:0.4 }
   } };
@@ -449,6 +452,7 @@ uniform float u_time;
 uniform float u_bgBlur,u_quad,u_cardType,u_icons,u_cardAlpha; // bg블러 / 우측 추가블러 / 카드색 타입 / 아이콘 표시 / 카드 알파
 uniform float u_zoneBlur[6];   // 6사분면(2열×3행) 영역별 추가 블러(배경과 함께 블러)
 uniform vec3 u_anim;                             // 카드 등장 애니메이션 (offX, offY, scale)
+uniform float u_settle;                          // 정착 진행도 0(내려오는 중·기체)→1(자리잡음·컬러)
 uniform vec3 u_cardC1,u_cardC2,u_cardC3;          // 카드색 1·2·3
 // 카드 안쪽 엣지 그라데이션 마스크 레이어(최대 4) + 카드 외곽 형태 opacity 마스크
 uniform float u_clN; uniform float u_clType[4],u_clInt[4],u_clWidth[4]; uniform vec3 u_clC1[4],u_clC2[4],u_clC3[4];
@@ -462,9 +466,9 @@ uniform vec3 u_lCol[6],u_lBlurCol[6],u_lShadCol[6];
 uniform float u_iriOn,u_iriInt,u_iriHue,u_iriHueShift,u_iriSat,u_iriSharp,u_iriWobble,u_iriDir;
 // ===== SurfaceFX (Rim/Glint/Sweep/Eyes — 각 int,width,size + color) =====
 uniform float u_sfxOn;
-uniform float u_rimInt,u_rimW,u_rimS; uniform vec3 u_rimC;
+uniform float u_rimN; uniform float u_rimInt[3],u_rimW[3],u_rimS[3],u_rimSpd[3]; uniform vec3 u_rimC[3];   // Rim 레이어
 uniform float u_glintInt,u_glintW,u_glintS; uniform vec3 u_glintC;
-uniform float u_swInt,u_swW,u_swS; uniform vec3 u_swC;
+uniform float u_swN; uniform float u_swInt[3],u_swW[3],u_swS[3],u_swSpd[3]; uniform vec3 u_swC[3];        // Sweep 레이어
 uniform float u_eyeInt,u_eyeW,u_eyeS; uniform vec3 u_eyeC;
 // ===== Inner FX =====
 uniform float u_innOn,u_innPulse,u_innCaustics,u_innFlare;
@@ -511,7 +515,8 @@ void main(){
   // 카드 등장 애니메이션: 카드+아이콘만 이동/스케일(배경은 고정)
   vec2 Pc=(P-u_cardC)/max(u_anim.z,0.05)+u_cardC-u_anim.xy;
   float d=scene(Pc); vec2 n=nrm(Pc);
-  float inside=smoothstep(0.002,-0.002,d);
+  float stl=clamp(u_settle,0.0,1.0); float ef=(1.0-stl)*0.06;   // 내려올 때 외곽을 넓게 흐림(기체 형태)
+  float inside=smoothstep(0.002+ef,-0.002-ef,d);
   // 배경(고정): bg 블러만
   vec3 base = u_bgBlur>0.02 ? frost(uvT,u_bgBlur*0.02) : smp(uvT);
   // 접촉 그림자(카드 아래)
@@ -532,10 +537,10 @@ void main(){
     vec2 fp=u_cardC+vec2(0.62*u_cardH.x*sin(ft*0.5)+0.22*u_cardH.x*sin(ft*0.23+2.0), 0.62*u_cardH.y*sin(ft*0.37+1.3)+0.22*u_cardH.y*sin(ft*0.19+4.0));
     float fdd=distance(Pc,fp), fsz=max(u_fbSize,0.05)*u_cardH.y;
     zb+=u_fbAmt*exp(-fdd*fdd/(fsz*fsz)); }
-  float bodyRad=u_frost*0.012 + cardRight*u_quad*0.05 + zb*0.05;   // 전역 + 우측 + 6사분면 + 부유 블러
+  float bodyRad=u_frost*0.012 + cardRight*u_quad*0.05 + zb*0.05 + (1.0-stl)*0.03;   // 전역 + 우측 + 6사분면 + 부유 + 내려올 때 추가 블러
   vec3 body=frost(uvT, bodyRad);                             // 배경을 평면적으로만 블러
   vec3 tcol=(dCard<0.0)?cardTintCol(Pc-u_cardC):u_cardC1;
-  vec3 col=mix(body, tcol, clamp(0.18+0.82*u_tint,0.0,1.0)); // 고체감: 0 유리 ~ 1 단색 면
+  vec3 col=mix(body, tcol, clamp(0.18+0.82*u_tint,0.0,1.0)*stl); // 고체감 + 정착 시 컬러 인(내려올 땐 배경 블러만)
   col=mix(vec3(dot(col,vec3(0.333))), col, 0.86);
   col=mix(col, mix(col,vec3(1.0),0.10), cardRight*u_quad*0.7);
   col*=1.0-0.10*exp(-pow(max(-d,0.0)/0.02,2.0));
@@ -550,6 +555,7 @@ void main(){
     if(u_smInv[si]>0.5) mk=1.0-mk;
     shapeM*=mix(1.0, mk, clamp(u_smOpacity[si],0.0,1.0)); }
   inside*=shapeM;
+  inside*=mix(0.45,1.0,stl);   // 내려올 때 더 투명하게(배경에 블렌딩) → 정착 시 불투명
   vec3 outc=mix(base,col,inside*clamp(u_cardAlpha,0.0,1.0));   // 카드 알파(투명도)
 
   vec2 ln=(Pc-u_cardC)/(u_cardH+1e-4);   // 카드 로컬 좌표(중심0, 가장자리 ±1)
@@ -615,14 +621,20 @@ void main(){
 
   // ===== SurfaceFX: Rim / Glint / Sweep / Eyes =====
   if(u_sfxOn>0.5){
-    float rim=exp(-pow(max(-d,0.0)/(u_rimW*0.06*(0.4+u_rimS)+0.004),2.0))*inside;  // Rim 림 라이트(width=두께,size=번짐)
-    outc+=u_rimC*rim*u_rimInt*1.2;
+    // Rim 레이어들 — 가장자리 림에 회전 아크(속도차로 단차감)
+    float pa=atan(ln.y,ln.x);
+    for(int i=0;i<3;i++){ if(float(i)>=u_rimN) break;
+      float eb=exp(-pow(max(-d,0.0)/(u_rimW[i]*0.06*(0.4+u_rimS[i])+0.004),2.0));
+      float da=pa-u_time*u_rimSpd[i]; da=atan(sin(da),cos(da));
+      float arc=0.45+0.55*exp(-da*da/0.7);
+      outc+=u_rimC[i]*eb*inside*u_rimInt[i]*arc*1.2; }
     vec2 gq=ln*(8.0+u_glintS*22.0); float gph=u_time*3.0;                     // Glint 스파클
     float gli=pow(max(0.0, sin(gq.x+gph)*sin(gq.y-gph*0.7)), mix(8.0,40.0,1.0-u_glintW));
     outc+=u_glintC*gli*u_glintInt*inside;
-    float sc2=dot(ln,normalize(vec2(0.8,0.6)))/(0.5+u_swS); float head=fract(u_time*0.18)*2.4-1.2;  // Sweep(width=띠두께,size=범위)
-    float swq=(sc2-head)/(u_swW*0.5+0.05); float sw=exp(-swq*swq);
-    outc+=u_swC*sw*u_swInt*inside;
+    // Sweep 레이어들 — 대각 스윕(레이어마다 속도 달라 단차)
+    for(int i=0;i<3;i++){ if(float(i)>=u_swN) break;
+      float sc2=dot(ln,normalize(vec2(0.8,0.6)))/(0.5+u_swS[i]); float head=fract(u_time*u_swSpd[i]*0.18)*2.4-1.2;
+      float swq=(sc2-head)/(u_swW[i]*0.5+0.05); outc+=u_swC[i]*exp(-swq*swq)*inside*u_swInt[i]; }
     float er=u_eyeS*0.4+0.12; vec2 e1=vec2(-0.45,-0.15), e2=vec2(0.45,-0.15);  // Eyes 캐치라이트 한 쌍
     float ey=exp(-dot(ln-e1,ln-e1)/(er*er))+exp(-dot(ln-e2,ln-e2)/(er*er));
     ey*=(0.6+0.4*sin(u_time*1.5))*(0.6+u_eyeW);
@@ -655,11 +667,11 @@ let glassReady=false; const GU={}; let gtex=null;
   gg.useProgram(gp);
   const gvb=gg.createBuffer(); gg.bindBuffer(gg.ARRAY_BUFFER,gvb); gg.bufferData(gg.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gg.STATIC_DRAW);
   const ga=gg.getAttribLocation(gp,'a_pos'); gg.enableVertexAttribArray(ga); gg.vertexAttribPointer(ga,2,gg.FLOAT,false,0,0);
-  { const arrs=['u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol','u_clType','u_clInt','u_clWidth','u_clC1','u_clC2','u_clC3','u_zoneBlur','u_smType','u_smOpacity','u_smBlur','u_smAngle','u_smCx','u_smCy','u_smSx','u_smSy','u_smInv'];
+  { const arrs=['u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol','u_clType','u_clInt','u_clWidth','u_clC1','u_clC2','u_clC3','u_zoneBlur','u_smType','u_smOpacity','u_smBlur','u_smAngle','u_smCx','u_smCy','u_smSx','u_smSy','u_smInv','u_rimInt','u_rimW','u_rimS','u_rimSpd','u_rimC','u_swInt','u_swW','u_swS','u_swSpd','u_swC'];
     ['u_res','u_bg','u_frost','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_bgBlur','u_quad','u_cardType','u_icons','u_cardAlpha','u_anim','u_cardC1','u_cardC2','u_cardC3',
-     'u_transOn','u_lN','u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol',
+     'u_settle','u_transOn','u_lN','u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol',
      'u_iriOn','u_iriInt','u_iriHue','u_iriHueShift','u_iriSat','u_iriSharp','u_iriWobble','u_iriDir',
-     'u_sfxOn','u_rimInt','u_rimW','u_rimS','u_rimC','u_glintInt','u_glintW','u_glintS','u_glintC','u_swInt','u_swW','u_swS','u_swC','u_eyeInt','u_eyeW','u_eyeS','u_eyeC',
+     'u_sfxOn','u_rimN','u_rimInt','u_rimW','u_rimS','u_rimSpd','u_rimC','u_glintInt','u_glintW','u_glintS','u_glintC','u_swN','u_swInt','u_swW','u_swS','u_swSpd','u_swC','u_eyeInt','u_eyeW','u_eyeS','u_eyeC',
      'u_innOn','u_innPulse','u_innCaustics','u_innFlare',
      'u_clN','u_clType','u_clInt','u_clWidth','u_clC1','u_clC2','u_clC3',
      'u_smN','u_smType','u_smOpacity','u_smBlur','u_smAngle','u_smCx','u_smCy','u_smSx','u_smSy','u_smInv','u_fbAmt','u_fbSize','u_fbSpeed','u_zoneBlur'
@@ -671,12 +683,12 @@ let glassReady=false; const GU={}; let gtex=null;
   gg.uniform1i(GU.u_bg,0); glassReady=true; })();
 // 카드 등장 애니메이션 값 — 카드(셰이더)와 카드 텍스트(2D)가 함께 움직이도록 공유
 function cardAnim(t){ const dsp=(GLASS.dropSpeed==null?1:GLASS.dropSpeed), dm=(GLASS.dropMode==null?0:GLASS.dropMode)|0;
-  if(dm===3) return {ox:0, oy:0, sc:1.0};       // 고정(애니메이션 없음)
+  if(dm===3) return {ox:0, oy:0, sc:1.0, settle:1.0};       // 고정(애니메이션 없음, 완전 정착)
   const period=Math.max(0.4, 3.0/Math.max(dsp,0.05)), ph=((((t||0)%period)+period)%period)/period;
   const ease=1.0-Math.pow(1.0-Math.min(1.0,ph/0.6),3.0); let oy=0,sc=1.0;
   if(dm===0||dm===2) oy=-1.6*(1.0-ease);       // 위에서 아래로 내려옴
   if(dm===1||dm===2) sc=0.2+0.8*ease;          // Z 앞으로(작게→크게)
-  return {ox:0, oy, sc}; }
+  return {ox:0, oy, sc, settle:ease}; }        // settle: 0(내려오는 중)→1(자리잡음)
 // #3 카드 렌더: 키스크린(360dp=720px) 기준 좌표 → P=(px-360)/720, (py-780)/720
 function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCanvas;
   gg.viewport(0,0,gcv.width,gcv.height);
@@ -688,7 +700,7 @@ function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCan
   gg.uniform1f(GU.u_frost,GLASS.frost); gg.uniform1f(GU.u_tint,GLASS.solid==null?0.7:GLASS.solid);
   gg.uniform1f(GU.u_bgBlur,GLASS.bgBlur); gg.uniform1f(GU.u_quad,GLASS.quad);
   // 카드 등장 애니메이션(위→아래 / Z앞으로 / 둘다) — 루프
-  { const A=cardAnim(t||0); gg.uniform3f(GU.u_anim,A.ox,A.oy,A.sc); }
+  { const A=cardAnim(t||0); gg.uniform3f(GU.u_anim,A.ox,A.oy,A.sc); gg.uniform1f(GU.u_settle,A.settle==null?1:A.settle); }
   const k1=hexToRGB(GLASS.cardC1),k2=hexToRGB(GLASS.cardC2),k3=hexToRGB(GLASS.cardC3);
   gg.uniform1f(GU.u_cardType,GLASS.cardType); gg.uniform1f(GU.u_icons,GLASS.icons?1:0); gg.uniform1f(GU.u_cardAlpha,GLASS.cardAlpha==null?1:GLASS.cardAlpha); gg.uniform3f(GU.u_cardC1,k1[0],k1[1],k1[2]); gg.uniform3f(GU.u_cardC2,k2[0],k2[1],k2[2]); gg.uniform3f(GU.u_cardC3,k3[0],k3[1],k3[2]);
   // ===== Transition: 빛 레이어 배열 업로드(최대 6) =====
@@ -716,9 +728,14 @@ function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCan
   // ===== SurfaceFX =====
   const sfx=fx.surface||{}; gg.uniform1f(GU.u_sfxOn,sfx.on?1:0);
   const upFX=(o,iU,wU,sU,cU,dInt)=>{ o=o||{}; gg.uniform1f(GU[iU],o.int==null?dInt:o.int); gg.uniform1f(GU[wU],o.width==null?0.3:o.width); gg.uniform1f(GU[sU],o.size==null?1:o.size); const c=hexToRGB(o.color||'#ffffff'); gg.uniform3f(GU[cU],c[0],c[1],c[2]); };
-  upFX(sfx.rim,'u_rimInt','u_rimW','u_rimS','u_rimC',0.5);
+  // Rim/Sweep 레이어 배열 업로드(최대 3, speed차로 단차)
+  const upLayers=(arr,iU,wU,sU,spU,cU,dInt,dCol)=>{ arr=Array.isArray(arr)?arr:[]; const n=Math.min(arr.length,3);
+    const it=new Float32Array(3),wd=new Float32Array(3),sz=new Float32Array(3),sp=new Float32Array(3),co=new Float32Array(9);
+    for(let i=0;i<n;i++){ const o=arr[i]||{}; it[i]=(o.int==null?dInt:o.int); wd[i]=(o.width==null?0.3:o.width); sz[i]=(o.size==null?1:o.size); sp[i]=(o.speed==null?1:o.speed); const c=hexToRGB(o.color||dCol); co[i*3]=c[0];co[i*3+1]=c[1];co[i*3+2]=c[2]; }
+    gg.uniform1fv(GU[iU],it); gg.uniform1fv(GU[wU],wd); gg.uniform1fv(GU[sU],sz); gg.uniform1fv(GU[spU],sp); gg.uniform3fv(GU[cU],co); return n; };
+  gg.uniform1f(GU.u_rimN, upLayers(sfx.rims,'u_rimInt','u_rimW','u_rimS','u_rimSpd','u_rimC',0.5,'#ffffff'));
+  gg.uniform1f(GU.u_swN,  upLayers(sfx.sweeps,'u_swInt','u_swW','u_swS','u_swSpd','u_swC',0.5,'#cfe0ff'));
   upFX(sfx.glint,'u_glintInt','u_glintW','u_glintS','u_glintC',0.4);
-  upFX(sfx.sweep,'u_swInt','u_swW','u_swS','u_swC',0.5);
   upFX(sfx.eyes,'u_eyeInt','u_eyeW','u_eyeS','u_eyeC',0.4);
   // ===== Inner FX =====
   const inn=fx.inner||{}; gg.uniform1f(GU.u_innOn,inn.on?1:0);
@@ -757,6 +774,7 @@ function drawCardText(t){ const DP=view.width/360, pad=20*DP;
   vctx.translate(ccx,ccy); vctx.translate(A.sc*A.ox*M, A.sc*A.oy*M); vctx.scale(A.sc*csz,A.sc*csz); vctx.translate(-ccx,-ccy);
   vctx.beginPath(); vctx.rect(tx,ty,tw,th); vctx.clip();   // 카드 영역 밖으로 넘치지 않게
   // 좌측 폰트 패널(FONT)의 옵션을 카드 텍스트에 실시간 반영(색/폰트/굵기/내용)
+  vctx.globalAlpha=(A.settle==null?1:A.settle);   // 텍스트도 정착 시 함께 등장
   const F=(typeof FONT!=='undefined'&&FONT)?FONT:{}; const fam=F.fontFamily?famString(F.fontFamily):famString('One UI Sans');
   vctx.font=(F.weight||'500')+' '+px+'px '+fam; vctx.textAlign='center'; vctx.textBaseline='top'; vctx.fillStyle=F.color||GLASS.cardTextColor||'#ffffff';
   vctx.shadowColor='rgba(0,0,0,0.30)'; vctx.shadowBlur=6; vctx.shadowOffsetY=1;
@@ -1216,10 +1234,28 @@ function buildSurface(parent,FX){ oOnoff(parent,FX.surface,'SurfaceFX'); const S
     oSlider(box,o,'size','Size',0.1,2.5,0.01,1);
     const cwrap=document.createElement('div'); cwrap.style.marginTop='4px'; box.appendChild(cwrap); oColor(cwrap,o,'color','Color',dCol);
     parent.appendChild(box); };
-  sub('rim','Rim (가장자리 림)',0.5,'#ffffff');
-  sub('glint','Glint (스파클)',0.4,'#ffffff');
-  sub('sweep','Sweep (대각 스윕)',0.5,'#cfe0ff');
-  sub('eyes','Eyes (캐치라이트)',0.4,'#ffffff'); }
+  // Rim 레이어들(속도차 → 단차)
+  S.rims=Array.isArray(S.rims)?S.rims:[]; parent.appendChild(secTitle('Rim 레이어 (가장자리 림 · 회전)'));
+  S.rims.forEach((o,i)=>surfLayerPanel(parent,S.rims,o,i,'Rim','#ffffff'));
+  { const ar=document.createElement('div'); ar.className='btns'; const a=document.createElement('button'); a.className='b acc'; a.textContent='＋ Rim 레이어';
+    a.onclick=()=>{ if(S.rims.length<3){ S.rims.push(newRim()); rebuildGlassPanel(); if(codeReady) refreshCode(); } }; ar.appendChild(a); parent.appendChild(ar); }
+  // Sweep 레이어들(속도차 → 단차)
+  S.sweeps=Array.isArray(S.sweeps)?S.sweeps:[]; parent.appendChild(secTitle('Sweep 레이어 (대각 스윕 · 속도차)'));
+  S.sweeps.forEach((o,i)=>surfLayerPanel(parent,S.sweeps,o,i,'Sweep','#cfe0ff'));
+  { const ar=document.createElement('div'); ar.className='btns'; const a=document.createElement('button'); a.className='b acc'; a.textContent='＋ Sweep 레이어';
+    a.onclick=()=>{ if(S.sweeps.length<3){ S.sweeps.push(newSweep()); rebuildGlassPanel(); if(codeReady) refreshCode(); } }; ar.appendChild(a); parent.appendChild(ar); }
+  parent.appendChild(secTitle('Glint / Eyes')); sub('glint','Glint (스파클)',0.4,'#ffffff'); sub('eyes','Eyes (캐치라이트)',0.4,'#ffffff'); }
+function surfLayerPanel(parent,arr,o,idx,name,dCol){ const box=document.createElement('div'); box.style.cssText='border:1px solid #2f2f37;border-radius:10px;padding:8px;margin:7px 0;background:#161619';
+  const hd=document.createElement('div'); hd.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px';
+  const tt=document.createElement('span'); tt.style.cssText='font-size:11px;font-weight:700;color:#c9b8ff'; tt.textContent=name+' '+(idx+1);
+  const del=document.createElement('button'); del.className='b'; del.style.cssText='flex:0 0 auto;padding:3px 9px'; del.textContent='🗑';
+  del.onclick=()=>{ arr.splice(idx,1); rebuildGlassPanel(); if(codeReady) refreshCode(); }; hd.appendChild(tt); hd.appendChild(del); box.appendChild(hd);
+  oSlider(box,o,'int','Intensity',0,1.5,0.01,0.5);
+  oSlider(box,o,'width','Width',0,1,0.01,0.3);
+  oSlider(box,o,'size','Size',0.1,2.5,0.01,1);
+  oSlider(box,o,'speed','Speed (속도)',0,4,0.05,1);
+  const cwrap=document.createElement('div'); cwrap.style.marginTop='4px'; box.appendChild(cwrap); oColor(cwrap,o,'color','Color',dCol);
+  parent.appendChild(box); }
 function buildInner(parent,FX){ oOnoff(parent,FX.inner,'Inner FX'); const o=FX.inner;
   oSlider(parent,o,'pulse','Inner pulse',0,1.5,0.01,0.4);
   oSlider(parent,o,'caustics','Caustics',0,1.5,0.01,0.4);
@@ -1465,13 +1501,17 @@ function applyConfig(txt){ const o=JSON.parse(txt);
     GLASS.layers=(GLASS.layers||[]).map(L=>Object.assign(newLight(L.type||0),L));   // 누락 필드 보강
     // FX 그룹 기본값 보강(없으면 기본, 있으면 병합)
     const dfx={ transition:{on:1}, iridescent:{on:0,intensity:0.5,hue:0,hueShift:0.2,sat:1.0,sharpness:0.5,wobble:0.3,direction:0},
-      surface:{on:0, rim:{int:0.5,color:'#ffffff',width:0.3,size:1.0}, glint:{int:0.4,color:'#ffffff',width:0.3,size:1.0}, sweep:{int:0.5,color:'#cfe0ff',width:0.3,size:1.0}, eyes:{int:0.4,color:'#ffffff',width:0.3,size:1.0} },
       inner:{on:0,pulse:0.4,caustics:0.4,edgeFlare:0.4} };
-    const ofx=o.glass.fx||{}; GLASS.fx={
+    const ofx=o.glass.fx||{}; const osf=ofx.surface||{}; GLASS.fx={
       transition:Object.assign({},dfx.transition,ofx.transition),
       iridescent:Object.assign({},dfx.iridescent,ofx.iridescent),
-      surface:Object.assign({},dfx.surface,ofx.surface,{ rim:Object.assign({},dfx.surface.rim,(ofx.surface||{}).rim), glint:Object.assign({},dfx.surface.glint,(ofx.surface||{}).glint), sweep:Object.assign({},dfx.surface.sweep,(ofx.surface||{}).sweep), eyes:Object.assign({},dfx.surface.eyes,(ofx.surface||{}).eyes) }),
+      surface:Object.assign({on:0}, osf, { glint:Object.assign({int:0.4,color:'#ffffff',width:0.3,size:1.0},osf.glint), eyes:Object.assign({int:0.4,color:'#ffffff',width:0.3,size:1.0},osf.eyes) }),
       inner:Object.assign({},dfx.inner,ofx.inner) };
+    // Rim/Sweep 레이어: 신규 rims/sweeps 우선, 없으면 구 단일 rim/sweep 변환
+    const sf=GLASS.fx.surface;
+    sf.rims = Array.isArray(osf.rims)? osf.rims.map(r=>Object.assign(newRim(),r)) : (osf.rim? [Object.assign(newRim(),osf.rim)] : [newRim()]);
+    sf.sweeps = Array.isArray(osf.sweeps)? osf.sweeps.map(r=>Object.assign(newSweep(),r)) : (osf.sweep? [Object.assign(newSweep(),osf.sweep)] : [newSweep()]);
+    delete sf.rim; delete sf.sweep;
     if(typeof rebuildGlassPanel==='function') rebuildGlassPanel(); }
   if(Array.isArray(o.bgImages) && typeof restoreBgImages==='function') restoreBgImages(o.bgImages,o.bgImageOn,o.bgImageIdx);  // 저장된 배경 이미지 복원
   if(o.artboard){ Object.assign(artboard,o.artboard); applyArtboard(); refreshArtUI(); }
@@ -1676,7 +1716,7 @@ function frame(now){
 }
 const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"screens":[{"pages":[{"params":{"orbSize":0.06,"centerX":0.49,"centerY":0.55,"blobAmt":0.06,"blobLobes":2,"blobSpeed":2.05,"shapeRound":0.04,"shapeRot":3,"shapeSides":0,"distortAmt":0.29,"distortFreq":2,"edgeAC":235,"edgeAW":27,"edgeBC":0,"edgeBW":26,"edgeContrast":0.75,"blurAmt":0.25,"compRot":90,"lightSize":0.21,"lightReach":1.65,"lightAmt":0.19,"lightUneven":0.9,"outerSize":0.28,"outerAmt":0,"hue":-180,"haloMix":1,"intensity":1.13,"exposure":0.82,"haloOuter":4,"falloff":0.5,"haloWarp":0.17,"haloWarpFreq":4,"surfWarp":0.07,"surfFreq":6,"rot":4,"breath":0.075},"palette":"Iridescent","ratioIdx":2,"genArcs":[],"edgeAOn":0,"edgeBOn":0,"bg":["#d7c4e4","#dfbdde","#c2d7b4"],"hold":0.7,"trans":0.5,"fadeIn":0.45,"font":{"text":"Welcome to","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}},{"params":{"orbSize":0.06,"centerX":0.49,"centerY":0.55,"blobAmt":0.06,"blobLobes":2,"blobSpeed":2.05,"shapeRound":0.04,"shapeRot":3,"shapeSides":0,"distortAmt":0.29,"distortFreq":2,"edgeAC":235,"edgeAW":27,"edgeBC":0,"edgeBW":26,"edgeContrast":0.75,"blurAmt":0.25,"compRot":90,"lightSize":0.21,"lightReach":1.65,"lightAmt":0.19,"lightUneven":0.9,"outerSize":0.28,"outerAmt":0,"hue":-180,"haloMix":1,"intensity":1.13,"exposure":0.82,"haloOuter":4,"falloff":0.5,"haloWarp":0.17,"haloWarpFreq":4,"surfWarp":0.07,"surfFreq":6,"rot":4,"breath":0.075},"palette":"Iridescent","ratioIdx":2,"genArcs":[],"edgeAOn":0,"edgeBOn":0,"bg":["#d7c4e4","#dfbdde","#c2d7b4"],"hold":1,"trans":0.8,"fadeIn":0,"font":{"text":"Galaxy AI","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}},{"params":{"orbSize":0.5,"centerX":0.5,"centerY":0.55,"blobAmt":0.06,"blobLobes":4,"blobSpeed":0.6,"shapeRound":0.32,"shapeRot":4,"shapeSides":0,"distortAmt":0.12,"distortFreq":6,"edgeAC":333,"edgeAW":44,"edgeBC":311,"edgeBW":72,"edgeContrast":0.8976409358121893,"blurAmt":0.2160497942528363,"compRot":174,"lightSize":1.035,"lightReach":0.91,"lightAmt":0.62,"lightUneven":0.6884091139295905,"outerSize":0.583584651867469,"outerAmt":0.377827780017696,"hue":-108,"haloMix":0.4,"intensity":2,"exposure":0.67,"haloOuter":0.89,"falloff":3.75,"haloWarp":0.6,"haloWarpFreq":2,"surfWarp":0,"surfFreq":1,"rot":39,"breath":0.095},"palette":"Aurora","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":0},{"relC":180,"hw":54,"on":0},{"relC":300,"hw":54,"on":1}],"edgeAOn":1,"edgeBOn":0,"bg":["#beafe5","#cea8df","#c8d7a1"],"hold":1.2,"trans":0.8,"fadeIn":0,"font":{"text":"Hello\nCamila.","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"One UI Sans","weight":"500","size":22,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}},{"params":{"orbSize":0.59,"centerX":0.48,"centerY":0.55,"blobAmt":0.21,"blobLobes":3,"blobSpeed":0.6,"shapeRound":0.4,"shapeRot":28,"shapeSides":0,"distortAmt":0.07,"distortFreq":9,"edgeAC":333,"edgeAW":44,"edgeBC":311,"edgeBW":72,"edgeContrast":0.8976409358121893,"blurAmt":0.2160497942528363,"compRot":174,"lightSize":0.05,"lightReach":0.47,"lightAmt":0.26,"lightUneven":0.52,"outerSize":0.2,"outerAmt":0.1,"hue":40,"haloMix":0.46,"intensity":1.16,"exposure":0.86,"haloOuter":1.42,"falloff":1.2,"haloWarp":0.32,"haloWarpFreq":7,"surfWarp":0.24,"surfFreq":1,"rot":6,"breath":0.03},"palette":"Aurora","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":0},{"relC":180,"hw":54,"on":1},{"relC":300,"hw":54,"on":1}],"edgeAOn":1,"edgeBOn":1,"bg":["#dce8b7","#b7e3b0","#b3a7da"],"hold":3.3222222222222224,"trans":0.8,"fadeIn":0,"font":{"text":"To better adapt to you going forward. I'll first carry over the context from your previous device.","color":"#ffffff","align":"center","shadowOn":true,"typing":true,"fontFamily":"One UI Sans","weight":"500","size":22,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":5,"shadowX":0,"shadowY":1,"shadowAlpha":0.225,"typeSpeed":36,"typeBlur":12}}],"activePage":3},{"pages":[{"params":{"orbSize":0.5,"centerX":0.5,"centerY":0.46,"blobAmt":0.12,"blobLobes":3,"blobSpeed":0.5,"shapeRound":0.4,"shapeRot":24,"shapeSides":4,"distortAmt":0,"distortFreq":5,"edgeAC":15,"edgeAW":45,"edgeBC":210,"edgeBW":60,"edgeContrast":0.88,"blurAmt":0.12,"compRot":0,"lightSize":0.3,"lightReach":0.3,"lightAmt":0.5,"lightUneven":0.65,"outerSize":0.55,"outerAmt":0.25,"hue":0,"haloMix":0.72,"intensity":1,"exposure":0.96,"haloOuter":0.8,"falloff":1.8,"haloWarp":0.15,"haloWarpFreq":3,"surfWarp":0.2,"surfFreq":3,"rot":12,"breath":0.05},"palette":"Ocean","ratioIdx":0,"genArcs":[],"edgeAOn":0,"edgeBOn":0,"bg":["#E9E4F5","#E2EEF6","#F7E8E2"],"hold":1.8,"trans":0.8,"fadeIn":0,"font":{"text":"","color":"#2a2a2a","align":"center","shadowOn":false,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5,"typeSpeed":6,"typeBlur":12}}],"activePage":0},{"pages":[{"params":{"orbSize":0.4927770247430743,"centerX":0.32,"centerY":0.46,"blobAmt":0.24508533655264214,"blobLobes":5,"blobSpeed":0.999258081190256,"shapeRound":0.2726166242370211,"shapeRot":72,"shapeSides":0,"distortAmt":0.011625649908982585,"distortFreq":5,"edgeAC":250,"edgeAW":24,"edgeBC":144,"edgeBW":43,"edgeContrast":0.7507672771645827,"blurAmt":0.1414949839415801,"compRot":163,"lightSize":0.2528231270474508,"lightReach":0.24945893973355435,"lightAmt":0.35885051814304136,"lightUneven":0.8995709894250532,"outerSize":0.5196188666143687,"outerAmt":0.1804333095306793,"hue":-61,"haloMix":0.9331355455584822,"intensity":0.6037848138248306,"exposure":0.9963804846720774,"haloOuter":0.6460511359215684,"falloff":1.372204996589531,"haloWarp":0.3213950387127403,"haloWarpFreq":3,"surfWarp":0.5339450959535662,"surfFreq":6,"rot":12,"breath":0.0750912508379228},"palette":"Aurora","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":1},{"relC":180,"hw":54,"on":0},{"relC":300,"hw":54,"on":0}],"edgeAOn":1,"edgeBOn":0,"bg":["#cbe1e4","#c3d3df","#d7beba"],"hold":1.8,"trans":0.8,"fadeIn":0,"font":{"text":"","color":"#2a2a2a","align":"center","shadowOn":false,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5,"typeSpeed":6,"typeBlur":12}}],"activePage":0}]};
 // ===== 사용자 제공 코드값 반영 (화면별 파라미터/배경) =====
-/*CFG_BAKE_START*/const CFG={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"artboard":{"type":"linear","angle":135,"c1":"#1a1a22","c2":"#23232c","c3":"#2c2638","size":100,"alpha":1},"glass":{"frost":1.16,"bgBlur":0,"quad":1,"solid":0.51,"icons":0,"cardAlpha":0.29,"cardTextColor":"#ffffff","dropMode":3,"dropSpeed":1,"disp":1,"cardWarp":0,"cardWarpFreq":6,"cardType":3,"cardC1":"#a7c0dc","cardC2":"#beafe5","cardC3":"#c8d7a1","cardLayers":[{"type":2,"c1":"#9bf3d6","c2":"#b1c3f2","c3":"#eaa4bc","intensity":1.01,"width":0.76},{"type":0,"c1":"#e3e97e","c2":"#bfe793","c3":"#8f89df","intensity":1.03,"width":0.66}],"shapeMask":{"on":1,"type":1,"opacity":0.61,"blur":0.85,"angle":200},"layers":[{"type":0,"mode":2,"sweep":1,"dir":5,"spin":0,"bright":0.4,"intensity":1.26,"width":0.45,"blur":1.31,"size":1,"thick":0.008,"glow":0.4,"soft":0,"shadow":0,"shadCol":"#2ff450","angle":0,"speed":1.15,"col":"#41c350","blurCol":"#6f9586"},{"type":1,"mode":0,"sweep":0,"dir":3,"spin":0,"bright":0.49,"intensity":0.71,"width":0.52,"blur":1.52,"size":0.29,"thick":0.008,"glow":0.16,"soft":0.11,"shadow":0.62,"shadCol":"#000000","angle":88,"speed":0.85,"col":"#c5dadd","blurCol":"#cfe0ff"},{"type":0,"mode":0,"sweep":0,"dir":3,"spin":1,"bright":0.33,"intensity":1,"width":0.4,"blur":0.44,"size":1,"thick":0.006,"glow":0.4,"soft":0,"shadow":0,"shadCol":"#000000","angle":0,"speed":1,"col":"#1371ec","blurCol":"#5a78ff"},{"type":1,"mode":0,"sweep":0,"dir":3,"spin":0,"bright":0.44,"intensity":1,"width":1.02,"blur":0.99,"size":1,"thick":0.006,"glow":0.4,"soft":0,"shadow":0,"shadCol":"#000000","angle":0,"speed":1,"col":"#80e7f9","blurCol":"#5a78ff"}],"fx":{"transition":{"on":1},"iridescent":{"on":0,"intensity":0.14,"hue":109,"hueShift":-1.11,"sat":0.21,"sharpness":0,"wobble":0,"direction":6},"surface":{"on":1,"rim":{"int":0.13,"color":"#ffffff","width":0.72,"size":0.25},"glint":{"int":0,"color":"#ffffff","width":0,"size":0.1},"sweep":{"int":0.23,"color":"#56adf0","width":0.64,"size":1},"eyes":{"int":0.62,"color":"#455af7","width":0.18,"size":1.65}},"inner":{"on":0,"pulse":1.19,"caustics":0.05,"edgeFlare":0.23}}},"screens":[{"pages":[{"params":{"orbSize":0.715,"centerX":0.065,"centerY":0.68,"blobAmt":0.3,"blobLobes":3,"blobSpeed":0.55,"shapeRound":0.8,"shapeRot":24,"shapeSides":1,"formBlur":0,"distortAmt":0.03,"distortFreq":5,"edgeAC":116,"edgeAW":49,"edgeBC":140,"edgeBW":36,"edgeContrast":0.9,"blurAmt":0.26,"compRot":95,"lightSize":0.215,"lightReach":0.89,"lightAmt":0.27,"lightUneven":1,"outerSize":0.36,"outerAmt":0,"hue":39,"haloMix":0.3,"intensity":0.88,"exposure":0.79,"haloOuter":2.46,"falloff":2.7,"haloWarp":0.17,"haloWarpFreq":1,"surfWarp":0,"surfFreq":3,"rot":19,"breath":0.0771},"palette":"Ocean","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":1},{"relC":180,"hw":54,"on":1},{"relC":300,"hw":54,"on":0}],"edgeAOn":0,"edgeBOn":0,"bg":["#c8dba7","#b1d5a1","#ac9acd"],"bgType":0,"bgSize":100,"bgAlpha":1,"blankBg":"#c07c7c","orbFill":"#ead2b7","orbFill2":"#dee4af","orbFill3":"#a7c0dc","orbFillType":2,"orbFillSize":154,"orbFillAlpha":0.69,"orbFillBlur":0,"hold":1.8,"trans":0.8,"fadeIn":0,"font":{"text":"","color":"#000000","align":"center","shadowOn":false,"typing":true,"fontFamily":"Samsung Sharp Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5,"typeSpeed":6,"typeBlur":12}}],"activePage":0,"artboard":{"type":"linear","angle":135,"c1":"#1a1a22","c2":"#23232c","c3":"#2c2638","size":100,"alpha":1}}]};/*CFG_BAKE_END*/
+/*CFG_BAKE_START*/const CFG={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"artboard":{"type":"linear","angle":135,"c1":"#1a1a22","c2":"#23232c","c3":"#2c2638","size":100,"alpha":1},"glass":{"frost":0.85,"bgBlur":0,"quad":0.74,"solid":0.52,"icons":0,"cardAlpha":0.97,"cardTextColor":"#ffffff","cardSize":0.99,"cardRound":1.07,"zoneBlur":[1.36,0,1.75,0,1.3070632123207195,1.88],"fbAmt":1.45,"fbSize":0.35,"fbSpeed":1.85,"dropMode":3,"dropSpeed":1.319201850059233,"disp":1,"cardWarp":0,"cardWarpFreq":6,"cardType":1,"cardC1":"#0d0f14","cardC2":"#1a2030","cardC3":"#2a1a22","cardLayers":[{"type":1,"c1":"#1f7498","c2":"#e8ff38","c3":"#757df0","intensity":1.2381276367912917,"width":0.8301366466340591}],"shapeMasks":[{"type":0,"opacity":0.7101605407619567,"blur":0.5871657087950769,"angle":85,"cx":-0.3184554313700139,"cy":0.5263805948671044,"sx":0.734675708664035,"sy":0.40608573208304477,"invert":1,"on":1}],"layers":[],"fx":{"transition":{"on":0},"iridescent":{"on":1,"intensity":0.14,"hue":109,"hueShift":-1.11,"sat":0.21,"sharpness":0,"wobble":0,"direction":6},"surface":{"on":1,"rim":{"int":0.22,"color":"#ffffff","width":0.27,"size":0.3},"glint":{"int":0,"color":"#ffffff","width":0,"size":0.1},"sweep":{"int":0.54,"color":"#e8f6a2","width":0.7,"size":1},"eyes":{"int":0,"color":"#455af7","width":0.18,"size":1.65}},"inner":{"on":0,"pulse":1.19,"caustics":0.05,"edgeFlare":0.23}}},"screens":[{"pages":[{"params":{"orbSize":0.715,"centerX":0.065,"centerY":0.68,"blobAmt":0.3,"blobLobes":3,"blobSpeed":0.55,"shapeRound":0.8,"shapeRot":24,"shapeSides":1,"formBlur":0,"distortAmt":0.03,"distortFreq":5,"edgeAC":116,"edgeAW":49,"edgeBC":140,"edgeBW":36,"edgeContrast":0.9,"blurAmt":0.26,"compRot":95,"lightSize":0.215,"lightReach":0.89,"lightAmt":0.27,"lightUneven":1,"outerSize":0.36,"outerAmt":0,"hue":39,"haloMix":0.3,"intensity":0.88,"exposure":0.79,"haloOuter":2.46,"falloff":2.7,"haloWarp":0.17,"haloWarpFreq":1,"surfWarp":0,"surfFreq":3,"rot":8,"breath":0.0771},"palette":"Ocean","ratioIdx":2,"genArcs":[{"relC":60,"hw":54,"on":1},{"relC":180,"hw":54,"on":1},{"relC":300,"hw":54,"on":0}],"edgeAOn":0,"edgeBOn":0,"bg":["#c8dba7","#b1d5a1","#ac9acd"],"bgType":0,"bgSize":100,"bgAlpha":1,"blankBg":"#c07c7c","orbFill":"#ead2b7","orbFill2":"#dee4af","orbFill3":"#a7c0dc","orbFillType":2,"orbFillSize":154,"orbFillAlpha":0.69,"orbFillBlur":0,"hold":1.8,"trans":0.8,"fadeIn":0,"font":{"text":"","color":"#ffffff","align":"center","shadowOn":false,"typing":true,"fontFamily":"One UI Sans","weight":"500","size":26,"alpha":1,"x":0.5,"y":0.5,"shadowBlur":8,"shadowX":0,"shadowY":2,"shadowAlpha":0.5,"typeSpeed":6,"typeBlur":12}}],"activePage":0,"artboard":{"type":"linear","angle":135,"c1":"#1a1a22","c2":"#23232c","c3":"#2c2638","size":100,"alpha":1}}]};/*CFG_BAKE_END*/
 INIT.screens=CFG.screens; INIT.activeScreen=CFG.activeScreen; if(CFG.artboard) Object.assign(artboard,CFG.artboard); if(CFG.glass) INIT.glass=CFG.glass;
 if(CFG.bgImages){ INIT.bgImages=CFG.bgImages; INIT.bgImageOn=CFG.bgImageOn; INIT.bgImageIdx=CFG.bgImageIdx; }   // 저장된 배경 이미지 복원
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
