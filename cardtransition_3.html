@@ -1590,11 +1590,16 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"screens":[{"page
 INIT.screens=CFG.screens; INIT.activeScreen=CFG.activeScreen; if(CFG.artboard) Object.assign(artboard,CFG.artboard); if(CFG.glass) INIT.glass=CFG.glass;
 if(CFG.bgImages){ INIT.bgImages=CFG.bgImages; INIT.bgImageOn=CFG.bgImageOn; INIT.bgImageIdx=CFG.bgImageIdx; }   // 저장된 배경 이미지 복원
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
-// 모바일: 화면 폭을 직접 측정해 body.mobile 부여 + 모든 패널을 접힌(줄어든) 상태로 시작
-function applyMobile(){ const m=Math.min(window.innerWidth,document.documentElement.clientWidth||window.innerWidth)<=820;
-  document.body.classList.toggle('mobile', m);
+// 모바일 감지: 뷰어가 폭을 넓게 보고하는 경우가 있어 '터치/coarse 포인터'로도 판단(폭은 보조)
+function isMobileEnv(){
+  try{ if(window.matchMedia && window.matchMedia('(pointer:coarse)').matches) return true; }catch(e){}
+  if('ontouchstart' in window) return true;
+  if(navigator.maxTouchPoints>0 || navigator.msMaxTouchPoints>0) return true;
+  return (window.innerWidth||9999)<=820;
+}
+function applyMobile(){ const m=isMobileEnv(); document.body.classList.toggle('mobile', m);
   if(m){ ['leftPanel','rightPanel'].forEach(id=>{ const pn=document.getElementById(id); if(pn && !pn.dataset.mobInit){ pn.classList.add('collapsed'); const dd=pn.querySelector('.dd'); if(dd) dd.textContent='▸'; pn.dataset.mobInit='1'; } }); } }
-applyMobile(); window.addEventListener('resize', applyMobile);
+applyMobile(); window.addEventListener('resize', applyMobile); window.addEventListener('orientationchange', applyMobile);
 // 임베드 폰트 로드 보장 후 렌더 시작
 if(document.fonts && document.fonts.load){ Promise.all([document.fonts.load('700 60px "Samsung Sharp Sans"'),document.fonts.load('500 60px "One UI Sans"')]).catch(()=>{}).finally(()=>requestAnimationFrame(frame)); }
 else requestAnimationFrame(frame);
