@@ -542,7 +542,8 @@ void main(){
   vec3 body=frost(uvT, bodyRad);                             // 배경을 평면적으로만 블러
   vec3 tcol=(dCard<0.0)?cardTintCol(Pc-u_cardC):u_cardC1;
   float rTint=1.0; if(u_centerFill>0.001){ vec2 lc2=(Pc-u_cardC)/(u_cardH+1e-4); rTint=mix(1.0, 1.0-smoothstep(0.1,1.05,length(lc2)), clamp(u_centerFill,0.0,1.0)); }  // 중앙 집중(외곽=배경 블러)
-  vec3 col=mix(body, tcol, clamp(0.18+0.82*u_tint,0.0,1.0)*rTint); // 네이비 중앙 집중(내려올 때도 유지) + 외곽 배경 블러
+  vec3 fillCol=mix(vec3(1.0), tcol, fxAmt);   // 도착 전: 흰색만 / 도착 후: 카드색(네이비)
+  vec3 col=mix(body, fillCol, clamp(0.18+0.82*u_tint,0.0,1.0)*rTint); // 중앙 집중 + 외곽 배경 블러
   col=mix(vec3(dot(col,vec3(0.333))), col, 0.86);
   col=mix(col, mix(col,vec3(1.0),0.10), cardRight*u_quad*0.7);
   col*=1.0-0.10*exp(-pow(max(-d,0.0)/0.02,2.0));
