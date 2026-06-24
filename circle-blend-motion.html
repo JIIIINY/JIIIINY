@@ -35,6 +35,9 @@
     transition:background .4s ease;
   }
   #device.light{background:#ffffff}
+  #device.grad{
+    background:linear-gradient(145deg,#ff5a1e 0%,#e23a55 32%,#7b6f9c 60%,#2f6fd0 100%);
+  }
   #device.checker{
     background-color:#cfcfcf;
     background-image:
@@ -115,7 +118,7 @@
 </head>
 <body>
   <div id="wrap">
-    <div id="device">
+    <div id="device" class="grad">
       <canvas id="gl"></canvas>
     </div>
   </div>
@@ -141,8 +144,12 @@
       <input type="range" id="edge" min="0" max="1.6" step="0.01" value="1.0">
     </div>
     <div class="row">
-      <label>가장자리 부드러움 <b id="vSoft">1.0</b></label>
-      <input type="range" id="soft" min="0.2" max="3" step="0.01" value="1.0">
+      <label>블렌딩 번짐 <b id="vBlend">1.0</b></label>
+      <input type="range" id="blend" min="0" max="1.6" step="0.01" value="1.0">
+    </div>
+    <div class="row">
+      <label>엣지 또렷함 <b id="vSoft">1.0</b></label>
+      <input type="range" id="soft" min="0.4" max="4" step="0.01" value="1.0">
     </div>
     <div class="row">
       <label>입자(그레인) <b id="vGrain">0.45</b></label>
@@ -151,10 +158,10 @@
 
     <div class="seclabel">컬러 테마</div>
     <div class="chips" id="themes">
-      <button data-theme="0" class="active">선셋</button>
-      <button data-theme="1">바이올렛·라임</button>
-      <button data-theme="2">스프링</button>
-      <button data-theme="3">크림</button>
+      <button data-theme="0" class="active">오렌지·크림</button>
+      <button data-theme="1">선셋</button>
+      <button data-theme="2">바이올렛·라임</button>
+      <button data-theme="3">스프링</button>
     </div>
 
     <div class="btns">
@@ -164,7 +171,8 @@
 
     <div class="seclabel">배경</div>
     <div class="bgrow">
-      <button data-bg="" class="active">검정</button>
+      <button data-bg="grad" class="active">그라데이션</button>
+      <button data-bg="">검정</button>
       <button data-bg="light">흰색</button>
       <button data-bg="checker">체커</button>
     </div>
@@ -184,37 +192,59 @@ precision highp float;
 uniform vec2  u_res;
 uniform float u_time;
 uniform float u_merge;
-uniform float u_soft;
+uniform float u_soft;     // edge crispness (px softness)
 uniform float u_grain;
 uniform float u_edge;     // edge color strength
-// circle L (left) : core gradient + 2 edge colors
-uniform vec3  u_Lc1; uniform vec3 u_Lc2; uniform vec3 u_Le1; uniform vec3 u_Le2;
-// circle R (right)
-uniform vec3  u_Rc1; uniform vec3 u_Rc2; uniform vec3 u_Re1; uniform vec3 u_Re2;
+uniform float u_blend;    // colored-edge halo spread (the blending)
+// circle L (left, FRONT) : core gradient + 3 edge colors
+uniform vec3  u_Lc1; uniform vec3 u_Lc2; uniform vec3 u_Le1; uniform vec3 u_Le2; uniform vec3 u_Le3;
+// circle R (right, BACK)
+uniform vec3  u_Rc1; uniform vec3 u_Rc2; uniform vec3 u_Re1; uniform vec3 u_Re2; uniform vec3 u_Re3;
 
 const float LOGW = 360.0;
 const float LOGH = 800.0;
 const float R    = 92.0;   // R = 92dp
-const float PI   = 3.14159265;
+const float TAU  = 6.28318530718;
 
 float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
 
-// one circle's local color: core vertical gradient + radial edge-color ring
-vec3 circleCol(vec2 P, vec2 c, vec3 c1, vec3 c2, vec3 e1, vec3 e2){
-  vec2 q = P - c;
-  float d = length(q);
-  float rN = clamp(d / R, 0.0, 1.0);
-  float ang = atan(q.y, q.x);
-  // core fill : vertical gradient
-  float tv = clamp((q.y + R) / (2.0*R), 0.0, 1.0);
-  vec3 core = mix(c1, c2, tv);
-  // iridescent edge : two edge colors swept around the rim
-  float ea = 0.5 + 0.5*sin(ang + 0.6);
-  vec3 edge = mix(e1, e2, ea);
-  // radial gradient : edge colors emerge near the outer rim
-  float ring = smoothstep(0.30, 1.0, rN);
-  ring = mix(0.0, ring, u_edge);
-  return mix(core, edge, ring);
+// 3-stop edge palette swept around the rim (alive, multi-color edge)
+vec3 edgePalette(float a, vec3 e1, vec3 e2, vec3 e3){
+  a = fract(a) * 3.0;
+  if(a < 1.0)      return mix(e1, e2, smoothstep(0.0,1.0,a));
+  else if(a < 2.0) return mix(e2, e3, smoothstep(0.0,1.0,a-1.0));
+  else             return mix(e3, e1, smoothstep(0.0,1.0,a-2.0));
+}
+
+// straight-alpha "source over" compositing
+vec4 over(vec4 dst, vec3 sc, float sa){
+  float a = sa + dst.a*(1.0-sa);
+  vec3  c = sc*sa + dst.rgb*dst.a*(1.0-sa);
+  return vec4(a > 0.0 ? c/a : c, a);
+}
+
+// draw one circle (translucent colored halo, then crisp gradient fill) onto acc
+vec4 drawCircle(vec4 acc, vec2 q, vec3 c1, vec3 c2, vec3 e1, vec3 e2, vec3 e3, float soft, float haloW){
+  float d   = length(q);
+  float ang = atan(q.y, q.x)/TAU + 0.5;
+  float tv  = clamp((q.y + R)/(2.0*R), 0.0, 1.0);
+
+  vec3 coreCol = mix(c1, c2, tv);                 // vivid core gradient
+  vec3 edgeCol = edgePalette(ang + 0.12, e1, e2, e3);
+
+  // crisp, living edge
+  float coreA = smoothstep(R + soft, R - soft, d);
+  // edge colors emerge toward the rim (radial), keeping the core vivid
+  float ring  = smoothstep(R*0.42, R, d) * u_edge;
+  vec3 fillCol = mix(coreCol, edgeCol, clamp(ring, 0.0, 1.0));
+
+  // translucent colored halo just outside the rim -> bleeds over the neighbour = the blend
+  float halo  = exp(-pow(max(d - R + soft, 0.0)/haloW, 2.0));
+  float haloA = halo * (1.0 - coreA) * 0.75 * u_blend;
+
+  acc = over(acc, edgeCol, haloA);   // colored edge halo (under)
+  acc = over(acc, fillCol, coreA);   // crisp circle on top
+  return acc;
 }
 
 void main(){
@@ -225,37 +255,27 @@ void main(){
   m = m*m*(3.0-2.0*m);
 
   // horizontal half-separation (left/right)
-  float restSep  = 86.0;                       // circles fill the width, near-pure colors
-  float mergeSep = mix(86.0, 34.0, u_merge);    // deep overlap at center
+  float restSep  = 86.0;                        // near-pure original colors
+  float mergeSep = mix(86.0, 36.0, u_merge);     // deep overlap at center
   float sep = mix(restSep, mergeSep, m);
 
-  vec2 cL = vec2(LOGW*0.5 - sep, LOGH*0.5);
-  vec2 cR = vec2(LOGW*0.5 + sep, LOGH*0.5);
+  vec2 qL = P - vec2(LOGW*0.5 - sep, LOGH*0.5);
+  vec2 qR = P - vec2(LOGW*0.5 + sep, LOGH*0.5);
 
-  // ---- metaball field : organic merge bridge ----
-  float dL2 = dot(P-cL, P-cL);
-  float dR2 = dot(P-cR, P-cR);
-  float fL = (R*R) / (dL2 + 1.0);
-  float fR = (R*R) / (dR2 + 1.0);
-  float f  = fL + fR;
+  float soft  = 1.4 * u_soft;
+  float haloW = 22.0 * (0.45 + u_blend);
 
-  float e = 0.16 * u_soft;
-  float shape = smoothstep(1.0 - e, 1.0 + e, f);
-
-  // per-circle colors (each keeps its own core + edge identity)
-  vec3 colL = circleCol(P, cL, u_Lc1, u_Lc2, u_Le1, u_Le2);
-  vec3 colR = circleCol(P, cR, u_Rc1, u_Rc2, u_Re1, u_Re2);
-
-  // blend weight from relative field : pure near each center,
-  // smooth gradient blend in the contact bridge.
-  float w = fR / (fL + fR + 1e-4);
-  vec3 rgb = mix(colL, colR, w);
+  // back (right) first, then front (left) over it -> front edge stays alive,
+  // its colored halo bleeds over the back circle in the overlap = natural blend.
+  vec4 acc = vec4(0.0);
+  acc = drawCircle(acc, qR, u_Rc1, u_Rc2, u_Re1, u_Re2, u_Re3, soft, haloW);
+  acc = drawCircle(acc, qL, u_Lc1, u_Lc2, u_Le1, u_Le2, u_Le3, soft, haloW);
 
   // film grain
   float g = (hash(gl_FragCoord.xy + u_time*60.0) - 0.5) * 0.06 * u_grain;
-  rgb += g;
+  acc.rgb += g * acc.a;
 
-  gl_FragColor = vec4(rgb, clamp(shape, 0.0, 1.0));
+  gl_FragColor = vec4(acc.rgb, clamp(acc.a, 0.0, 1.0));
 }`;
 
 function compile(type, src){
@@ -278,25 +298,25 @@ gl.enableVertexAttribArray(loc);
 gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
 const U = {};
-['u_res','u_time','u_merge','u_soft','u_grain','u_edge',
- 'u_Lc1','u_Lc2','u_Le1','u_Le2','u_Rc1','u_Rc2','u_Re1','u_Re2']
+['u_res','u_time','u_merge','u_soft','u_grain','u_edge','u_blend',
+ 'u_Lc1','u_Lc2','u_Le1','u_Le2','u_Le3','u_Rc1','u_Rc2','u_Re1','u_Re2','u_Re3']
  .forEach(n=> U[n]=gl.getUniformLocation(prog,n));
 
-// ---- color themes (from reference frames): each circle = core1,core2 + edge1,edge2 ----
+// ---- color themes : each circle = core1,core2 (fill gradient) + edge1,2,3 (alive rim) ----
 const hex = h => [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255];
 const THEMES = [
-  { // 0 선셋 : 따뜻 vs 차가움
-    Lc1:'#ffc24d', Lc2:'#ff7a3c', Le1:'#ff4f9d', Le2:'#ffd36b',
-    Rc1:'#8a4dff', Rc2:'#4f7bff', Re1:'#00d4ff', Re2:'#c9a6ff' },
-  { // 1 바이올렛·라임 (IMG_9992)
-    Lc1:'#7b2ff7', Lc2:'#5b3bff', Le1:'#b66bff', Le2:'#4f6bff',
-    Rc1:'#c6f25a', Rc2:'#7fd86a', Re1:'#fff07a', Re2:'#5fd0b0' },
-  { // 2 스프링
-    Lc1:'#b6f25a', Lc2:'#6fd86a', Le1:'#fff07a', Le2:'#5fd0c0',
-    Rc1:'#ff7eb6', Rc2:'#ff5f8a', Re1:'#ffb86c', Re2:'#c98bff' },
-  { // 3 크림 (IMG_9994/9996) : 크림화이트 + 오렌지, 이리데센트 림
-    Lc1:'#f8f1e2', Lc2:'#e9dcc4', Le1:'#ffc6e0', Le2:'#bfe3ff',
-    Rc1:'#ffb23e', Rc2:'#ff8a2b', Re1:'#ff5f9e', Re2:'#ffd98a' },
+  { // 0 오렌지·크림 — IMG_9995 (orange FRONT, cream-teal BACK)
+    Lc1:'#ff7a2e', Lc2:'#ff4513', Le1:'#ff2f7a', Le2:'#ff3a1e', Le3:'#ffa23d',
+    Rc1:'#f4e7d3', Rc2:'#e4d6bf', Re1:'#bfe9d6', Re2:'#8fc6e8', Re3:'#e7d2e6' },
+  { // 1 선셋 : 따뜻 vs 차가움
+    Lc1:'#ffc24d', Lc2:'#ff6a2e', Le1:'#ff4f9d', Le2:'#ff7a3c', Le3:'#ffd36b',
+    Rc1:'#8a4dff', Rc2:'#4f7bff', Re1:'#00d4ff', Re2:'#7b6bff', Re3:'#c9a6ff' },
+  { // 2 바이올렛·라임 (IMG_9992)
+    Lc1:'#7b2ff7', Lc2:'#5b3bff', Le1:'#b66bff', Le2:'#4f6bff', Le3:'#c9a6ff',
+    Rc1:'#c6f25a', Rc2:'#7fd86a', Re1:'#fff07a', Re2:'#5fd0b0', Re3:'#bfe97a' },
+  { // 3 스프링
+    Lc1:'#b6f25a', Lc2:'#6fd86a', Le1:'#fff07a', Le2:'#5fd0c0', Le3:'#c6f25a',
+    Rc1:'#ff7eb6', Rc2:'#ff5f8a', Re1:'#ffb86c', Re2:'#c98bff', Re3:'#ff9ec9' },
 ];
 let theme = THEMES[0];
 
@@ -309,7 +329,7 @@ function resize(){
 }
 window.addEventListener('resize', resize); resize();
 
-const state = { speed:0.55, merge:0.82, edge:1.0, soft:1.0, grain:0.45, playing:true };
+const state = { speed:0.55, merge:0.82, edge:1.0, blend:1.0, soft:1.0, grain:0.45, playing:true };
 let simTime = 0, last = performance.now();
 
 function frame(now){
@@ -321,10 +341,11 @@ function frame(now){
   gl.uniform1f(U.u_soft, state.soft);
   gl.uniform1f(U.u_grain, state.grain);
   gl.uniform1f(U.u_edge, state.edge);
+  gl.uniform1f(U.u_blend, state.blend);
   gl.uniform3fv(U.u_Lc1, hex(theme.Lc1)); gl.uniform3fv(U.u_Lc2, hex(theme.Lc2));
-  gl.uniform3fv(U.u_Le1, hex(theme.Le1)); gl.uniform3fv(U.u_Le2, hex(theme.Le2));
+  gl.uniform3fv(U.u_Le1, hex(theme.Le1)); gl.uniform3fv(U.u_Le2, hex(theme.Le2)); gl.uniform3fv(U.u_Le3, hex(theme.Le3));
   gl.uniform3fv(U.u_Rc1, hex(theme.Rc1)); gl.uniform3fv(U.u_Rc2, hex(theme.Rc2));
-  gl.uniform3fv(U.u_Re1, hex(theme.Re1)); gl.uniform3fv(U.u_Re2, hex(theme.Re2));
+  gl.uniform3fv(U.u_Re1, hex(theme.Re1)); gl.uniform3fv(U.u_Re2, hex(theme.Re2)); gl.uniform3fv(U.u_Re3, hex(theme.Re3));
   gl.clearColor(0,0,0,0);
   gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -341,6 +362,7 @@ function bind(id, key, label, fmt){
 bind('speed','speed','vSpeed', v=>v.toFixed(2));
 bind('merge','merge','vMerge', v=>v.toFixed(2));
 bind('edge','edge','vEdge', v=>v.toFixed(2));
+bind('blend','blend','vBlend', v=>v.toFixed(2));
 bind('soft','soft','vSoft', v=>v.toFixed(2));
 bind('grain','grain','vGrain', v=>v.toFixed(2));
 
