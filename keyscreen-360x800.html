@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=360, initial-scale=1.0, viewport-fit=cover">
+<title>Key Screen · 360×800</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%}
+  body{
+    display:flex;align-items:center;justify-content:center;
+    min-height:100vh;background:#0c0c10;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    overflow:hidden;
+  }
+
+  /* ---- mobile key screen frame: exactly 360 × 800, centered ---- */
+  .phone{
+    position:relative;
+    width:360px;height:800px;
+    border-radius:40px;
+    overflow:hidden;
+    background:#050507;
+    box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04);
+  }
+  .phone canvas{
+    position:absolute;inset:0;width:360px;height:800px;display:block;
+  }
+
+  /* status / clock overlay (lock-screen style) */
+  .ui{position:absolute;inset:0;z-index:2;pointer-events:none;color:#fff}
+  .statusbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 22px 0;font-size:12px;font-weight:600;letter-spacing:.02em;
+    color:rgba(255,255,255,.92);
+  }
+  .statusbar .icons{display:flex;gap:6px;align-items:center;font-size:11px}
+  .clock{
+    position:absolute;top:96px;left:0;right:0;text-align:center;
+    text-shadow:0 2px 24px rgba(0,0,0,.45);
+  }
+  .clock .time{font-size:78px;font-weight:200;letter-spacing:-.02em;line-height:1}
+  .clock .date{margin-top:6px;font-size:15px;font-weight:500;color:rgba(255,255,255,.82);letter-spacing:.04em}
+
+  .hint{
+    position:absolute;bottom:34px;left:0;right:0;text-align:center;
+    font-size:12px;color:rgba(255,255,255,.55);letter-spacing:.06em;
+  }
+  .grabber{
+    position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+    width:120px;height:4px;border-radius:4px;background:rgba(255,255,255,.4);
+  }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <canvas id="gl" width="720" height="1600"></canvas>
+    <div class="ui">
+      <div class="statusbar">
+        <span id="sbtime">9:41</span>
+        <span class="icons">●●● &nbsp;￩ &nbsp;100%</span>
+      </div>
+      <div class="clock">
+        <div class="time" id="bigtime">9:41</div>
+        <div class="date" id="bigdate">6월 24일 수요일</div>
+      </div>
+      <div class="hint">밀어서 잠금 해제</div>
+      <div class="grabber"></div>
+    </div>
+  </div>
+
+<script>
+/* ---------- config dumped by the user ---------- */
+const CFG = {"v":40,"state":0,"sliders":{"rpx":440,"spd":12,"lgt":0.75,"shd":0.5,"sct":1.95,"blr":0.6,"wrp":0.0,"lsn":0.4,"wid":0.44,"rim":0.15,"riw":0.015,"gli":0,"gls":0.5,"eyi":0.9,"eyg":0.2,"swi":0,"sww":0.3,"sws":0.5,"swa":0,"iri":0.25,"irs":0.4,"pls":0.65,"cau":0,"flr":1.15,"fli":0.75,"flw":0.94,"fei1":0.4,"feo1":1.3,"flci":0.65,"bsf":1.26,"bhd":0.7,"fr":92,"pfr":0.85,"cap":0.4,"capw":0.4,"litW":0.43,"litInt":1.0,"litAng":90,"litSpd":0.36,"litShadowAmt":0.8,"litShadowBlur":0.2,"colSplit":0.64,"sphereAlphaSlider":0.65,"contrastSlider":1.5},
+  colors:{"cP":"#f060a0","cS":"#d43030","cC":"#30d030","litColor":"#3060e8","litShadowCol":"#3d1a4e","flcc":"#6b52c8"}};
+
+const S = CFG.sliders, C = CFG.colors;
+function hex(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255];}
+
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl', {alpha:false, antialias:true, premultipliedAlpha:false});
+
+const VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a,0.0,1.0); }`;
+
+const FRAG = `
+precision highp float;
+uniform vec2  u_res;
+uniform float u_time;
+uniform float u_wid, u_rim, u_riw, u_sct, u_lgt, u_shd, u_iri, u_irs, u_pls;
+uniform float u_litAng, u_litW, u_litInt, u_shadowAmt, u_shadowBlur, u_colSplit;
+uniform float u_alpha, u_contrast, u_flr, u_fli;
+uniform vec3  u_cP, u_cS, u_cC, u_lit, u_litShadow, u_flcc;
+
+float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
+float noise(vec2 p){
+  vec2 i=floor(p), f=fract(p);
+  float a=hash(i), b=hash(i+vec2(1.,0.)), c=hash(i+vec2(0.,1.)), d=hash(i+vec2(1.,1.));
+  vec2 u=f*f*(3.0-2.0*f);
+  return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+}
+float fbm(vec2 p){ float v=0.0,a=0.5; for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.0+vec2(11.3,7.1);a*=0.5;} return v; }
+vec3 irid(float t){
+  vec3 a=vec3(0.5), b=vec3(0.5), c=vec3(1.0,1.0,1.0), d=vec3(0.0,0.33,0.67);
+  return a + b*cos(6.28318*(c*t+d));
+}
+
+void main(){
+  // center in a 360x800 portrait frame, normalize by width so the sphere is round
+  vec2 uv = (gl_FragCoord.xy - 0.5*u_res)/u_res.x;
+  float t = u_time;
+
+  // gentle breathing / pulse
+  float pulse = 1.0 + u_pls*0.04*sin(t*1.1);
+  float R = u_wid*1.05*pulse;
+
+  // slow organic warp of the surface
+  vec2 w = vec2(fbm(uv*2.4+vec2(0.0,t*0.05)), fbm(uv*2.4+vec2(5.2,-t*0.04)));
+  vec2 p = uv + (w-0.5)*0.03;
+
+  float r = length(p);
+  float ang = atan(p.y, p.x);
+
+  // ---- sphere mask (soft) ----
+  float edge = 0.006 + u_riw*1.2;
+  float sphere = smoothstep(R+edge, R-edge, r);
+  if(sphere < 0.001){
+    // dark vignette background
+    float bg = 0.04 - 0.03*length(uv);
+    gl_FragColor = vec4(vec3(max(bg,0.0)), 1.0);
+    return;
+  }
+
+  // fake 3D normal of the sphere
+  float z = sqrt(max(R*R - r*r, 0.0))/R;
+  vec3 N = normalize(vec3(p/R, z));
+
+  // directional light from litAng (degrees)
+  float la = radians(u_litAng);
+  vec3 L = normalize(vec3(cos(la), sin(la), 0.7));
+  float diff = clamp(dot(N,L), 0.0, 1.0);
+  float lit = mix(u_shd*0.5, 1.0, pow(diff, mix(1.0,2.2,u_shadowBlur)) ) * (0.6+u_lgt);
+
+  // ---- base color : split / blend between primary & secondary, complement on shadow ----
+  float split = u_colSplit;
+  float band = 0.5 + 0.5*sin(ang*1.0 + t*0.15);
+  vec3 base = mix(u_cS, u_cP, smoothstep(split-0.35, split+0.35, band));
+  // complement glints high on the lit pole
+  base = mix(base, u_cC, smoothstep(0.7,1.0,diff)*0.25);
+
+  // subsurface scatter glow (sct) — light bleeding through the orb
+  float sss = pow(1.0 - z, 1.5);
+  vec3 scatter = u_lit * sss * u_sct * 0.18;
+
+  // shadow tint toward litShadowCol on the dark side
+  vec3 shadeCol = mix(u_litShadow, vec3(1.0), diff);
+  vec3 col = base * lit * shadeCol;
+  col += scatter;
+
+  // ---- iridescent rim ----
+  float fres = pow(1.0 - z, 3.0);
+  float rimMask = smoothstep(R-u_rim, R, r);
+  float iv = ang/6.28318 + t*0.03 + 0.3*fbm(p*3.0+t*0.04);
+  vec3 rim = irid(iv) * (rimMask*fres) * (u_rim*6.0 + 0.4);
+  col += mix(rim, rim*u_lit, 0.5) * (0.4 + u_iri*2.0);
+
+  // small specular highlight
+  vec3 H = normalize(L + vec3(0.0,0.0,1.0));
+  float spec = pow(clamp(dot(N,H),0.0,1.0), 60.0);
+  col += vec3(1.0)*spec*0.9*u_lgt;
+
+  // soft outer halo / flare bloom
+  float halo = smoothstep(R+0.18, R, r)*(1.0-sphere);
+  vec3 bloom = u_flcc * halo * u_fli * 0.5;
+
+  // contrast
+  col = (col-0.5)*u_contrast + 0.5;
+  col = max(col, 0.0);
+
+  // composite sphere over dark bg + bloom
+  float bg = 0.04 - 0.03*length(uv);
+  vec3 outc = mix(vec3(max(bg,0.0))+bloom, col, sphere*u_alpha + sphere*(1.0-u_alpha)*0.9);
+
+  gl_FragColor = vec4(outc, 1.0);
+}`;
+
+function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));return s;}
+const prog=gl.createProgram();
+gl.attachShader(prog,sh(gl.VERTEX_SHADER,VERT));
+gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FRAG));
+gl.linkProgram(prog);gl.useProgram(prog);
+
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const loc=gl.getAttribLocation(prog,'a');
+gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+function u(n){return gl.getUniformLocation(prog,n);}
+const U={res:u('u_res'),time:u('u_time'),wid:u('u_wid'),rim:u('u_rim'),riw:u('u_riw'),
+  sct:u('u_sct'),lgt:u('u_lgt'),shd:u('u_shd'),iri:u('u_iri'),irs:u('u_irs'),pls:u('u_pls'),
+  litAng:u('u_litAng'),litW:u('u_litW'),litInt:u('u_litInt'),shadowAmt:u('u_shadowAmt'),
+  shadowBlur:u('u_shadowBlur'),colSplit:u('u_colSplit'),alpha:u('u_alpha'),contrast:u('u_contrast'),
+  flr:u('u_flr'),fli:u('u_fli'),cP:u('u_cP'),cS:u('u_cS'),cC:u('u_cC'),lit:u('u_lit'),
+  litShadow:u('u_litShadow'),flcc:u('u_flcc')};
+
+gl.viewport(0,0,cv.width,cv.height);
+
+let t0=performance.now();
+function frame(now){
+  const t=(now-t0)/1000 * (S.spd/12);  // spd drives animation speed
+  gl.uniform2f(U.res,cv.width,cv.height);
+  gl.uniform1f(U.time,t);
+  gl.uniform1f(U.wid,S.wid);
+  gl.uniform1f(U.rim,S.rim);
+  gl.uniform1f(U.riw,S.riw);
+  gl.uniform1f(U.sct,S.sct);
+  gl.uniform1f(U.lgt,S.lgt);
+  gl.uniform1f(U.shd,S.shd);
+  gl.uniform1f(U.iri,S.iri);
+  gl.uniform1f(U.irs,S.irs);
+  gl.uniform1f(U.pls,S.pls);
+  gl.uniform1f(U.litAng,S.litAng);
+  gl.uniform1f(U.litW,S.litW);
+  gl.uniform1f(U.litInt,S.litInt);
+  gl.uniform1f(U.shadowAmt,S.litShadowAmt);
+  gl.uniform1f(U.shadowBlur,S.litShadowBlur);
+  gl.uniform1f(U.colSplit,S.colSplit);
+  gl.uniform1f(U.alpha,S.sphereAlphaSlider);
+  gl.uniform1f(U.contrast,S.contrastSlider);
+  gl.uniform1f(U.flr,S.flr);
+  gl.uniform1f(U.fli,S.fli);
+  gl.uniform3fv(U.cP,hex(C.cP));
+  gl.uniform3fv(U.cS,hex(C.cS));
+  gl.uniform3fv(U.cC,hex(C.cC));
+  gl.uniform3fv(U.lit,hex(C.litColor));
+  gl.uniform3fv(U.litShadow,hex(C.litShadowCol));
+  gl.uniform3fv(U.flcc,hex(C.flcc));
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---- live clock ---- */
+const days=['일','월','화','수','목','금','토'];
+function tick(){
+  const d=new Date();
+  let h=d.getHours(), m=d.getMinutes().toString().padStart(2,'0');
+  const hh=((h%12)||12);
+  document.getElementById('bigtime').textContent = hh+':'+m;
+  document.getElementById('sbtime').textContent = hh+':'+m;
+  document.getElementById('bigdate').textContent = (d.getMonth()+1)+'월 '+d.getDate()+'일 '+days[d.getDay()]+'요일';
+}
+tick(); setInterval(tick,1000);
+</script>
+</body>
+</html>
