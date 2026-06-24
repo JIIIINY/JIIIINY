@@ -36,7 +36,7 @@
   }
   #device.light{background:#ffffff}
   #device.grad{
-    background:linear-gradient(160deg,#ff6a2e 0%,#2f6fd0 100%);
+    background:linear-gradient(180deg,#ff6a2e 0%,#2f6fd0 100%);
   }
   #device.checker{
     background-color:#cfcfcf;
@@ -218,6 +218,7 @@ vec3 edgePalette(float a, vec3 e1, vec3 e2, vec3 e3){
 
 // smooth-min : softly merges the joint (neck) of the two circles
 float smin(float a, float b, float k){
+  k = max(k, 1e-4);
   float h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0);
   return mix(b, a, h) - k*h*(1.0-h);
 }
@@ -241,8 +242,9 @@ void main(){
   m = m*m*(3.0-2.0*m);
 
   // horizontal half-separation (left/right)
-  float restSep  = 86.0;                        // near-pure original colors
-  float mergeSep = mix(86.0, 36.0, u_merge);     // deep overlap at center
+  // at rest the two circles are fully separate; they slide to the center to merge.
+  float restSep  = 95.0;                         // two distinct circles, original colors
+  float mergeSep = mix(95.0, 34.0, u_merge);      // deep overlap at center
   float sep = mix(restSep, mergeSep, m);
 
   vec2 qL = P - vec2(LOGW*0.5 - sep, LOGH*0.5);
@@ -255,13 +257,14 @@ void main(){
   vec3 colL = circleCol(qL, u_Lc1, u_Lc2, u_Le1, u_Le2, u_Le3);
   vec3 colR = circleCol(qR, u_Rc1, u_Rc2, u_Re1, u_Re2, u_Re3);
 
-  // CENTER blend : blurry color transition only where the circles meet.
-  float band = mix(5.0, 48.0, u_blend);
-  float w = smoothstep(-band, band, dL - dR);    // pure at each side, blurry in the middle
+  // CENTER blend : blurry color transition only where the circles meet (grows with merge).
+  float band = mix(5.0, 48.0, u_blend) * m;
+  float w = smoothstep(-band - 0.5, band + 0.5, dL - dR);
   vec3 rgb = mix(colL, colR, w);
 
-  // crisp outer silhouette, with the contact neck softly merged (no outer blur/shadow)
-  float k = mix(2.0, 20.0, u_blend);
+  // shape : two separate circles at rest (k=0 -> plain union),
+  // morphing into one as they meet (neck fills only while merging).
+  float k = m * mix(3.0, 24.0, u_blend);
   float dU = smin(dL, dR, k);
   float alpha = smoothstep(R + soft, R - soft, dU);
 
