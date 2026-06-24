@@ -2,13 +2,13 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Circle Blend Motion · 360×800</title>
 <style>
   :root{
-    --panel-bg: rgba(20,20,24,0.72);
+    --panel-bg: rgba(20,20,24,0.78);
     --panel-br: rgba(255,255,255,0.10);
-    --txt: rgba(255,255,255,0.86);
+    --txt: rgba(255,255,255,0.88);
     --txt-dim: rgba(255,255,255,0.45);
     --accent: #ffb86c;
   }
@@ -26,13 +26,15 @@
   #device{
     position:relative;
     width:360px;height:800px;
+    max-width:100vw;max-height:100vh;
+    aspect-ratio:360/800;
     border-radius:40px;
     overflow:hidden;
     box-shadow:0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05);
-    background:#ffffff;
+    background:#0a0a0c;
     transition:background .4s ease;
   }
-  #device.dark{background:#0a0a0c}
+  #device.light{background:#ffffff}
   #device.checker{
     background-color:#cfcfcf;
     background-image:
@@ -45,94 +47,112 @@
   }
   #gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 
-  /* control panel */
-  #panel{
-    position:fixed;left:18px;bottom:18px;z-index:10;
-    width:252px;padding:14px 14px 12px;
-    background:var(--panel-bg);
-    border:1px solid var(--panel-br);
-    border-radius:16px;
+  /* ---- floating toggle button (always top-right) ---- */
+  #toggle{
+    position:fixed;top:16px;right:16px;z-index:30;
+    width:48px;height:48px;border-radius:14px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--panel-bg);border:1px solid var(--panel-br);
+    color:var(--txt);font-size:20px;cursor:pointer;
     backdrop-filter:blur(18px) saturate(1.2);
     -webkit-backdrop-filter:blur(18px) saturate(1.2);
-    color:var(--txt);
-    box-shadow:0 8px 40px rgba(0,0,0,.28);
-    user-select:none;
-    transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+    transition:background .2s, transform .2s;
   }
-  #panel.collapsed{transform:translateY(calc(100% - 42px));opacity:.92}
-  .head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:10px}
-  .head h1{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--txt)}
-  .head .dot{font-size:11px;color:var(--txt-dim)}
+  #toggle:active{transform:scale(.94)}
 
-  .row{margin:11px 0}
-  .row label{display:flex;justify-content:space-between;font-size:11px;color:var(--txt-dim);margin-bottom:6px;letter-spacing:.02em}
+  /* control panel — always docked on the RIGHT, slides in/out */
+  #panel{
+    position:fixed;top:0;right:0;z-index:20;
+    height:100%;width:288px;max-width:86vw;
+    padding:72px 16px 18px;
+    overflow-y:auto;
+    background:var(--panel-bg);
+    border-left:1px solid var(--panel-br);
+    backdrop-filter:blur(22px) saturate(1.2);
+    -webkit-backdrop-filter:blur(22px) saturate(1.2);
+    color:var(--txt);
+    box-shadow:-12px 0 50px rgba(0,0,0,.4);
+    transform:translateX(100%);
+    transition:transform .34s cubic-bezier(.4,0,.2,1);
+  }
+  #panel.open{transform:translateX(0)}
+
+  .ptitle{font-size:12px;font-weight:600;letter-spacing:.05em;color:var(--txt);margin-bottom:4px}
+  .psub{font-size:10.5px;color:var(--txt-dim);margin-bottom:16px;line-height:1.5}
+
+  .row{margin:14px 0}
+  .row label{display:flex;justify-content:space-between;font-size:11px;color:var(--txt-dim);margin-bottom:7px;letter-spacing:.02em}
   .row label b{color:var(--accent);font-weight:600}
   input[type=range]{
-    -webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    -webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;
     background:rgba(255,255,255,.16);outline:none;cursor:pointer;
   }
   input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    -webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
     background:linear-gradient(135deg,#ffd2a0,#ff7eb6,#9b8bff);
-    box-shadow:0 1px 6px rgba(0,0,0,.35);
+    box-shadow:0 1px 6px rgba(0,0,0,.4);
   }
-  input[type=range]::-moz-range-thumb{width:14px;height:14px;border:none;border-radius:50%;
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;
     background:linear-gradient(135deg,#ffd2a0,#ff7eb6,#9b8bff)}
 
-  .seclabel{font-size:10px;color:var(--txt-dim);letter-spacing:.08em;text-transform:uppercase;margin:13px 0 7px}
-  .chips{display:flex;gap:6px;flex-wrap:wrap}
-  .chips button{flex:1 1 0;min-width:0}
-  .btns{display:flex;gap:7px;margin-top:13px}
+  .seclabel{font-size:10px;color:var(--txt-dim);letter-spacing:.08em;text-transform:uppercase;margin:18px 0 8px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chips button{flex:1 1 40%;min-width:0}
+  .btns{display:flex;gap:8px;margin-top:14px}
   button{
-    flex:1;padding:8px 0;font-size:11px;font-weight:600;letter-spacing:.02em;
+    flex:1;padding:11px 0;font-size:12px;font-weight:600;letter-spacing:.02em;
     color:var(--txt);background:rgba(255,255,255,.07);
-    border:1px solid var(--panel-br);border-radius:10px;cursor:pointer;
+    border:1px solid var(--panel-br);border-radius:11px;cursor:pointer;
     transition:background .2s,border-color .2s;
   }
   button:hover{background:rgba(255,255,255,.13)}
   button.active{border-color:var(--accent);color:#fff}
   button.rec{color:#ff8da3}
   button.rec.on{background:rgba(255,80,110,.18);border-color:#ff5a6e;color:#ffd0d8}
-
-  .bgrow{display:flex;gap:6px;margin-top:9px}
-  .bgrow button{padding:7px 0}
-  .hint{font-size:10px;color:var(--txt-dim);margin-top:10px;line-height:1.5}
+  .bgrow{display:flex;gap:7px;margin-top:10px}
 </style>
 </head>
 <body>
   <div id="wrap">
-    <div id="device" class="dark">
+    <div id="device">
       <canvas id="gl"></canvas>
     </div>
   </div>
 
+  <!-- mobile-friendly toggle button -->
+  <button id="toggle" aria-label="설정">⚙</button>
+
+  <!-- right-docked panel -->
   <div id="panel">
-    <div class="head" id="head">
-      <h1>CIRCLE BLEND · 360×800 · R=92</h1>
-      <span class="dot" id="chev">▾</span>
-    </div>
+    <div class="ptitle">CIRCLE BLEND · 360×800 · R=92</div>
+    <div class="psub">좌/우 두 원이 합쳐지며 중앙이 블렌딩되고, 제자리로 돌아가면 원래 컬러를 유지합니다.</div>
 
     <div class="row">
       <label>합쳐짐 속도 <b id="vSpeed">0.55</b></label>
       <input type="range" id="speed" min="0" max="2" step="0.01" value="0.55">
     </div>
     <div class="row">
-      <label>최대 겹침 <b id="vMerge">0.80</b></label>
-      <input type="range" id="merge" min="0.2" max="1" step="0.01" value="0.80">
+      <label>최대 겹침 <b id="vMerge">0.82</b></label>
+      <input type="range" id="merge" min="0.2" max="1" step="0.01" value="0.82">
+    </div>
+    <div class="row">
+      <label>엣지 컬러 세기 <b id="vEdge">1.0</b></label>
+      <input type="range" id="edge" min="0" max="1.6" step="0.01" value="1.0">
     </div>
     <div class="row">
       <label>가장자리 부드러움 <b id="vSoft">1.0</b></label>
       <input type="range" id="soft" min="0.2" max="3" step="0.01" value="1.0">
     </div>
     <div class="row">
-      <label>입자(그레인) <b id="vGrain">0.5</b></label>
-      <input type="range" id="grain" min="0" max="1.5" step="0.01" value="0.5">
+      <label>입자(그레인) <b id="vGrain">0.45</b></label>
+      <input type="range" id="grain" min="0" max="1.5" step="0.01" value="0.45">
     </div>
 
     <div class="seclabel">컬러 테마</div>
     <div class="chips" id="themes">
       <button data-theme="0" class="active">선셋</button>
-      <button data-theme="1">바이올렛</button>
+      <button data-theme="1">바이올렛·라임</button>
       <button data-theme="2">스프링</button>
       <button data-theme="3">크림</button>
     </div>
@@ -142,13 +162,12 @@
       <button id="rec" class="rec">● 녹화</button>
     </div>
 
+    <div class="seclabel">배경</div>
     <div class="bgrow">
-      <button data-bg="" >흰색</button>
-      <button data-bg="dark" class="active">검정</button>
+      <button data-bg="" class="active">검정</button>
+      <button data-bg="light">흰색</button>
       <button data-bg="checker">체커</button>
     </div>
-
-    <div class="hint">360×800 키스크린 중앙에 R=92dp 두 원이 합쳐지며 컬러가 블렌딩되고, 다시 제자리로 돌아가며 원래 컬러를 유지합니다. ‘녹화’는 알파 포함 .webm으로 저장됩니다.</div>
   </div>
 
 <script>
@@ -162,68 +181,81 @@ void main(){ gl_Position = vec4(a,0.0,1.0); }`;
 
 const FRAG = `
 precision highp float;
-uniform vec2  u_res;       // canvas pixel size
+uniform vec2  u_res;
 uniform float u_time;
-uniform float u_merge;     // max overlap amount 0..1
-uniform float u_soft;      // edge softness multiplier
-uniform float u_grain;     // film grain strength
-// two circles, each with a top & bottom gradient color
-uniform vec3  u_a_top;
-uniform vec3  u_a_bot;
-uniform vec3  u_b_top;
-uniform vec3  u_b_bot;
+uniform float u_merge;
+uniform float u_soft;
+uniform float u_grain;
+uniform float u_edge;     // edge color strength
+// circle L (left) : core gradient + 2 edge colors
+uniform vec3  u_Lc1; uniform vec3 u_Lc2; uniform vec3 u_Le1; uniform vec3 u_Le2;
+// circle R (right)
+uniform vec3  u_Rc1; uniform vec3 u_Rc2; uniform vec3 u_Re1; uniform vec3 u_Re2;
 
 const float LOGW = 360.0;
 const float LOGH = 800.0;
 const float R    = 92.0;   // R = 92dp
+const float PI   = 3.14159265;
 
 float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
 
+// one circle's local color: core vertical gradient + radial edge-color ring
+vec3 circleCol(vec2 P, vec2 c, vec3 c1, vec3 c2, vec3 e1, vec3 e2){
+  vec2 q = P - c;
+  float d = length(q);
+  float rN = clamp(d / R, 0.0, 1.0);
+  float ang = atan(q.y, q.x);
+  // core fill : vertical gradient
+  float tv = clamp((q.y + R) / (2.0*R), 0.0, 1.0);
+  vec3 core = mix(c1, c2, tv);
+  // iridescent edge : two edge colors swept around the rim
+  float ea = 0.5 + 0.5*sin(ang + 0.6);
+  vec3 edge = mix(e1, e2, ea);
+  // radial gradient : edge colors emerge near the outer rim
+  float ring = smoothstep(0.30, 1.0, rN);
+  ring = mix(0.0, ring, u_edge);
+  return mix(core, edge, ring);
+}
+
 void main(){
-  // map fragment to logical 360x800 space (origin top-left)
   vec2 P = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y) * (LOGW / u_res.x);
 
-  // ---- merge timeline: 0 = rest(separated) -> 1 = merged ----
-  float phase = u_time;                       // already scaled by speed on CPU
-  float m = 0.5 - 0.5*cos(phase);             // smooth breathe 0->1->0
-  m = m*m*(3.0-2.0*m);                         // ease
+  // ---- merge timeline : 0 = rest -> 1 = merged ----
+  float m = 0.5 - 0.5*cos(u_time);
+  m = m*m*(3.0-2.0*m);
 
-  // vertical separation of the two centers (half-distance)
-  float restSep  = 118.0;                      // pure, separated colors
-  float mergeSep = mix(118.0, 44.0, u_merge);  // deepest overlap
+  // horizontal half-separation (left/right)
+  float restSep  = 86.0;                       // circles fill the width, near-pure colors
+  float mergeSep = mix(86.0, 34.0, u_merge);    // deep overlap at center
   float sep = mix(restSep, mergeSep, m);
 
-  vec2 cA = vec2(LOGW*0.5, LOGH*0.5 - sep);    // top circle
-  vec2 cB = vec2(LOGW*0.5, LOGH*0.5 + sep);    // bottom circle
+  vec2 cL = vec2(LOGW*0.5 - sep, LOGH*0.5);
+  vec2 cR = vec2(LOGW*0.5 + sep, LOGH*0.5);
 
-  // ---- metaball field for organic merging bridge ----
-  float dA2 = dot(P-cA, P-cA);
-  float dB2 = dot(P-cB, P-cB);
-  float fA = (R*R) / (dA2 + 1.0);
-  float fB = (R*R) / (dB2 + 1.0);
-  float f  = fA + fB;
+  // ---- metaball field : organic merge bridge ----
+  float dL2 = dot(P-cL, P-cL);
+  float dR2 = dot(P-cR, P-cR);
+  float fL = (R*R) / (dL2 + 1.0);
+  float fR = (R*R) / (dR2 + 1.0);
+  float f  = fL + fR;
 
-  // soft surface around field == 1.0
   float e = 0.16 * u_soft;
   float shape = smoothstep(1.0 - e, 1.0 + e, f);
 
-  // ---- per-circle vertical gradient colors ----
-  float tA = clamp((P.y - (cA.y - R)) / (2.0*R), 0.0, 1.0);
-  float tB = clamp((P.y - (cB.y - R)) / (2.0*R), 0.0, 1.0);
-  vec3 colA = mix(u_a_top, u_a_bot, tA);
-  vec3 colB = mix(u_b_top, u_b_bot, tB);
+  // per-circle colors (each keeps its own core + edge identity)
+  vec3 colL = circleCol(P, cL, u_Lc1, u_Lc2, u_Le1, u_Le2);
+  vec3 colR = circleCol(P, cR, u_Rc1, u_Rc2, u_Re1, u_Re2);
 
-  // blend weight from relative field strength -> smooth gradient in the bridge,
-  // pure color near each center, full blend where they meet.
-  float w = fB / (fA + fB + 1e-4);
-  vec3 rgb = mix(colA, colB, w);
+  // blend weight from relative field : pure near each center,
+  // smooth gradient blend in the contact bridge.
+  float w = fR / (fL + fR + 1e-4);
+  vec3 rgb = mix(colL, colR, w);
 
-  // film grain like the reference frames
+  // film grain
   float g = (hash(gl_FragCoord.xy + u_time*60.0) - 0.5) * 0.06 * u_grain;
   rgb += g;
 
-  float alpha = shape;
-  gl_FragColor = vec4(rgb, clamp(alpha, 0.0, 1.0));
+  gl_FragColor = vec4(rgb, clamp(shape, 0.0, 1.0));
 }`;
 
 function compile(type, src){
@@ -245,29 +277,26 @@ const loc = gl.getAttribLocation(prog,'a');
 gl.enableVertexAttribArray(loc);
 gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
-const U = {
-  res:   gl.getUniformLocation(prog,'u_res'),
-  time:  gl.getUniformLocation(prog,'u_time'),
-  merge: gl.getUniformLocation(prog,'u_merge'),
-  soft:  gl.getUniformLocation(prog,'u_soft'),
-  grain: gl.getUniformLocation(prog,'u_grain'),
-  aTop:  gl.getUniformLocation(prog,'u_a_top'),
-  aBot:  gl.getUniformLocation(prog,'u_a_bot'),
-  bTop:  gl.getUniformLocation(prog,'u_b_top'),
-  bBot:  gl.getUniformLocation(prog,'u_b_bot'),
-};
+const U = {};
+['u_res','u_time','u_merge','u_soft','u_grain','u_edge',
+ 'u_Lc1','u_Lc2','u_Le1','u_Le2','u_Rc1','u_Rc2','u_Re1','u_Re2']
+ .forEach(n=> U[n]=gl.getUniformLocation(prog,n));
 
-// ---- color themes derived from the reference images ----
+// ---- color themes (from reference frames): each circle = core1,core2 + edge1,edge2 ----
 const hex = h => [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255];
 const THEMES = [
-  // 0 선셋 : 따뜻한(주황→핑크) + 차가운(바이올렛→블루)
-  { aTop:'#ffb23e', aBot:'#ff5fa2', bTop:'#7b2ff7', bBot:'#3e78e0' },
-  // 1 바이올렛 : 바이올렛 + 라임그린 (IMG_9992)
-  { aTop:'#7b2ff7', aBot:'#9b5cff', bTop:'#c6f25a', bBot:'#6fd0c0' },
-  // 2 스프링 : 라임 + 핑크/마젠타
-  { aTop:'#c6f25a', aBot:'#a6e84e', bTop:'#ff7eb6', bBot:'#ff8a2b' },
-  // 3 크림 : 크림화이트 + 주황 (IMG_9996 / 9994)
-  { aTop:'#f6efe0', aBot:'#bcecee', bTop:'#ffb23e', bBot:'#ff8a2b' },
+  { // 0 선셋 : 따뜻 vs 차가움
+    Lc1:'#ffc24d', Lc2:'#ff7a3c', Le1:'#ff4f9d', Le2:'#ffd36b',
+    Rc1:'#8a4dff', Rc2:'#4f7bff', Re1:'#00d4ff', Re2:'#c9a6ff' },
+  { // 1 바이올렛·라임 (IMG_9992)
+    Lc1:'#7b2ff7', Lc2:'#5b3bff', Le1:'#b66bff', Le2:'#4f6bff',
+    Rc1:'#c6f25a', Rc2:'#7fd86a', Re1:'#fff07a', Re2:'#5fd0b0' },
+  { // 2 스프링
+    Lc1:'#b6f25a', Lc2:'#6fd86a', Le1:'#fff07a', Le2:'#5fd0c0',
+    Rc1:'#ff7eb6', Rc2:'#ff5f8a', Re1:'#ffb86c', Re2:'#c98bff' },
+  { // 3 크림 (IMG_9994/9996) : 크림화이트 + 오렌지, 이리데센트 림
+    Lc1:'#f8f1e2', Lc2:'#e9dcc4', Le1:'#ffc6e0', Le2:'#bfe3ff',
+    Rc1:'#ffb23e', Rc2:'#ff8a2b', Re1:'#ff5f9e', Re2:'#ffd98a' },
 ];
 let theme = THEMES[0];
 
@@ -280,22 +309,22 @@ function resize(){
 }
 window.addEventListener('resize', resize); resize();
 
-// state
-const state = { speed:0.55, merge:0.80, soft:1.0, grain:0.5, playing:true };
+const state = { speed:0.55, merge:0.82, edge:1.0, soft:1.0, grain:0.45, playing:true };
 let simTime = 0, last = performance.now();
 
 function frame(now){
   const dt = Math.min((now-last)/1000, 0.05); last = now;
   if(state.playing) simTime += dt*state.speed;
-  gl.uniform2f(U.res, cv.width, cv.height);
-  gl.uniform1f(U.time, simTime);
-  gl.uniform1f(U.merge, state.merge);
-  gl.uniform1f(U.soft, state.soft);
-  gl.uniform1f(U.grain, state.grain);
-  gl.uniform3fv(U.aTop, hex(theme.aTop));
-  gl.uniform3fv(U.aBot, hex(theme.aBot));
-  gl.uniform3fv(U.bTop, hex(theme.bTop));
-  gl.uniform3fv(U.bBot, hex(theme.bBot));
+  gl.uniform2f(U.u_res, cv.width, cv.height);
+  gl.uniform1f(U.u_time, simTime);
+  gl.uniform1f(U.u_merge, state.merge);
+  gl.uniform1f(U.u_soft, state.soft);
+  gl.uniform1f(U.u_grain, state.grain);
+  gl.uniform1f(U.u_edge, state.edge);
+  gl.uniform3fv(U.u_Lc1, hex(theme.Lc1)); gl.uniform3fv(U.u_Lc2, hex(theme.Lc2));
+  gl.uniform3fv(U.u_Le1, hex(theme.Le1)); gl.uniform3fv(U.u_Le2, hex(theme.Le2));
+  gl.uniform3fv(U.u_Rc1, hex(theme.Rc1)); gl.uniform3fv(U.u_Rc2, hex(theme.Rc2));
+  gl.uniform3fv(U.u_Re1, hex(theme.Re1)); gl.uniform3fv(U.u_Re2, hex(theme.Re2));
   gl.clearColor(0,0,0,0);
   gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -311,8 +340,16 @@ function bind(id, key, label, fmt){
 }
 bind('speed','speed','vSpeed', v=>v.toFixed(2));
 bind('merge','merge','vMerge', v=>v.toFixed(2));
+bind('edge','edge','vEdge', v=>v.toFixed(2));
 bind('soft','soft','vSoft', v=>v.toFixed(2));
 bind('grain','grain','vGrain', v=>v.toFixed(2));
+
+// panel toggle (mobile)
+const panel = $('panel'), toggle = $('toggle');
+toggle.addEventListener('click', ()=>{
+  panel.classList.toggle('open');
+  toggle.textContent = panel.classList.contains('open') ? '✕' : '⚙';
+});
 
 const playBtn = $('play');
 playBtn.addEventListener('click', ()=>{
@@ -321,7 +358,6 @@ playBtn.addEventListener('click', ()=>{
   playBtn.classList.toggle('active', state.playing);
 });
 
-// theme buttons
 document.querySelectorAll('#themes button').forEach(b=>{
   b.addEventListener('click', ()=>{
     document.querySelectorAll('#themes button').forEach(x=>x.classList.remove('active'));
@@ -330,7 +366,6 @@ document.querySelectorAll('#themes button').forEach(b=>{
   });
 });
 
-// background toggle
 const device = $('device');
 document.querySelectorAll('.bgrow button').forEach(b=>{
   b.addEventListener('click', ()=>{
@@ -338,13 +373,6 @@ document.querySelectorAll('.bgrow button').forEach(b=>{
     b.classList.add('active');
     device.className = b.dataset.bg;
   });
-});
-
-// collapse panel
-const panel = $('panel'), chev = $('chev');
-$('head').addEventListener('click', ()=>{
-  panel.classList.toggle('collapsed');
-  chev.textContent = panel.classList.contains('collapsed') ? '▴' : '▾';
 });
 
 // ---- recording (alpha webm) ----
