@@ -102,6 +102,12 @@
   .btns button.active{border-color:var(--accent);color:#fff}
   .btns button.rec.on{background:rgba(255,80,110,.18);border-color:#ff5a6e;color:#ffd0d8}
   .bgidx{font-size:10.5px;color:var(--txt-dim);min-width:34px;text-align:center}
+  .layer{border:1px solid var(--panel-br);border-radius:10px;padding:8px;margin:8px 0;background:rgba(255,255,255,.03)}
+  .lhd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .lhd b{font-size:11px;color:#fff}
+  .lhd .rm{padding:2px 8px;font-size:11px;color:#ff9aa9;background:rgba(255,90,110,.12);
+    border:1px solid rgba(255,90,110,.3);border-radius:6px;cursor:pointer}
+  .lhd .lon{margin-right:6px}
 </style>
 </head>
 <body>
@@ -144,6 +150,14 @@
           <div class="row"><label>Z축 전진(기준점) <b></b></label><input type="range" data-k="zAnchor" min="0" max="1" step="0.01"></div>
           <div class="row"><label>드롭 속도 <b></b></label><input type="range" data-k="dropSpeed" min="0.1" max="3" step="0.01"></div>
           <div class="btns"><button id="dropBtn" class="active">▽ Drop 재생</button><button id="loopBtn">↻ 루프</button></div>
+        </div>
+      </div>
+
+      <!-- BLUR LAYERS -->
+      <div class="sec"><div class="sechd"><span>BLUR LAYERS</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="btns"><button id="addLayer">＋ 레이어 추가</button></div>
+          <div id="layerBox"></div>
         </div>
       </div>
 
@@ -274,6 +288,12 @@ uniform float u_sweepInt,u_sweepWidth,u_sweepSize, u_eyesInt,u_eyesWidth,u_eyesS
 uniform vec3  u_rimColor,u_glintColor,u_sweepColor,u_eyesColor;
 uniform float u_innerOn,u_pulseInt,u_causticsInt,u_edgeFlareInt;
 uniform int   u_bg; uniform sampler2D u_photo; uniform float u_hasPhoto,u_photoAspect;
+// stackable blur layers
+uniform int   u_layerCount;
+uniform int   u_layType[5];   uniform int u_layShape[5];
+uniform float u_layBlur[5];   uniform float u_laySize[5];
+uniform float u_layInt[5];    uniform float u_layOn[5];
+uniform vec2  u_layPos[5];    uniform vec3  u_layColor[5];
 
 const vec2  DP       = vec2(360.0,800.0);
 const vec2  CARD_MIN = vec2(10.0,10.0);
@@ -303,12 +323,11 @@ vec3 bgColor(vec2 uv){
     c=mix(c, pink, 0.25*smoothstep(0.6,0.0,distance(uv,vec2(0.32,0.78))));
     return c;
   }
-  if(u_bg==4){                                   // soft sage frosted
+  if(u_bg==4){                                   // soft sage frosted (smooth, no grain)
     vec3 light=vec3(0.90,0.93,0.88), green=vec3(0.42,0.60,0.40);
     float band=smoothstep(0.1,0.85,1.0-uv.y)*smoothstep(0.0,0.7,uv.x);
     vec3 c=mix(light, green, band*0.7);
     c=mix(c, green, 0.18*smoothstep(0.5,0.0,abs(uv.x-0.35+0.25*uv.y)));
-    c+=(hash(uv*u_res*0.5)-0.5)*0.05;            // grain
     return c;
   }
   vec3 top=vec3(0.83,0.87,0.90), bot=vec3(0.68,0.74,0.80);
@@ -317,12 +336,12 @@ vec3 bgColor(vec2 uv){
   return col;
 }
 
-vec3 blurBg(vec2 uv, float amt){           // frosted backdrop behind a translucent card
+vec3 blurBg(vec2 uv, float amt){           // smooth frosted-glass blur of the background
   if(amt<=0.001) return bgColor(uv);
   float aspect=u_res.x/u_res.y, rad=amt*0.02; vec3 acc=vec3(0.0);
-  for(int i=0;i<10;i++){ float a=float(i)*2.39996; float rr=rad*sqrt((float(i)+0.5)/10.0);
+  for(int i=0;i<18;i++){ float a=float(i)*2.39996; float rr=rad*sqrt((float(i)+0.5)/18.0);
     acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(1.0/aspect,1.0)); }
-  return acc/10.0;
+  return acc/18.0;
 }
 
 float sdCard(vec2 p){
@@ -346,6 +365,12 @@ vec2 lightPos(){
   if(u_lightMode==1) return dirVec(u_lightDir)*(fract(t*0.18)*2.0-1.0); // directional sweep
   return vec2(0.0);                                                     // radial (center)
 }
+float layerMask(vec2 nl, vec2 pos, float size, int shape, float soft){  // rect <-> circle
+  vec2 q=(nl-pos)/max(size,0.05);
+  float dd=(shape==1)? length(q) : max(abs(q.x),abs(q.y));
+  return smoothstep(1.0, 1.0-clamp(soft,0.05,0.95), dd);
+}
+
 vec3 cardBase(vec2 nl){                     // solid / linear / radial / mesh fill
   if(u_cardFill==0) return u_cardColor;
   float ca=cos(u_cardAngle), sa=sin(u_cardAngle);
@@ -396,6 +421,20 @@ void main(){
 
   // ---- card surface (solid / gradient base) ----
   vec3 surf=cardBase(nl);
+
+  // ---- stackable blur layers (frosted patches) ----
+  for(int i=0;i<5;i++){
+    if(i>=u_layerCount) break;
+    if(u_layOn[i]<0.5) continue;
+    if(u_layType[i]==0){                                   // colour blur: blurred BG tinted
+      float m=layerMask(nl,u_layPos[i],u_laySize[i],u_layShape[i],0.55);
+      vec3 bb=blurBg(suv,u_layBlur[i]);
+      surf=mix(surf, mix(bb,u_layColor[i],0.45), m*u_layInt[i]);
+    } else {                                               // light blur: soft additive glow
+      float m=layerMask(nl,u_layPos[i],u_laySize[i],u_layShape[i],0.18+u_layBlur[i]*0.16);
+      surf+=u_layColor[i]*m*u_layInt[i];
+    }
+  }
   surf=mix(surf,u_shadowColor, clamp(u_shadowAmt,0.0,1.0)*(1.0-spot));   // shaded solid
   if(u_layerInner>0.5 || u_trOn<0.5) surf+=lcol*spot*u_lintensity;        // surface light blur
   if(u_sweepType==1){                                                     // colour-blur glow
@@ -503,6 +542,9 @@ const state={
   eyesInt:0.0, eyesColor:'#ffffff', eyesWidth:0.5, eyesSize:0.35,
   innerOn:0, pulseInt:0.3, causticsInt:0.3, edgeFlareInt:0.3,
 };
+state.layers=[
+  {on:true, type:0, shape:1, blur:2.2, size:0.85, intensity:0.7, posx:-0.15, posy:0.15, color:'#bcd9ff'},
+];
 const loc={}; for(const k in META) loc[k]=gl.getUniformLocation(prog,'u_'+k);
 const Uextra={ res:gl.getUniformLocation(prog,'u_res'), time:gl.getUniformLocation(prog,'u_time'),
   prog:gl.getUniformLocation(prog,'u_prog'), bg:gl.getUniformLocation(prog,'u_bg'),
@@ -510,6 +552,17 @@ const Uextra={ res:gl.getUniformLocation(prog,'u_res'), time:gl.getUniformLocati
   photoAspect:gl.getUniformLocation(prog,'u_photoAspect') };
 gl.uniform1i(Uextra.photo,0);
 const hx=h=>{ const n=parseInt(h.slice(1),16); return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255]; };
+
+// blur-layer uniform locations + reusable buffers
+const MAXL=5;
+const Ul={ count:gl.getUniformLocation(prog,'u_layerCount'),
+  type:gl.getUniformLocation(prog,'u_layType'), shape:gl.getUniformLocation(prog,'u_layShape'),
+  blur:gl.getUniformLocation(prog,'u_layBlur'), size:gl.getUniformLocation(prog,'u_laySize'),
+  int:gl.getUniformLocation(prog,'u_layInt'), on:gl.getUniformLocation(prog,'u_layOn'),
+  pos:gl.getUniformLocation(prog,'u_layPos'), color:gl.getUniformLocation(prog,'u_layColor') };
+const bType=new Int32Array(MAXL),bShape=new Int32Array(MAXL),bOn=new Float32Array(MAXL),
+  bBlur=new Float32Array(MAXL),bSize=new Float32Array(MAXL),bInt=new Float32Array(MAXL),
+  bPos=new Float32Array(MAXL*2),bCol=new Float32Array(MAXL*3);
 
 // ---- background management ----
 function makeTex(){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
@@ -575,6 +628,15 @@ function frame(now){
   gl.uniform1f(Uextra.photoAspect,curAspect);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,curTex);
 
+  const N=Math.min(state.layers.length,MAXL);
+  for(let i=0;i<N;i++){ const L=state.layers[i];
+    bType[i]=L.type; bShape[i]=L.shape; bOn[i]=L.on?1:0; bBlur[i]=L.blur; bSize[i]=L.size; bInt[i]=L.intensity;
+    bPos[i*2]=L.posx; bPos[i*2+1]=L.posy; const c=hx(L.color); bCol[i*3]=c[0];bCol[i*3+1]=c[1];bCol[i*3+2]=c[2]; }
+  gl.uniform1i(Ul.count,N);
+  gl.uniform1iv(Ul.type,bType); gl.uniform1iv(Ul.shape,bShape);
+  gl.uniform1fv(Ul.blur,bBlur); gl.uniform1fv(Ul.size,bSize); gl.uniform1fv(Ul.int,bInt); gl.uniform1fv(Ul.on,bOn);
+  gl.uniform2fv(Ul.pos,bPos); gl.uniform3fv(Ul.color,bCol);
+
   for(const k in META){ const t=META[k], l=loc[k]; if(l==null) continue;
     if(t==='f') gl.uniform1f(l,state[k]);
     else if(t==='i') gl.uniform1i(l,state[k]|0);
@@ -618,6 +680,46 @@ document.querySelectorAll('.sechd').forEach(hd=>{
   const toggle=()=>{ const c=sec.classList.toggle('col'); if(exp) exp.textContent=c?'+':'−'; };
   hd.addEventListener('click',e=>{ if(e.target.classList.contains('tg')) return; toggle(); });
 });
+
+// ---- blur layers (dynamic) ----
+const layerBox=document.getElementById('layerBox');
+function renderLayers(){
+  layerBox.innerHTML='';
+  state.layers.forEach((L,i)=>{
+    const el=document.createElement('div'); el.className='layer';
+    el.innerHTML=
+      '<div class="lhd"><b>Layer '+(i+1)+'</b><span>'+
+        '<button class="tg lon'+(L.on?' active':'')+'">ON</button>'+
+        '<button class="rm">✕</button></span></div>'+
+      '<div class="seg lt"><button data-v="0"'+(L.type==0?' class="active"':'')+'>컬러 블러</button>'+
+        '<button data-v="1"'+(L.type==1?' class="active"':'')+'>라이트 블러</button></div>'+
+      '<div class="seg ls"><button data-v="0"'+(L.shape==0?' class="active"':'')+'>네모</button>'+
+        '<button data-v="1"'+(L.shape==1?' class="active"':'')+'>원형</button></div>'+
+      '<div class="cl">Color <input type="color" class="lc" value="'+L.color+'"></div>'+
+      '<div class="row"><label>Blur <b>'+L.blur.toFixed(2)+'</b></label><input type="range" class="lb" min="0" max="5" step="0.01" value="'+L.blur+'"></div>'+
+      '<div class="row"><label>Size <b>'+L.size.toFixed(2)+'</b></label><input type="range" class="lsz" min="0.1" max="2" step="0.01" value="'+L.size+'"></div>'+
+      '<div class="row"><label>Intensity <b>'+L.intensity.toFixed(2)+'</b></label><input type="range" class="li" min="0" max="2" step="0.01" value="'+L.intensity+'"></div>'+
+      '<div class="row"><label>Pos X <b>'+L.posx.toFixed(2)+'</b></label><input type="range" class="lpx" min="-1" max="1" step="0.01" value="'+L.posx+'"></div>'+
+      '<div class="row"><label>Pos Y <b>'+L.posy.toFixed(2)+'</b></label><input type="range" class="lpy" min="-1" max="1" step="0.01" value="'+L.posy+'"></div>';
+    el.querySelector('.lon').onclick=ev=>{ L.on=!L.on; ev.target.classList.toggle('active',L.on); };
+    el.querySelector('.rm').onclick=()=>{ state.layers.splice(i,1); renderLayers(); };
+    el.querySelectorAll('.lt button').forEach(b=>b.onclick=()=>{ L.type=+b.dataset.v;
+      el.querySelectorAll('.lt button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); });
+    el.querySelectorAll('.ls button').forEach(b=>b.onclick=()=>{ L.shape=+b.dataset.v;
+      el.querySelectorAll('.ls button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); });
+    el.querySelector('.lc').oninput=ev=>L.color=ev.target.value;
+    const sl=(cls,key)=>{ const inp=el.querySelector(cls), out=inp.parentElement.querySelector('b');
+      inp.oninput=()=>{ L[key]=parseFloat(inp.value); out.textContent=L[key].toFixed(2); }; };
+    sl('.lb','blur'); sl('.lsz','size'); sl('.li','intensity'); sl('.lpx','posx'); sl('.lpy','posy');
+    layerBox.appendChild(el);
+  });
+}
+document.getElementById('addLayer').onclick=()=>{
+  if(state.layers.length>=MAXL){ return; }
+  state.layers.push({on:true,type:0,shape:1,blur:2.0,size:0.7,intensity:0.7,posx:0,posy:0,color:'#ffd2e0'});
+  renderLayers();
+};
+renderLayers();
 
 // random card colours
 const randHex=()=>'#'+Array.from({length:3},()=>Math.floor(Math.random()*200+30).toString(16).padStart(2,'0')).join('');
