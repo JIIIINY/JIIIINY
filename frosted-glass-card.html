@@ -128,9 +128,19 @@
       <!-- CARD -->
       <div class="sec"><div class="sechd"><span>CARD</span><div class="hr"><button class="exp">−</button></div></div>
         <div class="secbody">
-          <div class="cl">카드 색상 <input type="color" data-k="cardColor"></div>
+          <div class="sub">COLOR</div>
+          <div class="seg" data-k="cardFill">
+            <button data-v="0">Solid</button><button data-v="3">Gradient</button>
+            <button data-v="2">Radial</button><button data-v="1">Linear</button>
+          </div>
+          <div class="cl">Chips
+            <input type="color" data-k="cardColor"><input type="color" data-k="cardColor2"><input type="color" data-k="cardColor3">
+            <button id="randCol" class="exp" style="width:auto;padding:0 8px;margin-left:auto">🎲 Random</button>
+          </div>
+          <div class="row"><label>그라데이션 각도 <b></b></label><input type="range" data-k="cardAngle" min="0" max="6.28" step="0.01"></div>
           <div class="row"><label>카드 알파(투명도) <b></b></label><input type="range" data-k="cardAlpha" min="0" max="1" step="0.01"></div>
           <div class="row"><label>카드 블러(프로스트) <b></b></label><input type="range" data-k="cardBlur" min="0" max="4" step="0.01"></div>
+          <div class="sub">MOTION</div>
           <div class="row"><label>Z축 전진(기준점) <b></b></label><input type="range" data-k="zAnchor" min="0" max="1" step="0.01"></div>
           <div class="row"><label>드롭 속도 <b></b></label><input type="range" data-k="dropSpeed" min="0.1" max="3" step="0.01"></div>
           <div class="btns"><button id="dropBtn" class="active">▽ Drop 재생</button><button id="loopBtn">↻ 루프</button></div>
@@ -250,7 +260,8 @@ const VERT = `attribute vec2 a; void main(){ gl_Position=vec4(a,0.0,1.0); }`;
 const FRAG = `
 precision highp float;
 uniform vec2  u_res; uniform float u_time; uniform float u_prog;
-uniform vec3  u_cardColor; uniform float u_zAnchor; uniform float u_cardAlpha,u_cardBlur;
+uniform vec3  u_cardColor,u_cardColor2,u_cardColor3; uniform int u_cardFill;
+uniform float u_zAnchor, u_cardAlpha,u_cardBlur,u_cardAngle;
 uniform int   u_lightMode; uniform int u_lightDir; uniform int u_sweepType;
 uniform float u_lwidth,u_lsize,u_lblur,u_lintensity,u_shadowAmt,u_langle,u_lspeed,u_glow;
 uniform vec3  u_shadowColor;
@@ -283,6 +294,22 @@ vec3 bgColor(vec2 uv){
     float ca=u_res.x/u_res.y; vec2 t=uv; float s=u_photoAspect/ca;
     if(s>1.0) t.x=(uv.x-0.5)/s+0.5; else t.y=(uv.y-0.5)*s+0.5;
     return texture2D(u_photo, vec2(t.x,1.0-t.y)).rgb;
+  }
+  if(u_bg==3){                                   // pink / deep-green mesh gradient
+    vec3 pink=vec3(0.93,0.80,0.82), rose=vec3(0.86,0.45,0.52), dgrn=vec3(0.04,0.24,0.15), grn=vec3(0.10,0.42,0.28);
+    float a=smoothstep(-0.2,1.1, uv.x+0.35*sin(uv.y*3.1+0.6));
+    float b=smoothstep(0.0,1.0, uv.y*1.1-0.2+0.3*cos(uv.x*2.4));
+    vec3 c=mix(mix(pink,dgrn,a), mix(rose,grn,a), b);
+    c=mix(c, pink, 0.25*smoothstep(0.6,0.0,distance(uv,vec2(0.32,0.78))));
+    return c;
+  }
+  if(u_bg==4){                                   // soft sage frosted
+    vec3 light=vec3(0.90,0.93,0.88), green=vec3(0.42,0.60,0.40);
+    float band=smoothstep(0.1,0.85,1.0-uv.y)*smoothstep(0.0,0.7,uv.x);
+    vec3 c=mix(light, green, band*0.7);
+    c=mix(c, green, 0.18*smoothstep(0.5,0.0,abs(uv.x-0.35+0.25*uv.y)));
+    c+=(hash(uv*u_res*0.5)-0.5)*0.05;            // grain
+    return c;
   }
   vec3 top=vec3(0.83,0.87,0.90), bot=vec3(0.68,0.74,0.80);
   vec3 col=mix(bot,top,uv.y);
@@ -319,6 +346,16 @@ vec2 lightPos(){
   if(u_lightMode==1) return dirVec(u_lightDir)*(fract(t*0.18)*2.0-1.0); // directional sweep
   return vec2(0.0);                                                     // radial (center)
 }
+vec3 cardBase(vec2 nl){                     // solid / linear / radial / mesh fill
+  if(u_cardFill==0) return u_cardColor;
+  float ca=cos(u_cardAngle), sa=sin(u_cardAngle);
+  float t=clamp((nl.x*ca+nl.y*sa)*0.6+0.5,0.0,1.0);
+  if(u_cardFill==1) return mix(u_cardColor,u_cardColor2,t);                       // linear
+  if(u_cardFill==2){ float r=clamp(length(nl)*0.85,0.0,1.0); return mix(u_cardColor,u_cardColor2,r); } // radial
+  float b=clamp(length(nl-vec2(0.35,-0.35))*0.7,0.0,1.0);                         // mesh / gradient
+  return mix(mix(u_cardColor,u_cardColor2,t), u_cardColor3, 1.0-b);
+}
+
 float lightDist2(vec2 nl, vec2 lp){
   vec2 diff=nl-lp; float ca=cos(u_langle),sa=sin(u_langle);
   vec2 rd=vec2(diff.x*ca+diff.y*sa,-diff.x*sa+diff.y*ca);
@@ -357,8 +394,8 @@ void main(){
   vec3 lcol = (u_sweepType==0)? vec3(1.0) : lightTint(u_time*0.06);
   if(u_trOn>0.5) lcol=mix(lcol,u_trColor,0.7);
 
-  // ---- solid card surface ----
-  vec3 surf=u_cardColor;
+  // ---- card surface (solid / gradient base) ----
+  vec3 surf=cardBase(nl);
   surf=mix(surf,u_shadowColor, clamp(u_shadowAmt,0.0,1.0)*(1.0-spot));   // shaded solid
   if(u_layerInner>0.5 || u_trOn<0.5) surf+=lcol*spot*u_lintensity;        // surface light blur
   if(u_sweepType==1){                                                     // colour-blur glow
@@ -440,7 +477,7 @@ gl.vertexAttribPointer(aLoc,2,gl.FLOAT,false,0,0);
 
 // ---- parameter state + metadata (key -> type, uniform = 'u_'+key) ----
 const META={
-  cardColor:'c', zAnchor:'f', cardAlpha:'f', cardBlur:'f',
+  cardColor:'c', cardColor2:'c', cardColor3:'c', cardFill:'i', cardAngle:'f', zAnchor:'f', cardAlpha:'f', cardBlur:'f',
   lightMode:'i', lightDir:'i', sweepType:'i',
   lwidth:'f',lsize:'f',lblur:'f',lintensity:'f',shadowAmt:'f',shadowColor:'c',langle:'f',lspeed:'f',glow:'f',
   trOn:'b',layerInner:'b',layerOuter:'b',trColor:'c',trGlow:'f',trBlur:'f',trBlurColor:'c',softFocus:'f',
@@ -453,7 +490,8 @@ const META={
   innerOn:'b',pulseInt:'f',causticsInt:'f',edgeFlareInt:'f',
 };
 const state={
-  cardColor:'#dfe3ea', zAnchor:0.6, dropSpeed:1.0, cardAlpha:1.0, cardBlur:0.6,
+  cardColor:'#dfe3ea', cardColor2:'#b8c6ff', cardColor3:'#ffd2a6', cardFill:0, cardAngle:0.8,
+  zAnchor:0.6, dropSpeed:1.0, cardAlpha:1.0, cardBlur:0.6,
   lightMode:0, lightDir:3, sweepType:1,
   lwidth:0.5, lsize:0.5, lblur:0.6, lintensity:0.7, shadowAmt:0.35, shadowColor:'#9aa3b2', langle:0.0, lspeed:1.0, glow:0.7,
   trOn:0, layerInner:1, layerOuter:1, trColor:'#ffd2a6', trGlow:0.5, trBlur:0.3, trBlurColor:'#b8c6ff', softFocus:0.3,
@@ -481,12 +519,17 @@ function makeTex(){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); return t; }
 const dummyTex=makeTex();
-const backgrounds=[{type:'gradient'},{type:'checker'}];
-let bgIndex=0, curTex=dummyTex, curBg=0, curHasPhoto=0, curAspect=1.0;
+const backgrounds=[
+  {type:'preset',bg:3,name:'Pink·Green'},
+  {type:'preset',bg:4,name:'Sage'},
+  {type:'preset',bg:0,name:'Blue-grey'},
+  {type:'checker'},
+];
+let bgIndex=0, curTex=dummyTex, curBg=3, curHasPhoto=0, curAspect=1.0;
 const bgIdxEl=document.getElementById('bgIdx');
 function applyBg(){
   const it=backgrounds[bgIndex];
-  if(it.type==='gradient'){ curBg=0; curHasPhoto=0; curTex=dummyTex; }
+  if(it.type==='preset'){ curBg=it.bg; curHasPhoto=0; curTex=dummyTex; }
   else if(it.type==='checker'){ curBg=2; curHasPhoto=0; curTex=dummyTex; }
   else { curBg=1; curHasPhoto=1; curTex=it.tex; curAspect=it.aspect; }
   bgIdxEl.textContent=`${bgIndex+1}/${backgrounds.length}`;
@@ -575,6 +618,13 @@ document.querySelectorAll('.sechd').forEach(hd=>{
   const toggle=()=>{ const c=sec.classList.toggle('col'); if(exp) exp.textContent=c?'+':'−'; };
   hd.addEventListener('click',e=>{ if(e.target.classList.contains('tg')) return; toggle(); });
 });
+
+// random card colours
+const randHex=()=>'#'+Array.from({length:3},()=>Math.floor(Math.random()*200+30).toString(16).padStart(2,'0')).join('');
+document.getElementById('randCol').onclick=()=>{
+  ['cardColor','cardColor2','cardColor3'].forEach(k=>{ state[k]=randHex();
+    const el=document.querySelector('input[type=color][data-k="'+k+'"]'); if(el) el.value=state[k]; });
+};
 
 // drop / loop / playback
 document.getElementById('dropBtn').onclick=()=>{ prog2=0; };
