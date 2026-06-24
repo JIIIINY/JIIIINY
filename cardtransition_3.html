@@ -279,11 +279,20 @@ const GLASS={ frost:1.0, bgBlur:0.0, quad:0.6, solid:0.7,   // 면 블러 / 배�
       eyes: { int:0.4, color:'#ffffff', width:0.3, size:1.0 } },
     inner:{ on:0, pulse:0.4, caustics:0.4, edgeFlare:0.4 }
   } };
-function randomCard(){ const rnd=(a,b)=>a+Math.random()*(b-a); GLASS.frost=rnd(0,2); GLASS.bgBlur=rnd(0,1.5); GLASS.quad=rnd(0,1); GLASS.solid=rnd(0.3,1);
-  GLASS.dropMode=Math.floor(rnd(0,3)); GLASS.dropSpeed=rnd(0.4,2.2);
-  GLASS.cardType=Math.floor(rnd(0,3)); const set=CARD_PRESETS[Math.floor(rnd(0,CARD_PRESETS.length))]; GLASS.cardC1=set[0]; GLASS.cardC2=set[1]; GLASS.cardC3=set[2];
-  const rc=()=>'#'+[0,0,0].map(()=>Math.floor(rnd(80,255)).toString(16).padStart(2,'0')).join('');
-  GLASS.layers.forEach(L=>{ L.mode=Math.floor(rnd(0,3)); L.sweep=Math.floor(rnd(0,2)); L.dir=Math.floor(rnd(0,8)); L.spin=Math.floor(rnd(0,3)); L.bright=rnd(0.3,1.2); L.intensity=rnd(0.5,1.5); L.width=rnd(0.15,0.8); L.thick=rnd(0.003,0.02); L.blur=rnd(0.2,1.2); L.speed=rnd(0.2,2.5); L.size=rnd(0.5,1.8); L.glow=rnd(0,0.8); L.soft=rnd(0,0.6); L.shadow=rnd(0,0.5); L.angle=Math.floor(rnd(0,360)); L.col=rc(); L.blurCol=rc(); }); }
+function _rnd(a,b){ return a+Math.random()*(b-a); }
+function _rc(){ return '#'+[0,0,0].map(()=>Math.floor(_rnd(80,255)).toString(16).padStart(2,'0')).join(''); }
+function randLight(L){ L.mode=Math.floor(_rnd(0,3)); L.sweep=Math.floor(_rnd(0,2)); L.dir=Math.floor(_rnd(0,8)); L.spin=Math.floor(_rnd(0,3)); L.bright=_rnd(0.3,1.2); L.intensity=_rnd(0.5,1.5); L.width=_rnd(0.15,0.8); L.thick=_rnd(0.003,0.02); L.blur=_rnd(0.2,1.2); L.speed=_rnd(0.2,2.5); L.size=_rnd(0.5,1.8); L.glow=_rnd(0,0.8); L.soft=_rnd(0,0.6); L.shadow=_rnd(0,0.5); L.angle=Math.floor(_rnd(0,360)); L.col=_rc(); L.blurCol=_rc(); }
+function randCardLayer(L){ L.type=Math.floor(_rnd(0,3)); L.intensity=_rnd(0.2,1.3); L.width=_rnd(0.1,0.9); const H=Math.random()*360; L.c1=hsl2hex(H,0.5,0.66); L.c2=hsl2hex(H+30,0.5,0.66); L.c3=hsl2hex(H+180,0.5,0.6); }
+function randShapeMask(m){ m.type=Math.floor(_rnd(0,3)); m.opacity=_rnd(0.2,0.9); m.blur=_rnd(0.1,0.7); m.angle=Math.floor(_rnd(0,360)); m.cx=_rnd(-0.6,0.6); m.cy=_rnd(-0.6,0.6); m.sx=_rnd(0.3,1.1); m.sy=_rnd(0.3,1.1); m.invert=Math.random()<0.4?1:0; }
+function randomCard(){ const rnd=_rnd; GLASS.frost=rnd(0,2); GLASS.bgBlur=rnd(0,1.2); GLASS.quad=rnd(0,1); GLASS.solid=rnd(0.2,1); GLASS.cardAlpha=rnd(0.4,1);
+  GLASS.cardSize=rnd(0.85,1.15); GLASS.cardRound=rnd(0.3,1.3);
+  GLASS.dropMode=Math.floor(rnd(0,4)); GLASS.dropSpeed=rnd(0.4,2.2);
+  GLASS.zoneBlur=[0,0,0,0,0,0].map(()=>Math.random()<0.5?0:rnd(0,2));
+  GLASS.fbAmt=Math.random()<0.5?0:rnd(0.3,2); GLASS.fbSize=rnd(0.2,1); GLASS.fbSpeed=rnd(0.3,2);
+  GLASS.cardType=Math.floor(rnd(0,4)); const set=CARD_PRESETS[Math.floor(rnd(0,CARD_PRESETS.length))]; GLASS.cardC1=set[0]; GLASS.cardC2=set[1]; GLASS.cardC3=set[2];
+  (GLASS.cardLayers||[]).forEach(randCardLayer);
+  (GLASS.shapeMasks||[]).forEach(randShapeMask);
+  (GLASS.layers||[]).forEach(randLight); }
 const CARD_PRESETS=[
   ['#ffffff','#c9b8ff','#bdeef0'], ['#ffd2f0','#c9b8ff','#bdeef0'], ['#a7c0dc','#beafe5','#c8d7a1'],
   ['#ffb37a','#ff7eb0','#7ad0ff'], ['#88e6e3','#8bbdff','#f0f488'], ['#2a2340','#3a2a55','#123a4a'],
@@ -1009,7 +1018,7 @@ function refreshArtUI(){ if(!artInputs) return;
 // 코드 블록
 // #3 카드 빛 컨트롤 (기본 + FX 그룹: Transition/Iridescent/SurfaceFX/Inner FX)
 /* ===== 카드 패널 공용 컨트롤(모듈 스코프) ===== */
-const _fmtN=st=>(st<0.01?3:(st<1?2:0));
+function _fmtN(st){ return st<0.01?3:(st<1?2:0); }
 function oSlider(parent,obj,key,label,min,max,step,dflt){ if(obj[key]==null)obj[key]=dflt; const r=document.createElement('div'); r.className='row';
   const l=document.createElement('label'); const b=document.createElement('b'); b.textContent=(+obj[key]).toFixed(_fmtN(step)); l.textContent=label; l.appendChild(b);
   const s=document.createElement('input'); s.type='range'; s.min=min; s.max=max; s.step=step; s.value=obj[key]; s.style.cssText='width:100%';
@@ -1110,6 +1119,8 @@ function shapeMaskPanel(wrap,m,idx){ const box=document.createElement('div'); bo
   if(t===2){ oSlider(box,m,'sx','가로 반경',0.1,1.5,0.01,0.7); oSlider(box,m,'sy','세로 반경',0.1,1.5,0.01,0.5); oSlider(box,m,'angle','회전(°)',0,360,1,0); }
   { const ib=document.createElement('button'); ib.className='b'+(m.invert?' on':''); ib.style.marginTop='4px'; ib.textContent='invert(안팎 반전): '+(m.invert?'ON':'OFF');
     ib.onclick=()=>{ m.invert=m.invert?0:1; ib.className='b'+(m.invert?' on':''); ib.textContent='invert(안팎 반전): '+(m.invert?'ON':'OFF'); if(codeReady) refreshCode(); }; box.appendChild(ib); }
+  { const rb=document.createElement('button'); rb.className='b acc2'; rb.style.marginTop='4px'; rb.textContent='🎲 이 마스크 랜덤';
+    rb.onclick=()=>{ randShapeMask(m); rebuildGlassPanel(); if(codeReady) refreshCode(); }; box.appendChild(rb); }
   wrap.appendChild(box); }
 function cardLayerPanel(wrap,L,idx){ const box=document.createElement('div'); box.style.cssText='border:1px solid #2f2f37;border-radius:10px;padding:8px;margin:7px 0;background:#161619';
   const hd=document.createElement('div'); hd.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px';
@@ -1126,8 +1137,8 @@ function cardLayerPanel(wrap,L,idx){ const box=document.createElement('div'); bo
     w.appendChild(l); w.appendChild(ci); cwrap.appendChild(w); pickers.push(ci); });
   oSlider(box,L,'intensity','세기',0,1.5,0.01,0.6);
   oSlider(box,L,'width','엣지 폭(안쪽)',0.02,1,0.01,0.35);
-  const rb=document.createElement('button'); rb.className='b acc2'; rb.style.marginTop='4px'; rb.textContent='🎲 색상 랜덤';
-  rb.onclick=()=>{ const H=Math.random()*360,s=0.35+Math.random()*0.5,l=0.55+Math.random()*0.3,d=24+Math.random()*40; L.c1=hsl2hex(H,s,l); L.c2=hsl2hex(H+d,s*0.9,Math.min(0.95,l*1.05)); L.c3=hsl2hex(H+180,s*0.8,l); pickers[0].value=L.c1;pickers[1].value=L.c2;pickers[2].value=L.c3; if(codeReady) refreshCode(); };
+  const rb=document.createElement('button'); rb.className='b acc2'; rb.style.marginTop='4px'; rb.textContent='🎲 이 레이어 랜덤';
+  rb.onclick=()=>{ randCardLayer(L); rebuildGlassPanel(); if(codeReady) refreshCode(); };
   box.appendChild(rb); wrap.appendChild(box); }
 
 /* ===== 탭3: 카드 내부 라이팅 (Transition/Iridescent/SurfaceFX/Inner FX) ===== */
@@ -1179,6 +1190,8 @@ function layerPanel(wrap,L,idx){ const box=document.createElement('div'); box.st
   oSlider(box,L,'shadow','Shadow amount',0,1,0.01,0);
   const cwrap=document.createElement('div'); cwrap.style.cssText='display:flex;flex-wrap:wrap;margin-top:4px'; box.appendChild(cwrap);
   oColor(cwrap,L,'col','Color','#ffffff'); oColor(cwrap,L,'blurCol','Blur color','#cfe0ff'); oColor(cwrap,L,'shadCol','Shadow color','#000000');
+  { const rb=document.createElement('button'); rb.className='b acc2'; rb.style.marginTop='2px'; rb.textContent='🎲 이 레이어 랜덤';
+    rb.onclick=()=>{ randLight(L); rebuildGlassPanel(); if(codeReady) refreshCode(); }; box.appendChild(rb); }
   wrap.appendChild(box); }
 function buildIridescent(parent,FX){ oOnoff(parent,FX.iridescent,'Iridescent'); const o=FX.iridescent;
   oSlider(parent,o,'intensity','Color-intensity',0,1.5,0.01,0.5);
@@ -1435,8 +1448,11 @@ function applyConfig(txt){ const o=JSON.parse(txt);
     if(!Array.isArray(GLASS.zoneBlur)||GLASS.zoneBlur.length<6) GLASS.zoneBlur=[0,0,0,0,0,0];
     GLASS.cardLayers=(Array.isArray(o.glass.cardLayers)?o.glass.cardLayers:GLASS.cardLayers||[]).map(L=>Object.assign(newCardLayer(),L));   // 카드 엣지 마스크 레이어 보강
     // 형태 마스크: 신규 shapeMasks 배열 우선, 없으면 구 shapeMask(단일, on이면 1레이어로 변환)
-    let smSrc = Array.isArray(o.glass.shapeMasks)?o.glass.shapeMasks : (Array.isArray(GLASS.shapeMasks)?GLASS.shapeMasks:null);
-    if(!smSrc){ const old=o.glass.shapeMask||GLASS.shapeMask; smSrc = (old&&old.on)? [old] : []; }
+    let smSrc;
+    if(Array.isArray(o.glass.shapeMasks)) smSrc=o.glass.shapeMasks;
+    else if(o.glass.shapeMask && o.glass.shapeMask.on) smSrc=[o.glass.shapeMask];   // 구 단일 마스크 → 1레이어 변환
+    else if(Array.isArray(GLASS.shapeMasks)) smSrc=GLASS.shapeMasks;
+    else smSrc=[];
     GLASS.shapeMasks = smSrc.map(m=>Object.assign(newShapeMask(m.type||0),m)); delete GLASS.shapeMask;
     if(GLASS.fbAmt==null) GLASS.fbAmt=0; if(GLASS.fbSize==null) GLASS.fbSize=0.4; if(GLASS.fbSpeed==null) GLASS.fbSpeed=1.0;
     GLASS.layers=(GLASS.layers||[]).map(L=>Object.assign(newLight(L.type||0),L));   // 누락 필드 보강
