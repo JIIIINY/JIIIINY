@@ -235,7 +235,7 @@ function newLight(type){ return { type:type||0, mode:0, sweep:0, dir:3, spin:0,
   glow:0.4, soft:0.0, shadow:0.0, shadCol:'#000000', angle:0, speed:1.0,
   col:(type?'#88bbff':'#ffffff'), blurCol:(type?'#5a78ff':'#cfe0ff') }; }
 const GLASS={ frost:1.0, bgBlur:0.0, quad:0.6, solid:0.7,   // 면 블러 / 배경 블러 / 우측 추가블러 / 고체감(기체→고체)
-  icons:0,                                                   // 하단 아이콘 원형 4개 표시(기본 off=삭제)
+  icons:0, cardAlpha:1.0,                                     // 하단 아이콘 표시(기본 off) / 카드 알파(투명도)
   dropMode:0, dropSpeed:1.0,                                 // 카드 등장: 0 위→아래 / 1 Z앞으로 / 2 둘다 + 속도
   disp:0.0, cardWarp:0.0, cardWarpFreq:6,                    // (구) 리퀴드 값 — 미사용(코드 호환용)
   cardType:0, cardC1:'#ffffff', cardC2:'#c9b8ff', cardC3:'#bdeef0',     // 카드 색(솔리드/리니어/래디얼)
@@ -408,7 +408,7 @@ uniform float u_frost,u_tint;          // u_frost=면 블러, u_tint=고체감(0
 uniform vec2 u_cardC,u_cardH; uniform float u_cardRT,u_cardRB;
 uniform vec2 u_circ[4]; uniform float u_circR;
 uniform float u_time;
-uniform float u_bgBlur,u_quad,u_cardType,u_icons; // bg블러 / 우측 추가블러 / 카드색 타입 / 하단 아이콘 4개 표시
+uniform float u_bgBlur,u_quad,u_cardType,u_icons,u_cardAlpha; // bg블러 / 우측 추가블러 / 카드색 타입 / 아이콘 표시 / 카드 알파
 uniform vec3 u_anim;                             // 카드 등장 애니메이션 (offX, offY, scale)
 uniform vec3 u_cardC1,u_cardC2,u_cardC3;          // 카드색 1·2·3
 // ===== Transition: 라이트 레이어(0=외곽,1=내부) =====
@@ -436,9 +436,10 @@ vec3 hueRot(vec3 c,float deg){ float a=radians(deg),ca=cos(a),sa=sin(a);
   float I2=I*ca-Q*sa,Q2=I*sa+Q*ca; return clamp(vec3(Y+0.956*I2+0.621*Q2,Y-0.272*I2-0.647*Q2,Y-1.106*I2+1.703*Q2),0.0,1.0); }
 vec3 satAdj(vec3 c,float s){ float l=dot(c,vec3(0.299,0.587,0.114)); return clamp(mix(vec3(l),c,s),0.0,1.0); }
 vec3 iriPal(float t){ return 0.5+0.5*cos(6.28318*(t+vec3(0.0,0.33,0.67))); }
-vec3 cardTintCol(vec2 lp){ if(u_cardType<0.5) return u_cardC1;
-  if(u_cardType<1.5){ float gx=clamp(0.5+(lp.x+lp.y)/(u_cardH.x+u_cardH.y+1e-4),0.0,1.0); return mix(u_cardC1,u_cardC2,gx); }
-  float rr=clamp(length(lp/(u_cardH+1e-4)),0.0,1.0); return mix(mix(u_cardC1,u_cardC2,rr),u_cardC3,smoothstep(0.6,1.0,rr)*0.5); }
+vec3 cardTintCol(vec2 lp){ if(u_cardType<0.5) return u_cardC1;                                  // 0 솔리드
+  if(u_cardType<1.5){ float gx=clamp(0.5+(lp.x+lp.y)/(u_cardH.x+u_cardH.y+1e-4),0.0,1.0); return mix(u_cardC1,u_cardC2,gx); }  // 1 리니어
+  if(u_cardType<2.5){ float rr=clamp(length(lp/(u_cardH+1e-4)),0.0,1.0); return mix(mix(u_cardC1,u_cardC2,rr),u_cardC3,smoothstep(0.6,1.0,rr)*0.5); }  // 2 래디얼
+  float gg=mod(atan(lp.y,lp.x)/6.28318+0.5,1.0); return mix(mix(u_cardC1,u_cardC2,smoothstep(0.0,0.5,gg)),u_cardC3,smoothstep(0.5,1.0,gg)); }  // 3 그라데이션(conic)
 float h21(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
 float gnoise(vec2 p){ vec2 i=floor(p),f=fract(p); float a=h21(i),b=h21(i+vec2(1.,0.)),c=h21(i+vec2(0.,1.)),d=h21(i+vec2(1.,1.)); vec2 u=f*f*(3.0-2.0*f); return mix(mix(a,b,u.x),mix(c,d,u.x),u.y); }
 float gfbm(vec2 p){ float v=0.0,amp=0.5; for(int i=0;i<4;i++){ v+=amp*gnoise(p); p=p*2.0+vec2(11.3,7.1); amp*=0.5; } return v; }
@@ -480,7 +481,7 @@ void main(){
   col=mix(vec3(dot(col,vec3(0.333))), col, 0.86);
   col=mix(col, mix(col,vec3(1.0),0.10), cardRight*u_quad*0.7);
   col*=1.0-0.10*exp(-pow(max(-d,0.0)/0.02,2.0));
-  vec3 outc=mix(base,col,inside);
+  vec3 outc=mix(base,col,inside*clamp(u_cardAlpha,0.0,1.0));   // 카드 알파(투명도)
 
   vec2 ln=(Pc-u_cardC)/(u_cardH+1e-4);   // 카드 로컬 좌표(중심0, 가장자리 ±1)
 
@@ -576,7 +577,7 @@ let glassReady=false; const GU={}; let gtex=null;
   const gvb=gg.createBuffer(); gg.bindBuffer(gg.ARRAY_BUFFER,gvb); gg.bufferData(gg.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gg.STATIC_DRAW);
   const ga=gg.getAttribLocation(gp,'a_pos'); gg.enableVertexAttribArray(ga); gg.vertexAttribPointer(ga,2,gg.FLOAT,false,0,0);
   { const arrs=['u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol'];
-    ['u_res','u_bg','u_frost','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_bgBlur','u_quad','u_cardType','u_icons','u_anim','u_cardC1','u_cardC2','u_cardC3',
+    ['u_res','u_bg','u_frost','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_bgBlur','u_quad','u_cardType','u_icons','u_cardAlpha','u_anim','u_cardC1','u_cardC2','u_cardC3',
      'u_transOn','u_lN','u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol',
      'u_iriOn','u_iriInt','u_iriHue','u_iriHueShift','u_iriSat','u_iriSharp','u_iriWobble','u_iriDir',
      'u_sfxOn','u_rimInt','u_rimW','u_rimS','u_rimC','u_glintInt','u_glintW','u_glintS','u_glintC','u_swInt','u_swW','u_swS','u_swC','u_eyeInt','u_eyeW','u_eyeS','u_eyeC',
@@ -608,7 +609,7 @@ function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCan
   // 카드 등장 애니메이션(위→아래 / Z앞으로 / 둘다) — 루프
   { const A=cardAnim(t||0); gg.uniform3f(GU.u_anim,A.ox,A.oy,A.sc); }
   const k1=hexToRGB(GLASS.cardC1),k2=hexToRGB(GLASS.cardC2),k3=hexToRGB(GLASS.cardC3);
-  gg.uniform1f(GU.u_cardType,GLASS.cardType); gg.uniform1f(GU.u_icons,GLASS.icons?1:0); gg.uniform3f(GU.u_cardC1,k1[0],k1[1],k1[2]); gg.uniform3f(GU.u_cardC2,k2[0],k2[1],k2[2]); gg.uniform3f(GU.u_cardC3,k3[0],k3[1],k3[2]);
+  gg.uniform1f(GU.u_cardType,GLASS.cardType); gg.uniform1f(GU.u_icons,GLASS.icons?1:0); gg.uniform1f(GU.u_cardAlpha,GLASS.cardAlpha==null?1:GLASS.cardAlpha); gg.uniform3f(GU.u_cardC1,k1[0],k1[1],k1[2]); gg.uniform3f(GU.u_cardC2,k2[0],k2[1],k2[2]); gg.uniform3f(GU.u_cardC3,k3[0],k3[1],k3[2]);
   // ===== Transition: 빛 레이어 배열 업로드(최대 6) =====
   const fx=GLASS.fx||{};
   gg.uniform1f(GU.u_transOn,(fx.transition&&fx.transition.on)?1:0);
@@ -941,19 +942,18 @@ function buildGlassBlock(p){
     b.onclick=()=>{ obj.on=obj.on?0:1; b.className='b'+(obj.on?' on':''); b.textContent=label+': '+(obj.on?'ON':'OFF'); if(codeReady) refreshCode(); }; parent.appendChild(b); };
   const sl=(label,key,min,max,step)=>objSlider(p,GLASS,key,label,min,max,step,GLASS[key]);
 
-  // ===== 기본(Base): 면 블러/고체감 · 등장 애니메이션 · 카드 컬러 =====
-  p.appendChild(secTitle('면 블러 / 고체감'));
-  sl('면 블러(프로스트)','frost',0,3,0.01);
+  // ===== 기본(Base): 고체감/추가 블러 · 등장 애니메이션 · 카드 컬러 =====
+  p.appendChild(secTitle('고체감 / 추가 블러'));
+  sl('고체감 (기체→고체)','solid',0,1,0.01);
   sl('우측 추가 블러','quad',0,1,0.01);
   sl('배경 블러 강도','bgBlur',0,3,0.01);
-  sl('고체감 (기체→고체)','solid',0,1,0.01);
   p.appendChild(secTitle('카드 등장 애니메이션 (기준점)'));
   objBtns(p,GLASS,'dropMode',[[0,'위→아래'],[1,'Z 앞으로'],[2,'둘 다'],[3,'고정']]);
   sl('등장 속도','dropSpeed',0.1,3,0.05);
   { const ib=document.createElement('button'); ib.className='b'+(GLASS.icons?' on':''); ib.style.marginTop='6px'; ib.textContent='하단 아이콘 4개: '+(GLASS.icons?'표시':'삭제');
     ib.onclick=()=>{ GLASS.icons=GLASS.icons?0:1; ib.className='b'+(GLASS.icons?' on':''); ib.textContent='하단 아이콘 4개: '+(GLASS.icons?'표시':'삭제'); if(codeReady) refreshCode(); }; p.appendChild(ib); }
-  p.appendChild(secTitle('카드 컬러 (솔리드/리니어/래디얼)'));
-  objBtns(p,GLASS,'cardType',[[0,'솔리드'],[1,'리니어'],[2,'래디얼']]);
+  p.appendChild(secTitle('카드 색상 / 블러 / 알파'));
+  objBtns(p,GLASS,'cardType',[[0,'솔리드'],[3,'그라데이션'],[2,'RADIAL'],[1,'LINEAR']]);
   const chipWrap=document.createElement('div'); chipWrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin:6px 0'; p.appendChild(chipWrap);
   const cardPickers=[];
   CARD_PRESETS.forEach(set=>{ const sw=document.createElement('button'); sw.title=set.join(' ');
@@ -964,6 +964,12 @@ function buildGlassBlock(p){
     const l=document.createElement('label'); l.style.cssText='font-size:11px;color:#b9b9c0;display:block;margin-bottom:3px'; l.textContent=lab;
     const ci=document.createElement('input'); ci.type='color'; ci.value=GLASS[k]; ci.oninput=()=>{ GLASS[k]=ci.value; if(codeReady) refreshCode(); };
     w.appendChild(l); w.appendChild(ci); ccw.appendChild(w); cardPickers.push(ci); }); p.appendChild(ccw);
+  { const rb=document.createElement('button'); rb.className='b acc2'; rb.style.marginTop='6px'; rb.textContent='🎲 카드 색상 랜덤';
+    rb.onclick=()=>{ const H=Math.random()*360,s=0.30+Math.random()*0.5,l=0.55+Math.random()*0.3,d=20+Math.random()*40;
+      GLASS.cardC1=hsl2hex(H,s,l); GLASS.cardC2=hsl2hex(H+d,s*0.9,Math.min(0.95,l*1.05)); GLASS.cardC3=hsl2hex(H+180,s*0.8,l);
+      cardPickers.forEach((ci,i)=>ci.value=GLASS['cardC'+(i+1)]); if(codeReady) refreshCode(); }; p.appendChild(rb); }
+  sl('블러 강도','frost',0,3,0.01);
+  sl('알파값 (투명도)','cardAlpha',0,1,0.01);
 
   // ===== 카드 내부 라이트 FX (그룹별 on/off + 파라미터) =====
   GLASS.fx=GLASS.fx||{}; const FX=GLASS.fx;
@@ -1273,7 +1279,7 @@ function refreshCode(){ if(codeBox && document.activeElement!==codeBox) codeBox.
 // screens 코드 → 전체 교체 / pages 코드 → 현재 화면 교체 / 단일 장면 → 현재 페이지에만 반영
 function applyConfig(txt){ const o=JSON.parse(txt);
   if(o.glass){ const lay=Array.isArray(o.glass.layers)?o.glass.layers.map(L=>Object.assign(newLight(L.type||0),L)):null; Object.assign(GLASS,o.glass); if(lay) GLASS.layers=lay;
-    if(GLASS.solid==null) GLASS.solid=0.7; if(GLASS.dropMode==null) GLASS.dropMode=0; if(GLASS.dropSpeed==null) GLASS.dropSpeed=1.0; if(GLASS.icons==null) GLASS.icons=0;
+    if(GLASS.solid==null) GLASS.solid=0.7; if(GLASS.dropMode==null) GLASS.dropMode=0; if(GLASS.dropSpeed==null) GLASS.dropSpeed=1.0; if(GLASS.icons==null) GLASS.icons=0; if(GLASS.cardAlpha==null) GLASS.cardAlpha=1.0;
     GLASS.layers=(GLASS.layers||[]).map(L=>Object.assign(newLight(L.type||0),L));   // 누락 필드 보강
     // FX 그룹 기본값 보강(없으면 기본, 있으면 병합)
     const dfx={ transition:{on:1}, iridescent:{on:0,intensity:0.5,hue:0,hueShift:0.2,sat:1.0,sharpness:0.5,wobble:0.3,direction:0},
