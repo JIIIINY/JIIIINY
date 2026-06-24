@@ -31,7 +31,7 @@
 
   /* control panel */
   #panel{
-    position:fixed;left:16px;top:16px;bottom:16px;z-index:10;
+    position:fixed;right:16px;top:16px;bottom:16px;z-index:10;
     width:264px;padding:0;
     background:var(--panel-bg);
     border:1px solid var(--panel-br);
@@ -52,8 +52,12 @@
   .sec{border-top:1px solid rgba(255,255,255,.06);padding:9px 0}
   .sec:first-child{border-top:none}
   .sechd{display:flex;align-items:center;justify-content:space-between;cursor:pointer}
-  .sechd span{font-size:11px;font-weight:700;letter-spacing:.06em;color:#fff}
-  .sechd .ch{font-size:10px;color:var(--txt-dim);margin-left:6px}
+  .sechd>span{font-size:11px;font-weight:700;letter-spacing:.06em;color:#fff}
+  .hr{display:flex;align-items:center;gap:7px}
+  .exp{width:20px;height:20px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:700;line-height:1;color:var(--txt-dim);
+    background:rgba(255,255,255,.06);border:1px solid var(--panel-br);border-radius:6px;cursor:pointer}
+  .exp:hover{background:rgba(255,255,255,.13);color:#fff}
   .secbody{margin-top:8px}
   .sec.col .secbody{display:none}
   .sec.off .secbody{opacity:.34;pointer-events:none}
@@ -109,7 +113,7 @@
     <div id="pscroll">
 
       <!-- BACKGROUND -->
-      <div class="sec"><div class="sechd"><span>BACKGROUND</span><span class="ch">▾</span></div>
+      <div class="sec"><div class="sechd"><span>BACKGROUND</span><div class="hr"><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="btns">
             <button id="bgUp">＋ 업로드</button>
@@ -122,7 +126,7 @@
       </div>
 
       <!-- CARD -->
-      <div class="sec"><div class="sechd"><span>CARD</span><span class="ch">▾</span></div>
+      <div class="sec"><div class="sechd"><span>CARD</span><div class="hr"><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="cl">카드 색상 <input type="color" data-k="cardColor"></div>
           <div class="row"><label>Z축 전진(기준점) <b></b></label><input type="range" data-k="zAnchor" min="0" max="1" step="0.01"></div>
@@ -132,7 +136,7 @@
       </div>
 
       <!-- LIGHT -->
-      <div class="sec"><div class="sechd"><span>LIGHT</span><span class="ch">▾</span></div>
+      <div class="sec"><div class="sechd"><span>LIGHT</span><div class="hr"><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="sub">LIGHT MODE</div>
           <div class="seg" data-k="lightMode">
@@ -160,7 +164,7 @@
       </div>
 
       <!-- TRANSITION -->
-      <div class="sec"><div class="sechd"><span>TRANSITION</span><span class="tg" data-k="trOn">ON</span></div>
+      <div class="sec"><div class="sechd"><span>TRANSITION</span><div class="hr"><span class="tg" data-k="trOn">ON</span><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="seg">
             <button class="tg" data-k="layerInner">Inner layer</button>
@@ -175,7 +179,7 @@
       </div>
 
       <!-- IRIDESCENT -->
-      <div class="sec"><div class="sechd"><span>IRIDESCENT</span><span class="tg" data-k="irOn">ON</span></div>
+      <div class="sec"><div class="sechd"><span>IRIDESCENT</span><div class="hr"><span class="tg" data-k="irOn">ON</span><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="sub">COLOR</div>
           <div class="row"><label>Intensity <b></b></label><input type="range" data-k="irInt" min="0" max="2" step="0.01"></div>
@@ -190,7 +194,7 @@
       </div>
 
       <!-- SURFACE FX -->
-      <div class="sec"><div class="sechd"><span>SURFACE FX</span><span class="tg" data-k="sfOn">ON</span></div>
+      <div class="sec"><div class="sechd"><span>SURFACE FX</span><div class="hr"><span class="tg" data-k="sfOn">ON</span><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="sub">RIM</div>
           <div class="row"><label>Int <b></b></label><input type="range" data-k="rimInt" min="0" max="2" step="0.01"></div>
@@ -216,7 +220,7 @@
       </div>
 
       <!-- INNER FX -->
-      <div class="sec"><div class="sechd"><span>INNER FX</span><span class="tg" data-k="innerOn">ON</span></div>
+      <div class="sec"><div class="sechd"><span>INNER FX</span><div class="hr"><span class="tg" data-k="innerOn">ON</span><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="row"><label>Inner pulse <b></b></label><input type="range" data-k="pulseInt" min="0" max="2" step="0.01"></div>
           <div class="row"><label>Caustics <b></b></label><input type="range" data-k="causticsInt" min="0" max="2" step="0.01"></div>
@@ -225,7 +229,7 @@
       </div>
 
       <!-- EXPORT -->
-      <div class="sec"><div class="sechd"><span>PLAYBACK</span><span class="ch">▾</span></div>
+      <div class="sec"><div class="sechd"><span>PLAYBACK</span><div class="hr"><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="btns"><button id="play" class="active">⏸ 정지</button><button id="rec" class="rec">● 녹화</button></div>
         </div>
@@ -366,8 +370,8 @@ void main(){
     float edge=exp(-pow(d/max(u_rimWidth*9.0,1.0),2.0));
     surf+=u_rimColor*edge*u_rimInt*(0.6+0.4*u_rimSize);                   // rim
     vec2 toL=normalize(Lp-nl+1e-5);
-    float gl_=pow(max(dot(n,toL),0.0),mix(7.0,1.5,u_glintSize))*exp(-pow(d/max(u_glintWidth*9.0,1.0),2.0));
-    surf+=u_glintColor*gl_*u_glintInt;                                    // glint
+    float gln=pow(max(dot(n,toL),0.0),mix(7.0,1.5,u_glintSize))*exp(-pow(d/max(u_glintWidth*9.0,1.0),2.0));
+    surf+=u_glintColor*gln*u_glintInt;                                    // glint
     float proj=nl.x*0.7+nl.y*0.7, bandPos=sin(u_time*u_sweepSize);
     float band=exp(-pow((proj-bandPos)/max(u_sweepWidth*0.5,0.03),2.0));
     surf+=u_sweepColor*band*u_sweepInt*inside;                            // sweep band
@@ -400,12 +404,22 @@ void main(){
   gl_FragColor=vec4(outc,1.0);
 }`;
 
+let shaderErr='';
 function compile(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; }
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ const log=gl.getShaderInfoLog(s); shaderErr+=log+'\n'; console.error(log); }
+  return s; }
 const prog=gl.createProgram();
 gl.attachShader(prog,compile(gl.VERTEX_SHADER,VERT));
 gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,FRAG));
-gl.linkProgram(prog); gl.useProgram(prog);
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){ shaderErr+=(gl.getProgramInfoLog(prog)||'link failed')+'\n'; }
+if(shaderErr){
+  const d=document.createElement('pre');
+  d.style.cssText='position:fixed;inset:0;z-index:99;margin:0;padding:18px;overflow:auto;'+
+    'background:#1a0000;color:#ff9a9a;font:12px/1.5 monospace;white-space:pre-wrap';
+  d.textContent='SHADER ERROR\n\n'+shaderErr; document.body.appendChild(d);
+}
+gl.useProgram(prog);
 
 const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
@@ -543,11 +557,11 @@ document.querySelectorAll('.tg[data-k]').forEach(btn=>{
     btn.classList.toggle('active',!!state[k]);
     if(sec) sec.classList.toggle('off',!state[k]); });
 });
-// section collapse
+// section collapse (+/-)
 document.querySelectorAll('.sechd').forEach(hd=>{
-  hd.addEventListener('click',e=>{ if(e.target.classList.contains('tg')) return;
-    hd.closest('.sec').classList.toggle('col');
-    const ch=hd.querySelector('.ch'); if(ch) ch.textContent=hd.closest('.sec').classList.contains('col')?'▸':'▾'; });
+  const sec=hd.closest('.sec'), exp=hd.querySelector('.exp');
+  const toggle=()=>{ const c=sec.classList.toggle('col'); if(exp) exp.textContent=c?'+':'−'; };
+  hd.addEventListener('click',e=>{ if(e.target.classList.contains('tg')) return; toggle(); });
 });
 
 // drop / loop / playback
