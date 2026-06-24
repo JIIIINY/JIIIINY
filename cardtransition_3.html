@@ -97,25 +97,22 @@
   .scrub-row{ display:flex; align-items:center; gap:8px; margin-top:8px; }
   .scrub-row input[type=checkbox]{ accent-color:#f0c45a; } .scrub-row .lp{ font-size:11px; color:#b9b9c0; }
 
-  /* ===== 모바일 레이아웃 ===== */
-  @media (max-width:768px){
-    .topbar{ height:48px; padding:0 8px; }
-    .brand .ver{ display:none; }
-    .topbtns{ gap:4px; } .topbtns button{ padding:6px 7px; font-size:11px; border-radius:8px; }
-    .stage{ top:48px; padding:0 !important; }
-    /* 키스크린 축소: 높이 기준으로 비율 유지(라운드 코너도 비율로 맞춤) */
-    .canvas-wrap{ width:auto; height:56vh; max-height:56vh; aspect-ratio:360/780; border-radius:25.5%/11.8%; box-shadow:0 14px 40px rgba(0,0,0,.5); }
-    canvas#view, #xfade{ border-radius:25.5%/11.8%; }
-    .kswrap{ gap:10px; }
-    .navbar{ gap:12px; } .nav{ width:38px; height:38px; font-size:20px; }
-    .screenbtns button, .ctxctrl button{ padding:5px 10px; font-size:11px; }
-    /* 패널: 펼치면 넓은 오버레이, 접으면 헤더만(좌·우 절반 바) */
-    .panel{ width:86vw; top:48px; z-index:60; }
-    .panel.left{ left:0; } .panel.right{ right:0; }
-    .panel.collapsed{ width:50vw; height:auto; bottom:auto; }
-    body.lp-open .panel.left, body:not(.lp-open) .panel.left{ transform:none; }
-    body.rp-open .panel.right, body:not(.rp-open) .panel.right{ transform:none; }
-  }
+  /* ===== 모바일(좁은 화면) — JS가 폭을 재서 body.mobile 부여(뷰포트 감지 의존 X) ===== */
+  body.mobile .topbar{ height:48px; padding:0 8px; }
+  body.mobile .brand .ver{ display:none; }
+  body.mobile .topbtns{ gap:4px; } body.mobile .topbtns button{ padding:6px 7px; font-size:11px; border-radius:8px; }
+  body.mobile .stage{ top:96px !important; left:0; right:0; padding:0 !important; }
+  /* 키스크린 축소: 가용 높이에 맞춰 360:780 비율 유지 */
+  body.mobile .canvas-wrap{ height:calc(100vh - 240px) !important; width:calc((100vh - 240px) * 360 / 780) !important; max-width:88vw; max-height:none; aspect-ratio:360/780; border-radius:25.5%/11.8%; box-shadow:0 12px 36px rgba(0,0,0,.5); }
+  body.mobile canvas#view, body.mobile #xfade{ border-radius:25.5%/11.8%; }
+  body.mobile .kswrap{ gap:8px; }
+  body.mobile .navbar{ gap:12px; } body.mobile .nav{ width:36px; height:36px; font-size:19px; }
+  body.mobile .screenbtns button, body.mobile .ctxctrl button{ padding:5px 9px; font-size:11px; }
+  /* 패널: 접힘=좌/우 절반 헤더바(48px) · 펼침=거의 전체 오버레이 */
+  body.mobile .panel{ top:48px !important; bottom:0 !important; width:94vw !important; z-index:60; transform:none !important; transition:none; }
+  body.mobile .panel.left{ left:0 !important; right:auto !important; }
+  body.mobile .panel.right{ right:0 !important; left:auto !important; }
+  body.mobile .panel.collapsed{ height:48px !important; bottom:auto !important; width:50vw !important; overflow:hidden !important; }
 </style>
 </head>
 <body class="lp-open rp-open">
@@ -1593,9 +1590,11 @@ const INIT={"app":"iridescent-halo-orb","v":9,"activeScreen":0,"screens":[{"page
 INIT.screens=CFG.screens; INIT.activeScreen=CFG.activeScreen; if(CFG.artboard) Object.assign(artboard,CFG.artboard); if(CFG.glass) INIT.glass=CFG.glass;
 if(CFG.bgImages){ INIT.bgImages=CFG.bgImages; INIT.bgImageOn=CFG.bgImageOn; INIT.bgImageIdx=CFG.bgImageIdx; }   // 저장된 배경 이미지 복원
 applyPalette(0); codeReady=true; applyConfig(JSON.stringify(INIT)); refreshScreenUI();
-// 모바일: 모든 패널을 접힌(줄어든) 상태로 시작
-if(window.matchMedia && window.matchMedia('(max-width:768px)').matches){
-  ['leftPanel','rightPanel'].forEach(id=>{ const pn=document.getElementById(id); if(!pn) return; pn.classList.add('collapsed'); const dd=pn.querySelector('.dd'); if(dd) dd.textContent='▸'; }); }
+// 모바일: 화면 폭을 직접 측정해 body.mobile 부여 + 모든 패널을 접힌(줄어든) 상태로 시작
+function applyMobile(){ const m=Math.min(window.innerWidth,document.documentElement.clientWidth||window.innerWidth)<=820;
+  document.body.classList.toggle('mobile', m);
+  if(m){ ['leftPanel','rightPanel'].forEach(id=>{ const pn=document.getElementById(id); if(pn && !pn.dataset.mobInit){ pn.classList.add('collapsed'); const dd=pn.querySelector('.dd'); if(dd) dd.textContent='▸'; pn.dataset.mobInit='1'; } }); } }
+applyMobile(); window.addEventListener('resize', applyMobile);
 // 임베드 폰트 로드 보장 후 렌더 시작
 if(document.fonts && document.fonts.load){ Promise.all([document.fonts.load('700 60px "Samsung Sharp Sans"'),document.fonts.load('500 60px "One UI Sans"')]).catch(()=>{}).finally(()=>requestAnimationFrame(frame)); }
 else requestAnimationFrame(frame);
