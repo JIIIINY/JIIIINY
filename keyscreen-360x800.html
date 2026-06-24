@@ -50,6 +50,30 @@
     position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
     width:120px;height:4px;border-radius:4px;background:rgba(255,255,255,.4);
   }
+
+  /* ---- control panel (buttons) ---- */
+  .controls{
+    position:fixed;right:28px;top:50%;transform:translateY(-50%);
+    width:208px;padding:18px 16px;z-index:30;
+    background:rgba(20,20,24,.82);border:1px solid rgba(255,255,255,.10);
+    border-radius:18px;color:#e8e8ee;
+    backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);
+    box-shadow:0 12px 48px rgba(0,0,0,.4);
+  }
+  .controls h2{font-size:11px;font-weight:700;letter-spacing:.10em;color:#c9b8ff;margin-bottom:14px}
+  .grp{margin-bottom:14px}
+  .grp:last-child{margin-bottom:0}
+  .grp .lab{font-size:10px;color:rgba(255,255,255,.5);margin-bottom:7px;letter-spacing:.04em}
+  .grp .btns{display:flex;flex-wrap:wrap;gap:6px}
+  .grp button{
+    flex:1 1 auto;min-width:40px;padding:8px 6px;font-size:11.5px;font-weight:600;
+    border:1px solid rgba(255,255,255,.12);border-radius:10px;
+    background:rgba(255,255,255,.06);color:#dcdce4;cursor:pointer;
+    transition:background .18s,border-color .18s,color .18s;
+  }
+  .grp button:hover{background:rgba(255,255,255,.12)}
+  .grp button.active{background:rgba(201,184,255,.22);border-color:#c9b8ff;color:#fff}
+  @media (max-width:680px){ .controls{position:static;transform:none;margin-top:18px;width:340px} body{flex-direction:column;overflow:auto} }
 </style>
 </head>
 <body>
@@ -69,6 +93,44 @@
     </div>
   </div>
 
+  <!-- ===== character control buttons ===== -->
+  <div class="controls">
+    <h2>캐릭터 표정</h2>
+    <div class="grp">
+      <div class="lab">표정</div>
+      <div class="btns" data-group="expr">
+        <button data-val="0" class="active">기본</button>
+        <button data-val="1">웃음</button>
+        <button data-val="2">놀람</button>
+        <button data-val="3">졸림</button>
+      </div>
+    </div>
+    <div class="grp">
+      <div class="lab">눈 크기</div>
+      <div class="btns" data-group="eyeScale">
+        <button data-val="0.85">작게</button>
+        <button data-val="1.0" class="active">보통</button>
+        <button data-val="1.2">크게</button>
+      </div>
+    </div>
+    <div class="grp">
+      <div class="lab">깜빡임</div>
+      <div class="btns" data-group="blinkRate">
+        <button data-val="0">없음</button>
+        <button data-val="0.06">천천히</button>
+        <button data-val="0.12" class="active">보통</button>
+        <button data-val="0.24">빠르게</button>
+      </div>
+    </div>
+    <div class="grp">
+      <div class="lab">시선</div>
+      <div class="btns" data-group="gazeMode">
+        <button data-val="auto" class="active">자동</button>
+        <button data-val="follow">따라오기</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 /* ---------- config dumped by the user ---------- */
 const CFG = {"v":40,"state":0,"sliders":{"rpx":440,"spd":12,"lgt":0.75,"shd":0.5,"sct":1.95,"blr":0.6,"wrp":0.0,"lsn":0.4,"wid":0.44,"rim":0.15,"riw":0.015,"gli":0,"gls":0.5,"eyi":0.9,"eyg":0.2,"swi":0,"sww":0.3,"sws":0.5,"swa":0,"iri":0.25,"irs":0.4,"pls":0.65,"cau":0,"flr":1.15,"fli":0.75,"flw":0.94,"fei1":0.4,"feo1":1.3,"flci":0.65,"bsf":1.26,"bhd":0.7,"fr":92,"pfr":0.85,"cap":0.4,"capw":0.4,"litW":0.43,"litInt":1.0,"litAng":90,"litSpd":0.36,"litShadowAmt":0.8,"litShadowBlur":0.2,"colSplit":0.64,"sphereAlphaSlider":0.65,"contrastSlider":1.5},
@@ -76,6 +138,31 @@ const CFG = {"v":40,"state":0,"sliders":{"rpx":440,"spd":12,"lgt":0.75,"shd":0.5
 
 const S = CFG.sliders, C = CFG.colors;
 function hex(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255];}
+
+/* ---------- face controls (driven by the button panel) ---------- */
+const face = { expr:0, eyeScale:1.0, blinkRate:0.12, gazeMode:'auto' };
+const follow = { x:0, y:0 };   // cursor-follow gaze offset
+
+document.querySelectorAll('.controls .btns').forEach(g=>{
+  const key = g.dataset.group;
+  g.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      g.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      face[key] = (key==='gazeMode') ? b.dataset.val : parseFloat(b.dataset.val);
+    });
+  });
+});
+
+// track pointer over the phone for "따라오기" gaze
+window.addEventListener('pointermove', e=>{
+  const c = document.getElementById('gl').getBoundingClientRect();
+  const nx =  (e.clientX - c.left - c.width/2)/c.width;
+  const ny = -(e.clientY - c.top  - c.height/2)/c.width;  // y up
+  const k = 0.10, lim = 0.05;
+  follow.x = Math.max(-lim, Math.min(lim, nx*k));
+  follow.y = Math.max(-lim, Math.min(lim, ny*k));
+});
 
 const cv = document.getElementById('gl');
 const gl = cv.getContext('webgl', {alpha:false, antialias:true, premultipliedAlpha:false});
@@ -90,6 +177,8 @@ uniform float u_wid, u_rim, u_riw, u_sct, u_lgt, u_shd, u_iri, u_irs, u_pls;
 uniform float u_litAng, u_litW, u_litInt, u_shadowAmt, u_shadowBlur, u_colSplit;
 uniform float u_alpha, u_contrast, u_flr, u_fli;
 uniform float u_eyi, u_eyg;
+uniform vec2  u_gaze;
+uniform float u_eyeScale, u_blinkRate, u_expr;
 uniform vec3  u_cP, u_cS, u_cC, u_lit, u_litShadow, u_flcc;
 
 float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
@@ -169,55 +258,95 @@ void main(){
   float spec = pow(clamp(dot(N,H),0.0,1.0), 60.0);
   col += vec3(1.0)*spec*0.9*u_lgt;
 
-  // ================= EYES (character face) =================
-  // eyes sit on the front of the sphere; gaze drifts + occasional blink
-  vec2 gaze = vec2(sin(t*0.5)*0.018, sin(t*0.37+1.0)*0.012);   // slow look-around
-  float blink = smoothstep(0.0,0.06, abs(fract(t*0.12)-0.5)-0.40); // 1 = open, dips to 0
-  blink = clamp(blink*1.6, 0.0, 1.0);
-
-  float eyeSep = R*0.42;          // distance between eyes
-  float eyeY   = R*0.10;          // vertical placement (slightly above center)
-  float eyeR   = R*(0.20+u_eyi*0.06);
-
-  // project onto the curved surface so eyes hug the sphere
+  // ================= FACE (eyes · brows · mouth) =================
+  // un-project to the sphere front so features hug the surface
   vec2 fp = p / max(z,0.35);
-  for(int e=0;e<2;e++){
-    vec2 ec = vec2(e==0?-eyeSep:eyeSep, eyeY);
-    vec2 d2 = (fp - ec - gaze);
-    // squash vertically for a blink
-    d2.y /= max(blink,0.04);
-    float de = length(d2);
 
-    float white = smoothstep(eyeR, eyeR*0.92, de);            // eye-white / socket
+  // expression flags
+  bool happy    = (u_expr>0.5 && u_expr<1.5);
+  bool surprise = (u_expr>1.5 && u_expr<2.5);
+  bool sleepy   = (u_expr>2.5);
+
+  // gaze comes from JS (auto-drift or cursor-follow)
+  vec2 gaze = u_gaze;
+
+  // blink: u_blinkRate==0 => never closes; sleepy => half-lidded
+  float openBase = sleepy ? 0.5 : 1.0;
+  float blink = 1.0;
+  if(u_blinkRate > 0.001){
+    float ph = fract(t*u_blinkRate);
+    blink = clamp(smoothstep(0.0,0.06, abs(ph-0.5)-0.40)*1.6, 0.0, 1.0);
+  }
+  float eyeOpen = max(openBase*blink, 0.04);
+
+  float wide   = surprise ? 1.18 : 1.0;
+  float eyeSep = R*0.42;
+  float eyeY   = R*0.10;
+  float eyeR   = R*(0.20+u_eyi*0.06)*u_eyeScale*wide;
+
+  for(int e=0;e<2;e++){
+    float sgn = (e==0)?-1.0:1.0;
+    vec2 ec = vec2(sgn*eyeSep, eyeY);
+
+    // ---- eyeball ----
+    vec2 d2 = (fp - ec - gaze);
+    d2.y /= eyeOpen;                    // vertical squash = blink
+    float de = length(d2);
+    float white = smoothstep(eyeR, eyeR*0.92, de);
     if(white>0.001){
-      // soft glossy white
       vec3 eyeWhite = mix(vec3(0.92,0.94,1.0), u_litShadow*0.6, 0.25);
       col = mix(col, eyeWhite, white*0.96);
 
-      // iris (uses iridescent palette + complement tint)
-      float irisR = eyeR*(0.55);
+      float irisR = eyeR*0.55;
       vec2 id = (fp - ec - gaze*1.6);
       float di = length(id);
       float irisM = smoothstep(irisR, irisR*0.86, di)*white;
       vec3 irisCol = mix(u_lit, u_cC, 0.4) * (0.7+0.6*irid(di*5.0+t*0.2).r);
       col = mix(col, irisCol, irisM*0.95);
 
-      // pupil
-      float pupR = irisR*(0.45);
+      float pupR = irisR*(sleepy?0.55:0.45);
       float pupM = smoothstep(pupR, pupR*0.8, di)*white;
       col = mix(col, vec3(0.02,0.02,0.04), pupM);
 
-      // catch-light glint (top-left)
-      float gl1 = smoothstep(eyeR*0.16, 0.0, length(id-vec2(-irisR*0.4,irisR*0.4)));
-      col += vec3(1.0)*gl1*white*(0.8+u_eyg*1.5);
-      // tiny secondary glint
-      float gl2 = smoothstep(eyeR*0.08, 0.0, length(id-vec2(irisR*0.25,-irisR*0.25)));
-      col += vec3(1.0)*gl2*white*0.4;
+      float g1 = smoothstep(eyeR*0.16,0.0,length(id-vec2(-irisR*0.4,irisR*0.4)));
+      col += vec3(1.0)*g1*white*(0.8+u_eyg*1.5);
+      float g2 = smoothstep(eyeR*0.08,0.0,length(id-vec2(irisR*0.25,-irisR*0.25)));
+      col += vec3(1.0)*g2*white*0.4;
 
-      // eyelid rim shadow for depth
-      float lid = smoothstep(eyeR*0.92, eyeR, de)*white;
+      float lid = smoothstep(eyeR*0.92,eyeR,de)*white;
       col = mix(col, col*0.55, lid);
     }
+
+    // ---- eyebrow ----
+    float browLift = surprise ? eyeR*0.62 : (sleepy ? eyeR*0.34 : eyeR*0.46);
+    // inner end tilt: sleepy/sad inner-down, happy slight raise, surprise flat
+    float innerTilt = sleepy ? -0.55 : (happy ? 0.30 : (surprise ? 0.0 : 0.12));
+    vec2 bc = vec2(sgn*eyeSep, eyeY + eyeR + browLift);
+    vec2 bd = fp - bc;
+    float bang = sgn*innerTilt;
+    float bx = bd.x*cos(bang) - bd.y*sin(bang);
+    float by = bd.x*sin(bang) + bd.y*cos(bang);
+    float brow = smoothstep(eyeR*0.62,eyeR*0.50,abs(bx)) * smoothstep(eyeR*0.11,0.0,abs(by));
+    col = mix(col, col*0.22 + vec3(0.02), brow*0.92);
+  }
+
+  // ---- mouth ----
+  vec2 mc = vec2(0.0, eyeY - eyeR*1.7);
+  vec2 md = fp - mc;
+  float mw = R*0.22;
+  if(surprise){
+    float oe = length(vec2(md.x/(mw*0.62), md.y/(mw*0.72)));
+    float m = smoothstep(1.0,0.85,oe);
+    col = mix(col, vec3(0.05,0.02,0.04), m);
+    col = mix(col, u_cS*0.45, smoothstep(0.6,0.0,oe)*0.5);   // inner mouth tint
+  } else {
+    // curvature: default gentle smile, happy big smile, sleepy slight frown
+    float curv = sleepy ? -0.5 : (happy ? 1.8 : 0.9);
+    float yc = mc.y + curv*(md.x*md.x)/R;
+    float dd = fp.y - yc;
+    float th = R*0.024;
+    float band = smoothstep(th,0.0,abs(dd)) * smoothstep(mw,mw*0.85,abs(md.x));
+    col = mix(col, vec3(0.06,0.02,0.03), band*0.9);
   }
   // ============================================================
 
@@ -254,7 +383,8 @@ const U={res:u('u_res'),time:u('u_time'),wid:u('u_wid'),rim:u('u_rim'),riw:u('u_
   litAng:u('u_litAng'),litW:u('u_litW'),litInt:u('u_litInt'),shadowAmt:u('u_shadowAmt'),
   shadowBlur:u('u_shadowBlur'),colSplit:u('u_colSplit'),alpha:u('u_alpha'),contrast:u('u_contrast'),
   flr:u('u_flr'),fli:u('u_fli'),cP:u('u_cP'),cS:u('u_cS'),cC:u('u_cC'),lit:u('u_lit'),
-  litShadow:u('u_litShadow'),flcc:u('u_flcc'),eyi:u('u_eyi'),eyg:u('u_eyg')};
+  litShadow:u('u_litShadow'),flcc:u('u_flcc'),eyi:u('u_eyi'),eyg:u('u_eyg'),
+  gaze:u('u_gaze'),eyeScale:u('u_eyeScale'),blinkRate:u('u_blinkRate'),expr:u('u_expr')};
 
 gl.viewport(0,0,cv.width,cv.height);
 
@@ -284,6 +414,14 @@ function frame(now){
   gl.uniform1f(U.fli,S.fli);
   gl.uniform1f(U.eyi,S.eyi);
   gl.uniform1f(U.eyg,S.eyg);
+  // ---- face controls (buttons) ----
+  let gx, gy;
+  if(face.gazeMode==='follow'){ gx=follow.x; gy=follow.y; }
+  else { gx=Math.sin(t*0.5)*0.018; gy=Math.sin(t*0.37+1.0)*0.012; }
+  gl.uniform2f(U.gaze, gx, gy);
+  gl.uniform1f(U.eyeScale, face.eyeScale);
+  gl.uniform1f(U.blinkRate, face.blinkRate);
+  gl.uniform1f(U.expr, face.expr);
   gl.uniform3fv(U.cP,hex(C.cP));
   gl.uniform3fv(U.cS,hex(C.cS));
   gl.uniform3fv(U.cC,hex(C.cC));
