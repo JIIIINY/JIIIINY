@@ -129,6 +129,8 @@
       <div class="sec"><div class="sechd"><span>CARD</span><div class="hr"><button class="exp">−</button></div></div>
         <div class="secbody">
           <div class="cl">카드 색상 <input type="color" data-k="cardColor"></div>
+          <div class="row"><label>카드 알파(투명도) <b></b></label><input type="range" data-k="cardAlpha" min="0" max="1" step="0.01"></div>
+          <div class="row"><label>카드 블러(프로스트) <b></b></label><input type="range" data-k="cardBlur" min="0" max="4" step="0.01"></div>
           <div class="row"><label>Z축 전진(기준점) <b></b></label><input type="range" data-k="zAnchor" min="0" max="1" step="0.01"></div>
           <div class="row"><label>드롭 속도 <b></b></label><input type="range" data-k="dropSpeed" min="0.1" max="3" step="0.01"></div>
           <div class="btns"><button id="dropBtn" class="active">▽ Drop 재생</button><button id="loopBtn">↻ 루프</button></div>
@@ -248,7 +250,7 @@ const VERT = `attribute vec2 a; void main(){ gl_Position=vec4(a,0.0,1.0); }`;
 const FRAG = `
 precision highp float;
 uniform vec2  u_res; uniform float u_time; uniform float u_prog;
-uniform vec3  u_cardColor; uniform float u_zAnchor;
+uniform vec3  u_cardColor; uniform float u_zAnchor; uniform float u_cardAlpha,u_cardBlur;
 uniform int   u_lightMode; uniform int u_lightDir; uniform int u_sweepType;
 uniform float u_lwidth,u_lsize,u_lblur,u_lintensity,u_shadowAmt,u_langle,u_lspeed,u_glow;
 uniform vec3  u_shadowColor;
@@ -286,6 +288,14 @@ vec3 bgColor(vec2 uv){
   vec3 col=mix(bot,top,uv.y);
   col*=1.0-0.13*smoothstep(0.2,0.95,distance(uv,vec2(0.5,0.6)));
   return col;
+}
+
+vec3 blurBg(vec2 uv, float amt){           // frosted backdrop behind a translucent card
+  if(amt<=0.001) return bgColor(uv);
+  float aspect=u_res.x/u_res.y, rad=amt*0.02; vec3 acc=vec3(0.0);
+  for(int i=0;i<10;i++){ float a=float(i)*2.39996; float rr=rad*sqrt((float(i)+0.5)/10.0);
+    acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(1.0/aspect,1.0)); }
+  return acc/10.0;
 }
 
 float sdCard(vec2 p){
@@ -392,8 +402,10 @@ void main(){
   // ---- soft focus (gentle lift + bloom) ----
   surf=mix(surf, surf+vec3(0.04)+spot*0.18, clamp((u_trOn>0.5?u_softFocus:0.0),0.0,1.0)*0.6);
 
-  // ---- composite (with drop fade-in) ----
-  outc=mix(outc, surf, inside*e);
+  // ---- composite: alpha (opacity) + frosted backdrop blur, with drop fade-in ----
+  vec3 behind=blurBg(suv,u_cardBlur);                       // background seen through the card
+  vec3 cardPix=mix(behind, surf, clamp(u_cardAlpha,0.0,1.0));
+  outc=mix(outc, cardPix, inside*e);
 
   // ---- outer light layer leaking onto background ----
   if(u_layerOuter>0.5){
@@ -428,7 +440,7 @@ gl.vertexAttribPointer(aLoc,2,gl.FLOAT,false,0,0);
 
 // ---- parameter state + metadata (key -> type, uniform = 'u_'+key) ----
 const META={
-  cardColor:'c', zAnchor:'f',
+  cardColor:'c', zAnchor:'f', cardAlpha:'f', cardBlur:'f',
   lightMode:'i', lightDir:'i', sweepType:'i',
   lwidth:'f',lsize:'f',lblur:'f',lintensity:'f',shadowAmt:'f',shadowColor:'c',langle:'f',lspeed:'f',glow:'f',
   trOn:'b',layerInner:'b',layerOuter:'b',trColor:'c',trGlow:'f',trBlur:'f',trBlurColor:'c',softFocus:'f',
@@ -441,7 +453,7 @@ const META={
   innerOn:'b',pulseInt:'f',causticsInt:'f',edgeFlareInt:'f',
 };
 const state={
-  cardColor:'#dfe3ea', zAnchor:0.6, dropSpeed:1.0,
+  cardColor:'#dfe3ea', zAnchor:0.6, dropSpeed:1.0, cardAlpha:1.0, cardBlur:0.6,
   lightMode:0, lightDir:3, sweepType:1,
   lwidth:0.5, lsize:0.5, lblur:0.6, lintensity:0.7, shadowAmt:0.35, shadowColor:'#9aa3b2', langle:0.0, lspeed:1.0, glow:0.7,
   trOn:0, layerInner:1, layerOuter:1, trColor:'#ffd2a6', trGlow:0.5, trBlur:0.3, trBlurColor:'#b8c6ff', softFocus:0.3,
