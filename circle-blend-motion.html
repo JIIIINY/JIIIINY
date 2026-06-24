@@ -36,7 +36,7 @@
   }
   #device.light{background:#ffffff}
   #device.grad{
-    background:linear-gradient(180deg,#ff6a2e 0%,#2f6fd0 100%);
+    background:linear-gradient(to bottom,#ff6a2e 0%,#2f6fd0 100%);
   }
   #device.checker{
     background-color:#cfcfcf;
@@ -255,10 +255,13 @@ void main(){
   float crispR = smoothstep(R + soft, R - soft, dR);
 
   // RIGHT circle sits ON TOP of the left one.
-  // Over the left circle its edge becomes blurry (soft blend); over the
-  // background it stays a crisp round disk -> the form is preserved.
-  float blurEdge = mix(4.0, 30.0, u_blend);
+  // Timeline: as it slides over the left, it FIRST keeps its crisp round
+  // form on top (you see the whole right disk), THEN blends near the peak.
+  float blendPhase = smoothstep(0.55, 1.0, m);
+  float blurEdge   = mix(soft, mix(10.0, 34.0, u_blend), blendPhase);
   float softR = smoothstep(R + blurEdge, R - blurEdge, dR);
+  // over the background always crisp; over the left circle, soften only
+  // once blending begins -> round form held first, then blended.
   float covR  = mix(crispR, softR, aL);
 
   vec3 rgb = mix(colL, colR, covR);
