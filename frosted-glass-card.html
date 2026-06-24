@@ -483,10 +483,10 @@ void main(){
   vec3 cardPix=mix(behind, surf, clamp(u_cardAlpha,0.0,1.0));
   outc=mix(outc, cardPix, inside*e);
 
-  // ---- outer light layer leaking onto background ----
+  // ---- outer light layer, masked INSIDE the card only (no bleed outside) ----
   if(u_layerOuter>0.5){
-    float oh=exp(-pow(max(d,0.0)/42.0,1.4))*(1.0-inside)*e;
-    outc+=lcol*oh*0.22*u_lintensity;
+    float ring=exp(-pow(max(-d,0.0)/42.0,1.4));   // glow band just inside the edge
+    outc+=lcol*ring*inside*e*0.28*u_lintensity;
   }
 
   gl_FragColor=vec4(outc,1.0);
