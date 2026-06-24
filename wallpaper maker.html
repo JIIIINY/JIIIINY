@@ -3,32 +3,101 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <title>Wallpaper Maker</title>
 <style>
+:root{--pbg:rgba(20,18,30,.82);--pbd:rgba(255,255,255,.10);--card:rgba(255,255,255,.035);--ink:#EDEAF6;--ink-dim:rgba(237,234,246,.55);--accent:#9FE7FF;}
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;}
-body{background:#000;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
-  font-family:"Geist","Inter",-apple-system,sans-serif;color:#EDEAF6;overflow:hidden;}
-/* phone frame — only visual clip; canvas itself is full-bleed for export */
-.frame{position:relative;width:360px;height:780px;border-radius:92px;overflow:hidden;background:#02020A;
-  box-shadow:0 30px 80px -30px rgba(0,0,0,.9);-webkit-mask-image:-webkit-radial-gradient(white,black);}
+html,body{min-height:100%;}
+body{background:#000;min-height:100vh;overflow:hidden;font-family:"Geist","Inter",-apple-system,sans-serif;}
+.stage{position:fixed;top:0;bottom:0;left:0;right:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:right .3s cubic-bezier(.4,0,.2,1);}
+.stage.full{right:0;}
+.frame{position:relative;width:360px;height:780px;background:#02020A;border-radius:92px;overflow:hidden;-webkit-mask-image:-webkit-radial-gradient(white,black);box-shadow:0 30px 80px -30px rgba(0,0,0,.9);}
 canvas{display:block;width:360px;height:780px;}
-.bar{display:flex;gap:10px;align-items:center;}
-.btn{appearance:none;cursor:pointer;font-family:inherit;font-weight:700;color:#fff;
-  border:1px solid rgba(159,231,255,.45);
-  background:linear-gradient(135deg,rgba(159,231,255,.20),rgba(220,196,255,.16));
-  padding:12px 22px;border-radius:13px;font-size:14px;transition:all .15s;}
-.btn:hover{background:linear-gradient(135deg,rgba(159,231,255,.30),rgba(220,196,255,.24));transform:translateY(-1px);}
-.btn:active{transform:translateY(0);}
-.btn.sec{border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.06);font-weight:600;}
-.btn.sec:hover{background:rgba(255,255,255,.12);}
-.hint{font-size:11px;color:rgba(237,234,246,.45);}
+
+/* ---- right control panel ---- */
+.panel{position:fixed;top:0;right:0;width:340px;height:100vh;display:flex;flex-direction:column;overflow:hidden;background:var(--pbg);border-left:1px solid var(--pbd);backdrop-filter:blur(20px) saturate(140%);padding:12px;color:var(--ink);box-shadow:-20px 0 60px -30px rgba(0,0,0,.8);transition:transform .3s cubic-bezier(.4,0,.2,1);}
+.panel.collapsed{transform:translateX(100%);}
+.pTop{flex:0 0 auto;} .proj{margin-bottom:8px;} .proj .nm{font-size:13px;font-weight:700;font-family:"Geist",monospace;} .proj .sub{font-size:10px;color:var(--ink-dim);}
+.tools{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.tbtn{appearance:none;border:1px solid rgba(255,255,255,.12);cursor:pointer;background:rgba(255,255,255,.05);color:var(--ink);padding:6px 9px;border-radius:9px;font-size:11px;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:5px;transition:all .15s;white-space:nowrap;}
+.tbtn:hover{background:rgba(255,255,255,.12);}
+.tbtn.accent{background:linear-gradient(135deg,rgba(159,231,255,.22),rgba(220,196,255,.18));border-color:rgba(159,231,255,.5);color:#fff;}
+.bigRnd{width:100%;appearance:none;border:1px solid rgba(159,231,255,.4);cursor:pointer;background:linear-gradient(135deg,rgba(159,231,255,.18),rgba(220,196,255,.14));color:#fff;padding:10px;border-radius:11px;font-size:12px;font-weight:700;font-family:inherit;margin-bottom:8px;}
+.tabBody{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0;padding-right:4px;} .tabBody::-webkit-scrollbar{width:6px;} .tabBody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}
+.card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px;margin-bottom:8px;}
+.card h3{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:9px;display:flex;align-items:center;gap:6px;} .card h3 .ic{font-size:12px;color:var(--accent);}
+.swatches{display:flex;gap:6px;} .sw{position:relative;flex:0 0 24px;width:24px;height:24px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.18);cursor:pointer;}
+.sw input[type=color]{position:absolute;inset:-6px;width:130%;height:130%;border:none;background:none;cursor:pointer;padding:0;}
+.miniRnd{margin-left:auto;appearance:none;border:1px solid rgba(255,255,255,.14);cursor:pointer;background:rgba(255,255,255,.05);color:var(--ink);width:22px;height:22px;border-radius:6px;font-size:11px;display:flex;align-items:center;justify-content:center;}
+.row{margin-bottom:8px;} .row:last-child{margin-bottom:2px;} .row .lab{display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px;} .row .lab .nm{color:var(--ink);font-weight:600;} .row .lab .val{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:600;}
+input[type=range]{-webkit-appearance:none;width:100%;height:3px;border-radius:3px;background:rgba(255,255,255,.12);outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--accent);box-shadow:0 0 8px -2px var(--accent);cursor:pointer;}
+.tog{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;font-weight:600;color:var(--ink-dim);user-select:none;transition:color .15s;}
+.tog.on{color:var(--accent);}
+.tog .pill{width:36px;height:20px;border-radius:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);position:relative;transition:all .2s;}
+.tog.on .pill{background:rgba(139,231,255,.25);border-color:rgba(139,231,255,.55);}
+.tog .knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#888;transition:all .2s;}
+.tog.on .knob{left:18px;background:var(--accent);box-shadow:0 0 8px rgba(139,231,255,.5);}
+.panelToggle{position:fixed;top:12px;right:12px;z-index:30;width:36px;height:36px;border-radius:10px;appearance:none;border:1px solid rgba(255,255,255,.14);cursor:pointer;background:rgba(20,18,30,.85);backdrop-filter:blur(14px);color:var(--ink);font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s;box-shadow:0 6px 20px -8px rgba(0,0,0,.6);}
+.panelToggle:hover{background:rgba(40,38,60,.9);border-color:var(--accent);}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:rgba(20,18,30,.95);border:1px solid rgba(159,231,255,.4);color:#fff;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:600;z-index:99;opacity:0;pointer-events:none;transition:all .25s;} .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style></head>
 <body>
-<div class="frame"><canvas id="gl"></canvas></div>
-<div class="bar">
-  <button class="btn" id="rndBtn">🎲 랜덤</button>
-  <button class="btn sec" id="saveBtn">💾 저장</button>
-</div>
-<div class="hint">랜덤 버튼을 누르면 배경(컬러 · 크기 · 위치)이 적용됩니다.</div>
+<div class="stage" id="stage"><div class="frame" id="frame"><canvas id="gl"></canvas></div></div>
+
+<button class="panelToggle" id="panelToggle" title="패널 열기/닫기">⚙</button>
+<aside class="panel" id="panel">
+  <div class="pTop">
+    <div class="proj"><span class="nm">wallpaper-maker</span><span class="sub">#2 배경 (3볼륨) 전용</span></div>
+    <div class="tools"><button class="tbtn accent" id="rndBtn">🎲 랜덤</button><button class="tbtn" id="resetBtn">↻ 초기화</button><button class="tbtn" id="saveBtn">🖼 저장</button></div>
+  </div>
+  <div class="tabBody">
+    <section class="card">
+      <button class="bigRnd" id="rndAllBg" style="margin:0;margin-bottom:6px">🎲 배경 전체 랜덤 (컬러·크기·위치)</button>
+      <button class="bigRnd" id="rndAllBgCol" style="margin:0">🎨 3볼륨 컬러 랜덤</button>
+    </section>
+    <section class="card"><div class="tog on" id="bgTog"><span class="pill"><span class="knob"></span></span><span>배경 ON/OFF</span></div></section>
+
+    <section class="card"><h3><span class="ic">☁</span>네뷸라</h3>
+      <div class="row"><div class="tog" id="nebTog"><span class="pill"><span class="knob"></span></span><span>네뷸라</span></div></div>
+      <div class="row"><div class="lab"><span class="nm">알파</span><span class="val" id="nebAV">1.00</span></div><input type="range" id="nebA" min="0" max="1.5" step="0.01" value="1.00"></div>
+      <div class="row"><div class="lab"><span class="nm">밝기</span><span class="val" id="nebBrV">0.65</span></div><input type="range" id="nebBr" min="0" max="2" step="0.01" value="0.65"></div>
+    </section>
+
+    <section class="card"><h3><span class="ic">◉</span>볼륨 1 (상단 타원) <button class="miniRnd" id="rndB1">🎲</button></h3>
+      <div class="row"><div class="lab"><span class="nm">위치 X</span><span class="val" id="b1xV">0.50</span></div><input type="range" id="b1x" min="0.1" max="0.9" step="0.01" value="0.50"></div>
+      <div class="row"><div class="lab"><span class="nm">위치 Y</span><span class="val" id="b1yV">0.68</span></div><input type="range" id="b1y" min="0.2" max="0.9" step="0.01" value="0.68"></div>
+      <div class="row"><div class="lab"><span class="nm">크기 X</span><span class="val" id="b1sxV">0.51</span></div><input type="range" id="b1sx" min="0.10" max="1.40" step="0.01" value="0.51"></div>
+      <div class="row"><div class="lab"><span class="nm">크기 Y</span><span class="val" id="b1syV">0.59</span></div><input type="range" id="b1sy" min="0.08" max="1.20" step="0.01" value="0.59"></div>
+      <div class="row"><div class="lab"><span class="nm">밝기</span><span class="val" id="b1brV">1.00</span></div><input type="range" id="b1br" min="0" max="2" step="0.01" value="1.00"></div>
+      <div class="row"><div class="lab"><span class="nm">알파</span><span class="val" id="b1aV">0.79</span></div><input type="range" id="b1a" min="0" max="1" step="0.01" value="0.79"></div>
+      <div class="row"><div class="lab"><span class="nm">컬러</span></div><div class="swatches"><div class="sw" id="b1cSw" style="background:#cf3ed4"></div><div style="flex:3"></div></div></div>
+    </section>
+
+    <section class="card"><h3><span class="ic">◉</span>볼륨 3 (중앙 가로 타원) <button class="miniRnd" id="rndB3">🎲</button></h3>
+      <div class="row"><div class="lab"><span class="nm">위치 X</span><span class="val" id="b3xV">0.50</span></div><input type="range" id="b3x" min="0.1" max="0.9" step="0.01" value="0.50"></div>
+      <div class="row"><div class="lab"><span class="nm">위치 Y</span><span class="val" id="b3yV">0.43</span></div><input type="range" id="b3y" min="0.1" max="0.9" step="0.01" value="0.43"></div>
+      <div class="row"><div class="lab"><span class="nm">크기 X</span><span class="val" id="b3sxV">0.51</span></div><input type="range" id="b3sx" min="0.10" max="1.40" step="0.01" value="0.51"></div>
+      <div class="row"><div class="lab"><span class="nm">크기 Y</span><span class="val" id="b3syV">0.26</span></div><input type="range" id="b3sy" min="0.04" max="0.60" step="0.01" value="0.26"></div>
+      <div class="row"><div class="lab"><span class="nm">밝기</span><span class="val" id="b3brV">0.74</span></div><input type="range" id="b3br" min="0" max="2" step="0.01" value="0.74"></div>
+      <div class="row"><div class="lab"><span class="nm">알파</span><span class="val" id="b3aV">0.84</span></div><input type="range" id="b3a" min="0" max="1" step="0.01" value="0.84"></div>
+      <div class="row"><div class="lab"><span class="nm">컬러</span></div><div class="swatches"><div class="sw" id="b3cSw" style="background:#395cda"></div><div style="flex:3"></div></div></div>
+    </section>
+
+    <section class="card"><h3><span class="ic">◉</span>볼륨 2 (하단 원형) <button class="miniRnd" id="rndB2">🎲</button></h3>
+      <div class="row"><div class="lab"><span class="nm">위치 X</span><span class="val" id="b2xV">0.50</span></div><input type="range" id="b2x" min="0.1" max="0.9" step="0.01" value="0.50"></div>
+      <div class="row"><div class="lab"><span class="nm">위치 Y</span><span class="val" id="b2yV">0.20</span></div><input type="range" id="b2y" min="0.1" max="0.8" step="0.01" value="0.20"></div>
+      <div class="row"><div class="lab"><span class="nm">크기 X</span><span class="val" id="b2sxV">0.51</span></div><input type="range" id="b2sx" min="0.08" max="1.20" step="0.01" value="0.51"></div>
+      <div class="row"><div class="lab"><span class="nm">크기 Y</span><span class="val" id="b2syV">0.40</span></div><input type="range" id="b2sy" min="0.06" max="1.00" step="0.01" value="0.40"></div>
+      <div class="row"><div class="lab"><span class="nm">밝기</span><span class="val" id="b2brV">0.83</span></div><input type="range" id="b2br" min="0" max="2" step="0.01" value="0.83"></div>
+      <div class="row"><div class="lab"><span class="nm">알파</span><span class="val" id="b2aV">0.79</span></div><input type="range" id="b2a" min="0" max="1" step="0.01" value="0.79"></div>
+      <div class="row"><div class="lab"><span class="nm">컬러</span></div><div class="swatches"><div class="sw" id="b2cSw" style="background:#70d865"></div><div style="flex:3"></div></div></div>
+    </section>
+
+    <section class="card"><h3><span class="ic">🎨</span>배경 기본색</h3>
+      <div class="row"><div class="lab"><span class="nm">컬러</span></div><div class="swatches"><div class="sw" id="baseBgSw" style="background:#02020A"></div><div style="flex:3"></div></div></div>
+    </section>
+  </div>
+</aside>
+<div class="toast" id="toast"></div>
 
 <script>
 const canvas=document.getElementById('gl');
@@ -38,23 +107,30 @@ canvas.width=Math.round(CW*DPR);canvas.height=Math.round(CH*DPR);gl.viewport(0,0
 
 const VERT='attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}';
 const FRAG=`precision highp float;
-uniform vec2 u_res;
+uniform vec2 u_res; uniform float u_time;
 uniform vec2 uB1Pos,uB1Scl; uniform vec3 uB1Col; uniform float uB1Br,uB1A;
 uniform vec2 uB2Pos,uB2Scl; uniform vec3 uB2Col; uniform float uB2Br,uB2A;
 uniform vec2 uB3Pos,uB3Scl; uniform vec3 uB3Col; uniform float uB3Br,uB3A;
-uniform vec3 uBaseBg;
+uniform vec3 uBaseBg; uniform float uBgOn,uNebula,uNebAlpha,uNebBr;
 void main(){
-  vec2 res=u_res; vec2 uv=gl_FragCoord.xy/res; float aspc=res.x/res.y;
+  vec2 res=u_res; vec2 uv=gl_FragCoord.xy/res; float aspc=res.x/res.y; float tt=u_time;
   vec3 gc=uBaseBg;
-  // volume 1
+  // volume 1 (상단 타원)
   vec2 b1=(uv-uB1Pos)/uB1Scl; b1.x*=aspc;
-  gc+=uB1Col*min(exp(-dot(b1,b1)*1.8)*uB1Br,1.0)*uB1A;
-  // volume 2
+  gc+=uB1Col*min(exp(-dot(b1,b1)*1.8)*uB1Br,1.0)*uB1A*uBgOn;
+  // volume 2 (하단 원형)
   vec2 b2=(uv-uB2Pos)/uB2Scl; b2.x*=aspc;
-  gc+=uB2Col*min(exp(-dot(b2,b2)*2.2)*uB2Br,1.0)*uB2A;
-  // volume 3
+  gc+=uB2Col*min(exp(-dot(b2,b2)*2.2)*uB2Br,1.0)*uB2A*uBgOn;
+  // volume 3 (중앙 가로 타원)
   vec2 b3=(uv-uB3Pos)/uB3Scl; b3.x*=aspc;
-  gc+=uB3Col*min(exp(-dot(b3,b3)*2.0)*uB3Br,1.0)*uB3A;
+  gc+=uB3Col*min(exp(-dot(b3,b3)*2.0)*uB3Br,1.0)*uB3A*uBgOn;
+  // nebula (static — frozen time, no looping)
+  if(uNebula>0.5){vec3 neb=vec3(0.0);
+    for(int k=0;k<6;k++){float fk=float(k);float na=fk*1.05+tt*0.04;float nr=0.35+0.35*sin(fk*1.7);
+      vec2 cen=vec2(0.5)+vec2(cos(na),sin(na))*nr+vec2(sin(tt*0.18+fk*1.3),cos(tt*0.22+fk*0.9))*0.04;
+      vec2 dd=(uv-cen)*vec2(aspc,1.0);float blob=exp(-dot(dd,dd)*7.0)*(0.55+0.45*sin(tt*0.3+fk));
+      vec3 hue;float m=mod(fk,3.0);if(m<0.5)hue=vec3(0.55,0.40,0.95);else if(m<1.5)hue=vec3(0.40,0.55,0.95);else hue=vec3(0.45,0.92,0.75);neb+=blob*hue;}
+    vec2 cv=uv-0.5;neb*=0.65+0.45*(1.0-smoothstep(0.30,0.85,length(cv*vec2(aspc,1.0))));gc+=neb*uNebAlpha*uNebBr*uBgOn;}
   gl_FragColor=vec4(clamp(gc,0.0,1.0),1.0);
 }`;
 function compile(t,s){const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);
@@ -68,8 +144,8 @@ gl.useProgram(prog);
 const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-const U={};['u_res','uB1Pos','uB1Scl','uB1Col','uB1Br','uB1A','uB2Pos','uB2Scl','uB2Col','uB2Br','uB2A',
-  'uB3Pos','uB3Scl','uB3Col','uB3Br','uB3A','uBaseBg'].forEach(k=>U[k]=gl.getUniformLocation(prog,k));
+const U={};['u_res','u_time','uB1Pos','uB1Scl','uB1Col','uB1Br','uB1A','uB2Pos','uB2Scl','uB2Col','uB2Br','uB2A',
+  'uB3Pos','uB3Scl','uB3Col','uB3Br','uB3A','uBaseBg','uBgOn','uNebula','uNebAlpha','uNebBr'].forEach(k=>U[k]=gl.getUniformLocation(prog,k));
 
 // ---- helpers ----
 function hexToRgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255];}
@@ -79,58 +155,102 @@ function hslToHex(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l
   return'#'+f(0)+f(8)+f(4);}
 function rndColorHex(){return hslToHex(Math.random()*360,55+Math.random()*40,52+Math.random()*22);}
 
-// ---- background state (3 volumes: color + size x/y + position x/y) ----
-// alpha starts at 0 → only the dark base shows until the random button is pressed.
-const baseBg=hexToRgb('#02020A');
-const S={
-  b1:{col:hexToRgb('#34D399'),x:0.50,y:0.68,sx:0.44,sy:0.45,br:1.0,a:0},
-  b2:{col:hexToRgb('#67E8F9'),x:0.50,y:0.20,sx:0.44,sy:0.37,br:0.9,a:0},
-  b3:{col:hexToRgb('#F472B6'),x:0.50,y:0.43,sx:0.50,sy:0.24,br:0.8,a:0}
+// ---- background state (DEFAULTS taken from #2 of the original) ----
+const NEB_TIME=6.0; // fixed time → static nebula (no looping)
+const DEFAULTS={
+  bgOn:1,nebOn:0,nebA:1.00,nebBr:0.65,baseBg:'#02020A',
+  b1x:0.50,b1y:0.68,b1sx:0.51,b1sy:0.59,b1br:1.00,b1a:0.79,b1col:'#cf3ed4',
+  b2x:0.50,b2y:0.20,b2sx:0.51,b2sy:0.40,b2br:0.83,b2a:0.79,b2col:'#70d865',
+  b3x:0.50,b3y:0.43,b3sx:0.51,b3sy:0.26,b3br:0.74,b3a:0.84,b3col:'#395cda'
 };
+const S=JSON.parse(JSON.stringify(DEFAULTS));
 
-// static render — no loop. draws exactly one frame when called.
+// static render — no animation loop. draws one frame when called.
 function render(){
   gl.uniform2f(U.u_res,canvas.width,canvas.height);
-  gl.uniform3fv(U.uBaseBg,baseBg);
-  const v=(n,b)=>{gl.uniform2f(U['uB'+n+'Pos'],b.x,b.y);gl.uniform2f(U['uB'+n+'Scl'],b.sx,b.sy);
-    gl.uniform3fv(U['uB'+n+'Col'],b.col);gl.uniform1f(U['uB'+n+'Br'],b.br);gl.uniform1f(U['uB'+n+'A'],b.a);};
-  v(1,S.b1);v(2,S.b2);v(3,S.b3);
+  gl.uniform1f(U.u_time,NEB_TIME);
+  gl.uniform3fv(U.uBaseBg,hexToRgb(S.baseBg));
+  gl.uniform1f(U.uBgOn,S.bgOn);gl.uniform1f(U.uNebula,S.nebOn);gl.uniform1f(U.uNebAlpha,S.nebA);gl.uniform1f(U.uNebBr,S.nebBr);
+  gl.uniform2f(U.uB1Pos,S.b1x,S.b1y);gl.uniform2f(U.uB1Scl,S.b1sx,S.b1sy);gl.uniform3fv(U.uB1Col,hexToRgb(S.b1col));gl.uniform1f(U.uB1Br,S.b1br);gl.uniform1f(U.uB1A,S.b1a);
+  gl.uniform2f(U.uB2Pos,S.b2x,S.b2y);gl.uniform2f(U.uB2Scl,S.b2sx,S.b2sy);gl.uniform3fv(U.uB2Col,hexToRgb(S.b2col));gl.uniform1f(U.uB2Br,S.b2br);gl.uniform1f(U.uB2A,S.b2a);
+  gl.uniform2f(U.uB3Pos,S.b3x,S.b3y);gl.uniform2f(U.uB3Scl,S.b3sx,S.b3sy);gl.uniform3fv(U.uB3Col,hexToRgb(S.b3col));gl.uniform1f(U.uB3Br,S.b3br);gl.uniform1f(U.uB3A,S.b3a);
   gl.drawArrays(gl.TRIANGLES,0,3);
 }
 
-// ---- random button: color, size(x,y), position(x,y) for every volume ----
-function randomizeBg(){
-  S.b1.col=hexToRgb(rndColorHex());
-  S.b1.x=+rnd(.20,.80).toFixed(3);S.b1.y=+rnd(.40,.85).toFixed(3);
-  S.b1.sx=+rnd(.25,1.00).toFixed(3);S.b1.sy=+rnd(.18,.80).toFixed(3);
-  S.b1.br=+rnd(.7,1.3).toFixed(2);S.b1.a=+rnd(.80,.95).toFixed(2);
+// ---- toast ----
+let toastT=null;function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),1400);}
 
-  S.b2.col=hexToRgb(rndColorHex());
-  S.b2.x=+rnd(.20,.80).toFixed(3);S.b2.y=+rnd(.10,.50).toFixed(3);
-  S.b2.sx=+rnd(.18,.85).toFixed(3);S.b2.sy=+rnd(.12,.60).toFixed(3);
-  S.b2.br=+rnd(.6,1.2).toFixed(2);S.b2.a=+rnd(.80,.95).toFixed(2);
+// ---- sliders (live edit → render) ----
+function slider(id,key,dec){const el=document.getElementById(id),v=document.getElementById(id+'V');
+  el.addEventListener('input',e=>{S[key]=parseFloat(e.target.value);v.textContent=Number(e.target.value).toFixed(dec);render();});}
+slider('nebA','nebA',2);slider('nebBr','nebBr',2);
+slider('b1x','b1x',2);slider('b1y','b1y',2);slider('b1sx','b1sx',2);slider('b1sy','b1sy',2);slider('b1br','b1br',2);slider('b1a','b1a',2);
+slider('b2x','b2x',2);slider('b2y','b2y',2);slider('b2sx','b2sx',2);slider('b2sy','b2sy',2);slider('b2br','b2br',2);slider('b2a','b2a',2);
+slider('b3x','b3x',2);slider('b3y','b3y',2);slider('b3sx','b3sx',2);slider('b3sy','b3sy',2);slider('b3br','b3br',2);slider('b3a','b3a',2);
 
-  S.b3.col=hexToRgb(rndColorHex());
-  S.b3.x=+rnd(.20,.80).toFixed(3);S.b3.y=+rnd(.25,.65).toFixed(3);
-  S.b3.sx=+rnd(.30,.95).toFixed(3);S.b3.sy=+rnd(.08,.40).toFixed(3);
-  S.b3.br=+rnd(.6,1.1).toFixed(2);S.b3.a=+rnd(.80,.95).toFixed(2);
+// ---- color pickers ----
+function colorPicker(swId,key){const sw=document.getElementById(swId),inp=document.createElement('input');inp.type='color';inp.value=S[key];
+  inp.addEventListener('input',e=>{S[key]=e.target.value;sw.style.background=e.target.value;render();});sw.appendChild(inp);return inp;}
+const b1cInp=colorPicker('b1cSw','b1col'),b2cInp=colorPicker('b2cSw','b2col'),b3cInp=colorPicker('b3cSw','b3col'),baseBgInp=colorPicker('baseBgSw','baseBg');
 
-  render(); // apply only on button press
+// ---- toggles ----
+function wireToggle(id,key){const el=document.getElementById(id);el.classList.toggle('on',!!S[key]);
+  el.addEventListener('click',()=>{S[key]=S[key]?0:1;el.classList.toggle('on',!!S[key]);render();});}
+wireToggle('bgTog','bgOn');wireToggle('nebTog','nebOn');
+
+// ---- sync all UI from state ----
+function syncUI(){
+  const set=(id,val,dec)=>{const el=document.getElementById(id);if(el){el.value=val;document.getElementById(id+'V').textContent=Number(val).toFixed(dec);}};
+  set('nebA',S.nebA,2);set('nebBr',S.nebBr,2);
+  ['b1','b2','b3'].forEach(b=>{set(b+'x',S[b+'x'],2);set(b+'y',S[b+'y'],2);set(b+'sx',S[b+'sx'],2);set(b+'sy',S[b+'sy'],2);set(b+'br',S[b+'br'],2);set(b+'a',S[b+'a'],2);});
+  document.getElementById('b1cSw').style.background=S.b1col;b1cInp.value=S.b1col;
+  document.getElementById('b2cSw').style.background=S.b2col;b2cInp.value=S.b2col;
+  document.getElementById('b3cSw').style.background=S.b3col;b3cInp.value=S.b3col;
+  document.getElementById('baseBgSw').style.background=S.baseBg;baseBgInp.value=S.baseBg;
+  document.getElementById('bgTog').classList.toggle('on',!!S.bgOn);
+  document.getElementById('nebTog').classList.toggle('on',!!S.nebOn);
 }
-document.getElementById('rndBtn').addEventListener('click',randomizeBg);
 
-// ---- save current wallpaper as PNG ----
+// ---- random: color + size(x,y) + position(x,y) for every volume ----
+function randomizeAll(){
+  S.b1col=rndColorHex();S.b1x=+rnd(.2,.8).toFixed(2);S.b1y=+rnd(.35,.85).toFixed(2);S.b1sx=+rnd(.25,1.0).toFixed(2);S.b1sy=+rnd(.18,.80).toFixed(2);S.b1br=+rnd(.6,1.3).toFixed(2);
+  S.b2col=rndColorHex();S.b2x=+rnd(.2,.8).toFixed(2);S.b2y=+rnd(.1,.5).toFixed(2);S.b2sx=+rnd(.18,.85).toFixed(2);S.b2sy=+rnd(.12,.60).toFixed(2);S.b2br=+rnd(.5,1.2).toFixed(2);
+  S.b3col=rndColorHex();S.b3x=+rnd(.2,.8).toFixed(2);S.b3y=+rnd(.25,.65).toFixed(2);S.b3sx=+rnd(.30,.95).toFixed(2);S.b3sy=+rnd(.08,.35).toFixed(2);S.b3br=+rnd(.5,1.1).toFixed(2);
+  syncUI();render();toast('배경 랜덤');
+}
+function randB(n){
+  if(n===1){S.b1col=rndColorHex();S.b1x=+rnd(.2,.8).toFixed(2);S.b1y=+rnd(.4,.85).toFixed(2);S.b1sx=+rnd(.2,1.1).toFixed(2);S.b1sy=+rnd(.15,.90).toFixed(2);}
+  if(n===2){S.b2col=rndColorHex();S.b2x=+rnd(.2,.8).toFixed(2);S.b2y=+rnd(.1,.5).toFixed(2);S.b2sx=+rnd(.15,.90).toFixed(2);S.b2sy=+rnd(.10,.70).toFixed(2);}
+  if(n===3){S.b3col=rndColorHex();S.b3x=+rnd(.2,.8).toFixed(2);S.b3y=+rnd(.2,.7).toFixed(2);S.b3sx=+rnd(.25,1.0).toFixed(2);S.b3sy=+rnd(.08,.40).toFixed(2);}
+  syncUI();render();toast('볼륨'+n+' 랜덤');
+}
+function randomizeColors(){S.b1col=rndColorHex();S.b2col=rndColorHex();S.b3col=rndColorHex();syncUI();render();toast('컬러 랜덤');}
+function resetAll(){Object.assign(S,JSON.parse(JSON.stringify(DEFAULTS)));syncUI();render();toast('초기화');}
+
+document.getElementById('rndBtn').addEventListener('click',randomizeAll);
+document.getElementById('rndAllBg').addEventListener('click',randomizeAll);
+document.getElementById('rndAllBgCol').addEventListener('click',randomizeColors);
+document.getElementById('rndB1').addEventListener('click',e=>{e.stopPropagation();randB(1);});
+document.getElementById('rndB2').addEventListener('click',e=>{e.stopPropagation();randB(2);});
+document.getElementById('rndB3').addEventListener('click',e=>{e.stopPropagation();randB(3);});
+document.getElementById('resetBtn').addEventListener('click',resetAll);
+
+// ---- save PNG ----
 document.getElementById('saveBtn').addEventListener('click',()=>{
-  render(); // make sure latest frame is in the buffer
-  canvas.toBlob(b=>{
-    const u=URL.createObjectURL(b);const a=document.createElement('a');
+  render();
+  canvas.toBlob(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');
     const d=new Date(),p=n=>String(n).padStart(2,'0');
     a.href=u;a.download='wallpaper_'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+'.png';
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
   },'image/png');
+  toast('PNG 저장');
 });
 
-// initial frame: dark base only (background color applied on first button press)
-render();
+// ---- panel toggle ----
+const panelEl=document.getElementById('panel'),stageEl=document.getElementById('stage'),togBtn=document.getElementById('panelToggle');
+togBtn.addEventListener('click',()=>{const off=panelEl.classList.toggle('collapsed');stageEl.classList.toggle('full',off);togBtn.textContent=off?'☰':'⚙';});
+
+// initial frame
+syncUI();render();
 </script>
 </body></html>
