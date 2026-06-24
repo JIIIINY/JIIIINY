@@ -559,7 +559,7 @@ void main(){
   inside*=shapeM;
   inside*=mix(0.7,1.0,stl);   // 내려올 때 살짝 투명(배경 블렌딩) → 정착 시 불투명
   vec3 outc=mix(base,col,inside*clamp(u_cardAlpha,0.0,1.0));   // 카드 알파(투명도)
-  float wedge=exp(-pow(max(-d,0.0)/0.012,2.0)); outc+=vec3(1.0)*wedge*(1.0-stl)*0.9;   // 내려올 때 흰색 엣지(정착하면 사라지고 컬러 효과로 대체)
+  float wd=d/0.012; float wedge=exp(-wd*wd); outc+=vec3(1.0)*wedge*(1.0-stl)*0.9;   // 내려올 때 흰색 엣지(경계 d=0에서만, 바깥 전체 흰색 버그 수정)
 
   vec2 ln=(Pc-u_cardC)/(u_cardH+1e-4);   // 카드 로컬 좌표(중심0, 가장자리 ±1)
 
