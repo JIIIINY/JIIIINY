@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Frosted Glass Card · Lock Screen</title>
+<style>
+  :root{
+    --panel-bg: rgba(18,18,22,0.78);
+    --panel-br: rgba(255,255,255,0.10);
+    --txt: rgba(255,255,255,0.88);
+    --txt-dim: rgba(255,255,255,0.42);
+    --accent: #c9b8ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;width:100%;overflow:hidden;background:#0b0c0e;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  body{display:flex;align-items:center;justify-content:center}
+
+  /* lock-screen frame — 360 x 800 dp, 93dp radius (scaled to fit) */
+  #wrap{
+    --scale: min(96vh / 800, 96vw / 360);
+    position:relative;
+    width:  calc(360 * var(--scale));
+    height: calc(800 * var(--scale));
+    border-radius: calc(93 * var(--scale));
+    overflow:hidden;
+    box-shadow:0 0 60px rgba(0,0,0,.6);
+  }
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* control panel */
+  #panel{
+    position:fixed;right:16px;top:16px;bottom:16px;z-index:10;
+    width:264px;padding:0;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-br);
+    border-radius:16px;
+    backdrop-filter:blur(18px) saturate(1.2);
+    -webkit-backdrop-filter:blur(18px) saturate(1.2);
+    color:var(--txt);
+    box-shadow:0 8px 40px rgba(0,0,0,.28);
+    user-select:none;display:flex;flex-direction:column;
+  }
+  #ptop{display:flex;align-items:center;justify-content:space-between;
+    padding:13px 14px;border-bottom:1px solid var(--panel-br);flex:0 0 auto}
+  #ptop h1{font-size:12px;font-weight:700;letter-spacing:.05em}
+  #pscroll{overflow-y:auto;padding:6px 14px 16px;flex:1 1 auto}
+  #pscroll::-webkit-scrollbar{width:7px}
+  #pscroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px}
+
+  .sec{border-top:1px solid rgba(255,255,255,.06);padding:9px 0}
+  .sec:first-child{border-top:none}
+  .sechd{display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+  .sechd>span{font-size:11px;font-weight:700;letter-spacing:.06em;color:#fff}
+  .hr{display:flex;align-items:center;gap:7px}
+  .exp{width:20px;height:20px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:700;line-height:1;color:var(--txt-dim);
+    background:rgba(255,255,255,.06);border:1px solid var(--panel-br);border-radius:6px;cursor:pointer}
+  .exp:hover{background:rgba(255,255,255,.13);color:#fff}
+  .secbody{margin-top:8px}
+  .sec.col .secbody{display:none}
+  .sec.off .secbody{opacity:.34;pointer-events:none}
+
+  .sub{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--accent);
+    margin:10px 0 4px;opacity:.85}
+
+  .row{margin:8px 0}
+  .row label{display:flex;justify-content:space-between;font-size:10.5px;color:var(--txt-dim);margin-bottom:4px;letter-spacing:.02em}
+  .row label b{color:var(--accent);font-weight:600}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:rgba(255,255,255,.16);outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0);box-shadow:0 1px 6px rgba(0,0,0,.35);
+  }
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0)}
+
+  .cl{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--txt-dim);margin:7px 0}
+  .cl input[type=color]{width:26px;height:18px;border:1px solid var(--panel-br);
+    border-radius:5px;background:none;cursor:pointer;padding:0}
+
+  .seg{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+  .seg button{flex:1 1 auto;min-width:30px;padding:6px 4px;font-size:10.5px;font-weight:600;
+    color:var(--txt);background:rgba(255,255,255,.06);border:1px solid var(--panel-br);
+    border-radius:8px;cursor:pointer;transition:.15s}
+  .seg button:hover{background:rgba(255,255,255,.12)}
+  .seg button.active{border-color:var(--accent);color:#fff;background:rgba(201,184,255,.16)}
+
+  .tg{font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--txt-dim);
+    padding:3px 9px;border:1px solid var(--panel-br);border-radius:20px;cursor:pointer;
+    background:rgba(255,255,255,.05);transition:.15s}
+  .tg.active{color:#0b0c0e;background:var(--accent);border-color:var(--accent)}
+
+  .btns{display:flex;gap:6px;margin:8px 0}
+  .btns button{flex:1;padding:7px 0;font-size:10.5px;font-weight:600;color:var(--txt);
+    background:rgba(255,255,255,.07);border:1px solid var(--panel-br);border-radius:9px;cursor:pointer;transition:.2s}
+  .btns button:hover{background:rgba(255,255,255,.13)}
+  .btns button.active{border-color:var(--accent);color:#fff}
+  .btns button.rec.on{background:rgba(255,80,110,.18);border-color:#ff5a6e;color:#ffd0d8}
+  .bgidx{font-size:10.5px;color:var(--txt-dim);min-width:34px;text-align:center}
+  .layer{border:1px solid var(--panel-br);border-radius:10px;padding:8px;margin:8px 0;background:rgba(255,255,255,.03)}
+  .lhd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .lhd b{font-size:11px;color:#fff}
+  .lhd .rm{padding:2px 8px;font-size:11px;color:#ff9aa9;background:rgba(255,90,110,.12);
+    border:1px solid rgba(255,90,110,.3);border-radius:6px;cursor:pointer}
+  .lhd .lon{margin-right:6px}
+</style>
+</head>
+<body>
+  <div id="wrap"><canvas id="gl"></canvas></div>
+  <input type="file" id="file" accept="image/*" multiple style="display:none">
+
+  <div id="panel">
+    <div id="ptop"><h1>GLASS · LOCK SCREEN</h1><span class="tg" id="collapseAll" style="display:none"></span></div>
+    <div id="pscroll">
+
+      <!-- BACKGROUND -->
+      <div class="sec"><div class="sechd"><span>BACKGROUND</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="btns">
+            <button id="bgUp">＋ 업로드</button>
+            <button id="bgPrev">◀</button>
+            <span class="bgidx" id="bgIdx">1/2</span>
+            <button id="bgNext">▶</button>
+          </div>
+          <div class="row" style="font-size:10px;color:var(--txt-dim)">이미지를 추가하면 좌우로 전환됩니다.</div>
+        </div>
+      </div>
+
+      <!-- CARD -->
+      <div class="sec"><div class="sechd"><span>CARD</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="sub">COLOR</div>
+          <div class="seg" data-k="cardFill">
+            <button data-v="0">Solid</button><button data-v="3">Gradient</button>
+            <button data-v="2">Radial</button><button data-v="1">Linear</button>
+          </div>
+          <div class="cl">Chips
+            <input type="color" data-k="cardColor"><input type="color" data-k="cardColor2"><input type="color" data-k="cardColor3">
+            <button id="randCol" class="exp" style="width:auto;padding:0 8px;margin-left:auto">🎲 Random</button>
+          </div>
+          <div class="row"><label>그라데이션 각도 <b></b></label><input type="range" data-k="cardAngle" min="0" max="6.28" step="0.01"></div>
+          <div class="row"><label>면 컬러 Opacity (솔리드) <b></b></label><input type="range" data-k="cardAlpha" min="0" max="1" step="0.01"></div>
+          <div class="sub">COLOR 범위 (HSV)</div>
+          <div class="row"><label>Hue <b></b></label><input type="range" data-k="colHue" min="-0.5" max="0.5" step="0.005"></div>
+          <div class="row"><label>Saturation <b></b></label><input type="range" data-k="colSat" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Brightness <b></b></label><input type="range" data-k="colBright" min="0" max="2" step="0.01"></div>
+          <div class="sub">MOTION</div>
+          <div class="row"><label>Z축 전진(기준점) <b></b></label><input type="range" data-k="zAnchor" min="0" max="1" step="0.01"></div>
+          <div class="row"><label>드롭 속도 <b></b></label><input type="range" data-k="dropSpeed" min="0.1" max="3" step="0.01"></div>
+          <div class="btns"><button id="dropBtn" class="active">▽ Drop 재생</button><button id="loopBtn">↻ 루프</button></div>
+        </div>
+      </div>
+
+      <!-- BLUR LAYERS -->
+      <div class="sec"><div class="sechd"><span>BLUR LAYERS</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="btns"><button id="addLayer">＋ 레이어 추가</button></div>
+          <div id="layerBox"></div>
+        </div>
+      </div>
+
+      <!-- PARTIAL BLUR MASKING -->
+      <div class="sec"><div class="sechd"><span>PARTIAL BLUR MASKING</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="sub">일괄 (GLOBAL)</div>
+          <div class="row"><label>Blur <b></b></label><input type="range" data-k="cardBlur" min="0" max="4" step="0.01"></div>
+          <div class="row"><label>BG Hue <b></b></label><input type="range" data-k="bgHue" min="-0.5" max="0.5" step="0.005"></div>
+          <div class="sub">6 FACES (상 1·2·3 / 하 4·5·6)</div>
+          <div id="segBox"></div>
+        </div>
+      </div>
+
+      <!-- EDGE MASK -->
+      <div class="sec"><div class="sechd"><span>EDGE MASK</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="btns"><button id="addEdge">＋ 엣지마스크 추가</button></div>
+          <div id="edgeBox"></div>
+        </div>
+      </div>
+
+      <!-- LIGHT -->
+      <div class="sec"><div class="sechd"><span>LIGHT</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="sub">LIGHT MODE</div>
+          <div class="seg" data-k="lightMode">
+            <button data-v="0">Orbit</button><button data-v="1">Directional</button><button data-v="2">Radial</button>
+          </div>
+          <div class="sub">DIRECTION</div>
+          <div class="seg" data-k="lightDir">
+            <button data-v="0">↑</button><button data-v="1">↓</button><button data-v="2">←</button>
+            <button data-v="3">→</button><button data-v="4">↖</button><button data-v="5">↗</button>
+          </div>
+          <div class="sub">SWEEP TYPE</div>
+          <div class="seg" data-k="sweepType">
+            <button data-v="0">밝은 빛</button><button data-v="1">컬러 블러</button>
+          </div>
+          <div class="row"><label>Width <b></b></label><input type="range" data-k="lwidth" min="0.02" max="2" step="0.01"></div>
+          <div class="row"><label>Size <b></b></label><input type="range" data-k="lsize" min="0.02" max="2" step="0.01"></div>
+          <div class="row"><label>Blur <b></b></label><input type="range" data-k="lblur" min="0" max="3" step="0.01"></div>
+          <div class="row"><label>Intensity <b></b></label><input type="range" data-k="lintensity" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Shadow amount <b></b></label><input type="range" data-k="shadowAmt" min="0" max="1" step="0.01"></div>
+          <div class="cl">Shadow color <input type="color" data-k="shadowColor"></div>
+          <div class="row"><label>Angle <b></b></label><input type="range" data-k="langle" min="0" max="6.28" step="0.01"></div>
+          <div class="row"><label>Speed <b></b></label><input type="range" data-k="lspeed" min="0" max="3" step="0.01"></div>
+          <div class="row"><label>Glow (컬러블러) <b></b></label><input type="range" data-k="glow" min="0" max="2" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- TRANSITION -->
+      <div class="sec"><div class="sechd"><span>TRANSITION</span><div class="hr"><span class="tg" data-k="trOn">ON</span><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="seg">
+            <button class="tg" data-k="layerInner">Inner layer</button>
+          </div>
+          <div class="cl">Color <input type="color" data-k="trColor"></div>
+          <div class="row"><label>Light glow <b></b></label><input type="range" data-k="trGlow" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Blur <b></b></label><input type="range" data-k="trBlur" min="0" max="3" step="0.01"></div>
+          <div class="cl">Blur color <input type="color" data-k="trBlurColor"></div>
+          <div class="row"><label>Soft focus <b></b></label><input type="range" data-k="softFocus" min="0" max="1" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- IRIDESCENT -->
+      <div class="sec"><div class="sechd"><span>IRIDESCENT</span><div class="hr"><span class="tg" data-k="irOn">ON</span><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="sub">COLOR</div>
+          <div class="row"><label>Intensity <b></b></label><input type="range" data-k="irInt" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Hue <b></b></label><input type="range" data-k="irHue" min="0" max="1" step="0.01"></div>
+          <div class="row"><label>Hue shift <b></b></label><input type="range" data-k="irHueShift" min="0" max="3" step="0.01"></div>
+          <div class="row"><label>Saturation <b></b></label><input type="range" data-k="irSat" min="0" max="1.5" step="0.01"></div>
+          <div class="sub">PATTERN</div>
+          <div class="row"><label>Sharpness <b></b></label><input type="range" data-k="irSharp" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Wobble <b></b></label><input type="range" data-k="irWobble" min="0" max="3" step="0.01"></div>
+          <div class="row"><label>Direction <b></b></label><input type="range" data-k="irDir" min="0" max="6.28" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- SURFACE FX -->
+      <div class="sec"><div class="sechd"><span>SURFACE FX</span><div class="hr"><span class="tg" data-k="sfOn">ON</span><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="sub">RIM</div>
+          <div class="row"><label>Int <b></b></label><input type="range" data-k="rimInt" min="0" max="2" step="0.01"></div>
+          <div class="cl">Color <input type="color" data-k="rimColor"></div>
+          <div class="row"><label>Width <b></b></label><input type="range" data-k="rimWidth" min="0.02" max="1.5" step="0.01"></div>
+          <div class="row"><label>Size <b></b></label><input type="range" data-k="rimSize" min="0" max="1" step="0.01"></div>
+          <div class="sub">GLINT</div>
+          <div class="row"><label>Int <b></b></label><input type="range" data-k="glintInt" min="0" max="2" step="0.01"></div>
+          <div class="cl">Color <input type="color" data-k="glintColor"></div>
+          <div class="row"><label>Width <b></b></label><input type="range" data-k="glintWidth" min="0.02" max="1.5" step="0.01"></div>
+          <div class="row"><label>Size <b></b></label><input type="range" data-k="glintSize" min="0" max="1" step="0.01"></div>
+          <div class="sub">SWEEP</div>
+          <div class="row"><label>Int <b></b></label><input type="range" data-k="sweepInt" min="0" max="2" step="0.01"></div>
+          <div class="cl">Color <input type="color" data-k="sweepColor"></div>
+          <div class="row"><label>Width <b></b></label><input type="range" data-k="sweepWidth" min="0.02" max="1.5" step="0.01"></div>
+          <div class="row"><label>Size <b></b></label><input type="range" data-k="sweepSize" min="0.1" max="3" step="0.01"></div>
+          <div class="sub">EYES</div>
+          <div class="row"><label>Int <b></b></label><input type="range" data-k="eyesInt" min="0" max="2" step="0.01"></div>
+          <div class="cl">Color <input type="color" data-k="eyesColor"></div>
+          <div class="row"><label>Width(간격) <b></b></label><input type="range" data-k="eyesWidth" min="0" max="1" step="0.01"></div>
+          <div class="row"><label>Size <b></b></label><input type="range" data-k="eyesSize" min="0.02" max="1" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- INNER FX -->
+      <div class="sec"><div class="sechd"><span>INNER FX</span><div class="hr"><span class="tg" data-k="innerOn">ON</span><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="row"><label>Inner pulse <b></b></label><input type="range" data-k="pulseInt" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Caustics <b></b></label><input type="range" data-k="causticsInt" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Edge flare <b></b></label><input type="range" data-k="edgeFlareInt" min="0" max="2" step="0.01"></div>
+        </div>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="sec"><div class="sechd"><span>PLAYBACK</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="btns"><button id="play" class="active">⏸ 정지</button><button id="rec" class="rec">● 녹화</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl', {alpha:false, antialias:true, preserveDrawingBuffer:true});
+if(!gl){ alert('이 브라우저는 WebGL을 지원하지 않습니다.'); }
+
+const VERT = `attribute vec2 a; void main(){ gl_Position=vec4(a,0.0,1.0); }`;
+
+const FRAG = `
+precision highp float;
+uniform vec2  u_res; uniform float u_time; uniform float u_prog;
+uniform vec3  u_cardColor,u_cardColor2,u_cardColor3; uniform int u_cardFill;
+uniform float u_zAnchor, u_cardAlpha,u_cardBlur,u_cardAngle;
+uniform int   u_lightMode; uniform int u_lightDir; uniform int u_sweepType;
+uniform float u_lwidth,u_lsize,u_lblur,u_lintensity,u_shadowAmt,u_langle,u_lspeed,u_glow;
+uniform vec3  u_shadowColor;
+uniform float u_trOn,u_layerInner,u_trGlow,u_trBlur,u_softFocus;
+uniform vec3  u_trColor,u_trBlurColor;
+uniform float u_irOn,u_irInt,u_irHue,u_irHueShift,u_irSat,u_irSharp,u_irWobble,u_irDir;
+uniform float u_sfOn;
+uniform float u_rimInt,u_rimWidth,u_rimSize, u_glintInt,u_glintWidth,u_glintSize;
+uniform float u_sweepInt,u_sweepWidth,u_sweepSize, u_eyesInt,u_eyesWidth,u_eyesSize;
+uniform vec3  u_rimColor,u_glintColor,u_sweepColor,u_eyesColor;
+uniform float u_innerOn,u_pulseInt,u_causticsInt,u_edgeFlareInt;
+uniform int   u_bg; uniform sampler2D u_photo; uniform float u_hasPhoto,u_photoAspect;
+// stackable blur layers
+uniform int   u_layerCount;
+uniform int   u_layType[5];   uniform int u_layShape[5];
+uniform float u_layBlur[5];   uniform float u_laySize[5];
+uniform float u_layInt[5];    uniform float u_layOn[5];
+uniform vec2  u_layPos[5];    uniform vec3  u_layColor[5];
+// card colour HSV adjust + global background hue
+uniform float u_colHue,u_colSat,u_colBright,u_bgHue;
+// partial blur masking — 6 faces (top 0,1,2 / bottom 3,4,5)
+uniform float u_segBlur[6];   uniform float u_segHue[6];
+// edge-mask layers (inner border)
+uniform int   u_emCount;
+uniform float u_emOn[3],u_emColorOn[3],u_emLightOn[3];
+uniform float u_emWidth[3],u_emColInt[3],u_emLightInt[3],u_emDistort[3];
+uniform vec3  u_emColA[3],u_emColB[3],u_emLightCol[3];
+
+const vec2  DP       = vec2(360.0,800.0);
+const vec2  CARD_MIN = vec2(10.0,10.0);
+const vec2  CARD_MAX = vec2(350.0,243.0);
+const float R_TOP=80.0, R_BOT=60.0;
+
+float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
+float noise(vec2 p){ vec2 i=floor(p),f=fract(p);
+  float a=hash(i),b=hash(i+vec2(1.,0.)),c=hash(i+vec2(0.,1.)),d=hash(i+vec2(1.,1.));
+  vec2 u=f*f*(3.0-2.0*f); return mix(mix(a,b,u.x),mix(c,d,u.x),u.y); }
+float fbm(vec2 p){ float v=0.0,amp=0.5; for(int i=0;i<4;i++){ v+=amp*noise(p); p=p*2.0+vec2(11.3,7.1); amp*=0.5; } return v; }
+vec3 palette(float t){ return vec3(0.55)+vec3(0.45)*cos(6.28318*(t+vec3(0.0,0.33,0.67))); }
+vec3 rgb2hsv(vec3 c){
+  vec4 K=vec4(0.0,-1.0/3.0,2.0/3.0,-1.0);
+  vec4 p=mix(vec4(c.bg,K.wz),vec4(c.gb,K.xy),step(c.b,c.g));
+  vec4 q=mix(vec4(p.xyw,c.r),vec4(c.r,p.yzx),step(p.x,c.r));
+  float dd=q.x-min(q.w,q.y), e=1.0e-10;
+  return vec3(abs(q.z+(q.w-q.y)/(6.0*dd+e)), dd/(q.x+e), q.x);
+}
+vec3 hsv2rgb(vec3 c){
+  vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
+  vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www);
+  return c.z*mix(K.xxx,clamp(p-K.xxx,0.0,1.0),c.y);
+}
+vec3 hueShift(vec3 col,float h){ vec3 v=rgb2hsv(col); v.x=fract(v.x+h); return hsv2rgb(v); }
+vec3 adjustHSV(vec3 col,float h,float s,float v){
+  vec3 c=rgb2hsv(col); c.x=fract(c.x+h); c.y=clamp(c.y*s,0.0,1.0); c.z=clamp(c.z*v,0.0,2.0);
+  return hsv2rgb(c);
+}
+vec3 lightTint(float t){ return mix(vec3(1.0), 0.5+0.5*cos(6.28318*(t+vec3(0.0,0.33,0.67))), 0.78); }
+
+vec3 bgColor(vec2 uv){
+  if(u_bg==2){ vec2 g=floor(uv*u_res/30.0); return mix(vec3(0.82),vec3(0.58),mod(g.x+g.y,2.0)); }
+  if(u_bg==1 && u_hasPhoto>0.5){
+    float ca=u_res.x/u_res.y; vec2 t=uv; float s=u_photoAspect/ca;
+    if(s>1.0) t.x=(uv.x-0.5)/s+0.5; else t.y=(uv.y-0.5)*s+0.5;
+    return texture2D(u_photo, vec2(t.x,1.0-t.y)).rgb;
+  }
+  if(u_bg==3){                                   // pink / deep-green mesh gradient
+    vec3 pink=vec3(0.93,0.80,0.82), rose=vec3(0.86,0.45,0.52), dgrn=vec3(0.04,0.24,0.15), grn=vec3(0.10,0.42,0.28);
+    float a=smoothstep(-0.2,1.1, uv.x+0.35*sin(uv.y*3.1+0.6));
+    float b=smoothstep(0.0,1.0, uv.y*1.1-0.2+0.3*cos(uv.x*2.4));
+    vec3 c=mix(mix(pink,dgrn,a), mix(rose,grn,a), b);
+    c=mix(c, pink, 0.25*smoothstep(0.6,0.0,distance(uv,vec2(0.32,0.78))));
+    return c;
+  }
+  if(u_bg==4){                                   // soft sage frosted (smooth, no grain)
+    vec3 light=vec3(0.90,0.93,0.88), green=vec3(0.42,0.60,0.40);
+    float band=smoothstep(0.1,0.85,1.0-uv.y)*smoothstep(0.0,0.7,uv.x);
+    vec3 c=mix(light, green, band*0.7);
+    c=mix(c, green, 0.18*smoothstep(0.5,0.0,abs(uv.x-0.35+0.25*uv.y)));
+    return c;
+  }
+  vec3 top=vec3(0.83,0.87,0.90), bot=vec3(0.68,0.74,0.80);
+  vec3 col=mix(bot,top,uv.y);
+  col*=1.0-0.13*smoothstep(0.2,0.95,distance(uv,vec2(0.5,0.6)));
+  return col;
+}
+
+vec3 blurBg(vec2 uv, float amt){           // smooth frosted-glass blur of the background
+  if(amt<=0.001) return bgColor(uv);
+  float aspect=u_res.x/u_res.y, rad=amt*0.02; vec3 acc=vec3(0.0);
+  for(int i=0;i<18;i++){ float a=float(i)*2.39996; float rr=rad*sqrt((float(i)+0.5)/18.0);
+    acc+=bgColor(uv+vec2(cos(a),sin(a))*rr*vec2(1.0/aspect,1.0)); }
+  return acc/18.0;
+}
+
+float sdCard(vec2 p){
+  vec2 b=(CARD_MAX-CARD_MIN)*0.5;
+  vec4 r=vec4(R_TOP,R_BOT,R_TOP,R_BOT);
+  r.xy=(p.x>0.0)?r.xy:r.zw; r.x=(p.y>0.0)?r.x:r.y; r.x=min(r.x,min(b.x,b.y));
+  vec2 q=abs(p)-b+r.x; return min(max(q.x,q.y),0.0)+length(max(q,vec2(0.0)))-r.x;
+}
+vec2 sdNormal(vec2 p){ float e=0.6;
+  return normalize(vec2(sdCard(p+vec2(e,0.0))-sdCard(p-vec2(e,0.0)),
+                        sdCard(p+vec2(0.0,e))-sdCard(p-vec2(0.0,e)))+1e-6); }
+
+vec2 dirVec(int d){
+  if(d==0) return vec2(0.0,1.0); if(d==1) return vec2(0.0,-1.0);
+  if(d==2) return vec2(-1.0,0.0); if(d==3) return vec2(1.0,0.0);
+  if(d==4) return normalize(vec2(-1.0,1.0)); return normalize(vec2(1.0,1.0));
+}
+vec2 lightPos(){
+  float t=u_time*u_lspeed;
+  if(u_lightMode==0) return vec2(0.62*cos(t*0.7),0.44*sin(t*0.9+0.5)); // orbit / float
+  if(u_lightMode==1) return dirVec(u_lightDir)*(fract(t*0.18)*2.0-1.0); // directional sweep
+  return vec2(0.0);                                                     // radial (center)
+}
+float layerMask(vec2 nl, vec2 pos, float size, int shape, float soft){  // rect <-> circle
+  vec2 q=(nl-pos)/max(size,0.05);
+  float dd=(shape==1)? length(q) : max(abs(q.x),abs(q.y));
+  return smoothstep(1.0, 1.0-clamp(soft,0.05,0.95), dd);
+}
+
+vec3 cardBase(vec2 nl){                     // solid / linear / radial / mesh fill
+  if(u_cardFill==0) return u_cardColor;
+  float ca=cos(u_cardAngle), sa=sin(u_cardAngle);
+  float t=smoothstep(0.0,1.0, clamp((nl.x*ca+nl.y*sa)*0.6+0.5,0.0,1.0));          // smooth blend
+  if(u_cardFill==1) return mix(u_cardColor,u_cardColor2,t);                       // linear
+  if(u_cardFill==2){ float r=smoothstep(0.0,1.0,clamp(length(nl)*0.85,0.0,1.0)); return mix(u_cardColor,u_cardColor2,r); } // radial
+  float b=smoothstep(0.0,1.0,clamp(length(nl-vec2(0.35,-0.35))*0.7,0.0,1.0));     // mesh / gradient
+  return mix(mix(u_cardColor,u_cardColor2,t), u_cardColor3, 1.0-b);
+}
+
+float lightDist2(vec2 nl, vec2 lp){
+  vec2 diff=nl-lp; float ca=cos(u_langle),sa=sin(u_langle);
+  vec2 rd=vec2(diff.x*ca+diff.y*sa,-diff.x*sa+diff.y*ca);
+  float sx=max(u_lwidth,0.02)*(1.0+u_lblur+u_trBlur);
+  float sy=max(u_lsize,0.02)*(1.0+u_lblur+u_trBlur);
+  return (rd.x*rd.x)/(sx*sx)+(rd.y*rd.y)/(sy*sy);
+}
+
+void main(){
+  vec2 suv=gl_FragCoord.xy/u_res;
+  vec2 dp =vec2(suv.x*DP.x,(1.0-suv.y)*DP.y);
+
+  // ---- drop (Y) + Z-forward animation ----
+  float e=smoothstep(0.0,1.0,clamp(u_prog,0.0,1.0));
+  float zs=mix(1.0-0.35*u_zAnchor,1.0,e);
+  vec2  center=vec2(180.0,126.5-(1.0-e)*340.0);
+  vec2  lp2=dp-center;
+  vec2  P=vec2(lp2.x,-lp2.y)/zs;
+  vec2  b=(CARD_MAX-CARD_MIN)*0.5;
+  vec2  nl=P/b;
+
+  float d=sdCard(P); vec2 n=sdNormal(P);
+  float inside=smoothstep(1.0,-1.0,d);
+
+  vec3 outc=bgColor(suv);
+
+  // ---- light field on the surface ----
+  vec2 Lp=lightPos();
+  float spot, halo;
+  if(u_lightMode==2){
+    float rr=length(nl), ringR=fract(u_time*u_lspeed*0.2);
+    float w=max(u_lwidth*0.5+u_lblur*0.3,0.03);
+    spot=exp(-pow((rr-ringR)/w,2.0)); halo=exp(-pow((rr-ringR)/(w*2.6),2.0));
+  } else { float dd=lightDist2(nl,Lp); spot=exp(-dd); halo=exp(-dd*0.3); }
+
+  vec3 lcol = (u_sweepType==0)? vec3(1.0) : lightTint(u_time*0.06);
+  if(u_trOn>0.5) lcol=mix(lcol,u_trColor,0.7);
+
+  // ---- card surface (solid / gradient base + HSV range adjust) ----
+  vec3 surf=adjustHSV(cardBase(nl), u_colHue, u_colSat, u_colBright);
+
+  // ---- stackable blur layers (frosted patches) ----
+  for(int i=0;i<5;i++){
+    if(i>=u_layerCount) break;
+    if(u_layOn[i]<0.5) continue;
+    if(u_layType[i]==0){                                   // colour blur: blurred BG tinted
+      float m=layerMask(nl,u_layPos[i],u_laySize[i],u_layShape[i],0.55);
+      vec3 bb=blurBg(suv,u_layBlur[i]);
+      surf=mix(surf, mix(bb,u_layColor[i],0.45), m*u_layInt[i]);
+    } else {                                               // light blur: soft additive glow
+      float m=layerMask(nl,u_layPos[i],u_laySize[i],u_layShape[i],0.18+u_layBlur[i]*0.16);
+      surf+=u_layColor[i]*m*u_layInt[i];
+    }
+  }
+  surf=mix(surf,u_shadowColor, clamp(u_shadowAmt,0.0,1.0)*(1.0-spot));   // shaded solid
+  if(u_layerInner>0.5 || u_trOn<0.5) surf+=lcol*spot*u_lintensity;        // surface light blur
+  if(u_sweepType==1){                                                     // colour-blur glow
+    vec3 gcol=mix(lcol,u_trBlurColor,(u_trOn>0.5)?0.5:0.0);
+    surf+=gcol*halo*(u_glow + (u_trOn>0.5?u_trGlow:0.0))*0.6;
+  }
+
+  // ---- iridescent ----
+  if(u_irOn>0.5){
+    float grad=nl.x*cos(u_irDir)+nl.y*sin(u_irDir);
+    float pat=fbm(nl*(1.0+u_irSharp*5.0)+vec2(sin(u_time*u_irWobble),cos(u_time*u_irWobble))*0.6);
+    vec3 iri=palette(u_irHue+u_irHueShift*u_time*0.05+grad*0.5+pat*0.6);
+    iri=mix(vec3(dot(iri,vec3(0.333))),iri,u_irSat);
+    surf+=iri*u_irInt*0.5*(0.5+0.5*spot);
+  }
+
+  // ---- surface FX ----
+  if(u_sfOn>0.5){
+    float edge=exp(-pow(d/max(u_rimWidth*9.0,1.0),2.0));
+    surf+=u_rimColor*edge*u_rimInt*(0.6+0.4*u_rimSize);                   // rim
+    vec2 toL=normalize(Lp-nl+1e-5);
+    float gln=pow(max(dot(n,toL),0.0),mix(7.0,1.5,u_glintSize))*exp(-pow(d/max(u_glintWidth*9.0,1.0),2.0));
+    surf+=u_glintColor*gln*u_glintInt;                                    // glint
+    float proj=nl.x*0.7+nl.y*0.7, bandPos=sin(u_time*u_sweepSize);
+    float band=exp(-pow((proj-bandPos)/max(u_sweepWidth*0.5,0.03),2.0));
+    surf+=u_sweepColor*band*u_sweepInt*inside;                            // sweep band
+    float r2=max(u_eyesSize,0.03); vec2 ec=vec2(0.32*(0.3+u_eyesWidth),0.18);
+    float ey=exp(-dot(nl-ec,nl-ec)/(r2*r2))+exp(-dot(nl-vec2(-ec.x,ec.y),nl-vec2(-ec.x,ec.y))/(r2*r2));
+    surf+=u_eyesColor*ey*u_eyesInt*0.8;                                   // eyes
+  }
+
+  // ---- inner FX ----
+  if(u_innerOn>0.5){
+    surf*=1.0+0.25*u_pulseInt*sin(u_time*2.0);                            // pulse
+    float c=smoothstep(0.62,0.92,fbm(nl*3.2+u_time*0.3));
+    surf+=vec3(1.0)*c*u_causticsInt*0.5;                                  // caustics
+    float ef=exp(-pow(d/22.0,2.0))*(0.55+0.45*sin(u_time*3.0));
+    surf+=lcol*ef*u_edgeFlareInt;                                         // edge flare
+  }
+
+  // ---- edge-mask layers: smooth colour gradient + light along the inner border ----
+  for(int i=0;i<3;i++){
+    if(i>=u_emCount) break;
+    if(u_emOn[i]<0.5) continue;
+    float w=max(u_emWidth[i]*120.0,1.0);
+    float din=max(-d,0.0) + u_emDistort[i]*40.0*(fbm(nl*2.5+u_time*0.2)-0.5);  // distortion
+    float t=clamp(din/w,0.0,1.0);
+    float vis=(1.0-smoothstep(0.55,1.0,t))*inside;          // band fades inward, clipped to card
+    if(u_emColorOn[i]>0.5){
+      vec3 g=mix(u_emColA[i], u_emColB[i], smoothstep(0.0,1.0,t));   // start<->end blended
+      surf=mix(surf, g, vis*u_emColInt[i]);
+    }
+    if(u_emLightOn[i]>0.5) surf+=u_emLightCol[i]*vis*u_emLightInt[i];
+  }
+
+  // ---- soft focus (gentle lift + bloom) ----
+  surf=mix(surf, surf+vec3(0.04)+spot*0.18, clamp((u_trOn>0.5?u_softFocus:0.0),0.0,1.0)*0.6);
+
+  // ---- partial blur masking: 6 faces (top 0,1,2 / bottom 3,4,5), each own blur + bg hue ----
+  float cx=(nl.x+1.0)*0.5;
+  int colI=(cx<0.3333)?0:((cx<0.6667)?1:2);
+  int rowI=(nl.y>0.0)?0:1;
+  int seg=rowI*3+colI;
+  float blurAmt=u_cardBlur, hueAmt=u_bgHue;
+  for(int s=0;s<6;s++){ if(s==seg){ blurAmt+=u_segBlur[s]; hueAmt+=u_segHue[s]; } }
+
+  // ---- composite: opacity + frosted backdrop blur, with drop fade-in ----
+  vec3 behind=hueShift(blurBg(suv,blurAmt), hueAmt);        // per-face blurred, hue-shifted bg
+  vec3 cardPix=mix(behind, surf, clamp(u_cardAlpha,0.0,1.0));
+  outc=mix(outc, cardPix, inside*e);
+
+  gl_FragColor=vec4(outc,1.0);
+}`;
+
+let shaderErr='';
+function compile(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ const log=gl.getShaderInfoLog(s); shaderErr+=log+'\n'; console.error(log); }
+  return s; }
+const prog=gl.createProgram();
+gl.attachShader(prog,compile(gl.VERTEX_SHADER,VERT));
+gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,FRAG));
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){ shaderErr+=(gl.getProgramInfoLog(prog)||'link failed')+'\n'; }
+if(shaderErr){
+  const d=document.createElement('pre');
+  d.style.cssText='position:fixed;inset:0;z-index:99;margin:0;padding:18px;overflow:auto;'+
+    'background:#1a0000;color:#ff9a9a;font:12px/1.5 monospace;white-space:pre-wrap';
+  d.textContent='SHADER ERROR\n\n'+shaderErr; document.body.appendChild(d);
+}
+gl.useProgram(prog);
+
+const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const aLoc=gl.getAttribLocation(prog,'a'); gl.enableVertexAttribArray(aLoc);
+gl.vertexAttribPointer(aLoc,2,gl.FLOAT,false,0,0);
+
+// ---- parameter state + metadata (key -> type, uniform = 'u_'+key) ----
+const META={
+  cardColor:'c', cardColor2:'c', cardColor3:'c', cardFill:'i', cardAngle:'f', zAnchor:'f', cardAlpha:'f', cardBlur:'f',
+  lightMode:'i', lightDir:'i', sweepType:'i',
+  lwidth:'f',lsize:'f',lblur:'f',lintensity:'f',shadowAmt:'f',shadowColor:'c',langle:'f',lspeed:'f',glow:'f',
+  trOn:'b',layerInner:'b',trColor:'c',trGlow:'f',trBlur:'f',trBlurColor:'c',softFocus:'f',
+  colHue:'f',colSat:'f',colBright:'f',bgHue:'f',
+  irOn:'b',irInt:'f',irHue:'f',irHueShift:'f',irSat:'f',irSharp:'f',irWobble:'f',irDir:'f',
+  sfOn:'b',
+  rimInt:'f',rimColor:'c',rimWidth:'f',rimSize:'f',
+  glintInt:'f',glintColor:'c',glintWidth:'f',glintSize:'f',
+  sweepInt:'f',sweepColor:'c',sweepWidth:'f',sweepSize:'f',
+  eyesInt:'f',eyesColor:'c',eyesWidth:'f',eyesSize:'f',
+  innerOn:'b',pulseInt:'f',causticsInt:'f',edgeFlareInt:'f',
+};
+const state={
+  cardColor:'#dfe3ea', cardColor2:'#b8c6ff', cardColor3:'#ffd2a6', cardFill:0, cardAngle:0.8,
+  zAnchor:0.6, dropSpeed:1.0, cardAlpha:1.0, cardBlur:0.6,
+  lightMode:0, lightDir:3, sweepType:1,
+  lwidth:0.5, lsize:0.5, lblur:0.6, lintensity:0.7, shadowAmt:0.35, shadowColor:'#9aa3b2', langle:0.0, lspeed:1.0, glow:0.7,
+  trOn:0, layerInner:1, trColor:'#ffd2a6', trGlow:0.5, trBlur:0.3, trBlurColor:'#b8c6ff', softFocus:0.3,
+  colHue:0.0, colSat:1.0, colBright:1.0, bgHue:0.0,
+  irOn:1, irInt:0.5, irHue:0.1, irHueShift:1.0, irSat:0.9, irSharp:0.4, irWobble:0.6, irDir:0.8,
+  sfOn:1,
+  rimInt:0.5, rimColor:'#ffffff', rimWidth:0.3, rimSize:0.5,
+  glintInt:0.4, glintColor:'#fff2d0', glintWidth:0.3, glintSize:0.5,
+  sweepInt:0.0, sweepColor:'#ffffff', sweepWidth:0.4, sweepSize:1.0,
+  eyesInt:0.0, eyesColor:'#ffffff', eyesWidth:0.5, eyesSize:0.35,
+  innerOn:0, pulseInt:0.3, causticsInt:0.3, edgeFlareInt:0.3,
+};
+state.layers=[
+  {on:true, type:0, shape:1, blur:2.2, size:0.85, intensity:0.7, posx:-0.15, posy:0.15, color:'#bcd9ff'},
+];
+state.segBlur=[0,0,0,0,0,0];          // per-face extra blur (faces 1..6)
+state.segHue =[0,0,0,0,0,0];          // per-face bg hue shift
+state.edges=[                          // edge-mask layers
+  {on:true, colorOn:true, lightOn:false, colA:'#ffffff', colB:'#bcd9ff', lightCol:'#ffffff',
+   width:0.35, colInt:0.6, lightInt:0.5, distort:0.0},
+];
+const loc={}; for(const k in META) loc[k]=gl.getUniformLocation(prog,'u_'+k);
+const Uextra={ res:gl.getUniformLocation(prog,'u_res'), time:gl.getUniformLocation(prog,'u_time'),
+  prog:gl.getUniformLocation(prog,'u_prog'), bg:gl.getUniformLocation(prog,'u_bg'),
+  photo:gl.getUniformLocation(prog,'u_photo'), hasPhoto:gl.getUniformLocation(prog,'u_hasPhoto'),
+  photoAspect:gl.getUniformLocation(prog,'u_photoAspect') };
+gl.uniform1i(Uextra.photo,0);
+const hx=h=>{ const n=parseInt(h.slice(1),16); return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255]; };
+
+// blur-layer uniform locations + reusable buffers
+const MAXL=5;
+const Ul={ count:gl.getUniformLocation(prog,'u_layerCount'),
+  type:gl.getUniformLocation(prog,'u_layType'), shape:gl.getUniformLocation(prog,'u_layShape'),
+  blur:gl.getUniformLocation(prog,'u_layBlur'), size:gl.getUniformLocation(prog,'u_laySize'),
+  int:gl.getUniformLocation(prog,'u_layInt'), on:gl.getUniformLocation(prog,'u_layOn'),
+  pos:gl.getUniformLocation(prog,'u_layPos'), color:gl.getUniformLocation(prog,'u_layColor') };
+const bType=new Int32Array(MAXL),bShape=new Int32Array(MAXL),bOn=new Float32Array(MAXL),
+  bBlur=new Float32Array(MAXL),bSize=new Float32Array(MAXL),bInt=new Float32Array(MAXL),
+  bPos=new Float32Array(MAXL*2),bCol=new Float32Array(MAXL*3);
+
+// partial-blur 6 faces + edge-mask layers
+const Useg={ blur:gl.getUniformLocation(prog,'u_segBlur'), hue:gl.getUniformLocation(prog,'u_segHue') };
+const sBlur=new Float32Array(6), sHue=new Float32Array(6);
+const MAXE=3;
+const Uem={ count:gl.getUniformLocation(prog,'u_emCount'),
+  on:gl.getUniformLocation(prog,'u_emOn'), colorOn:gl.getUniformLocation(prog,'u_emColorOn'),
+  lightOn:gl.getUniformLocation(prog,'u_emLightOn'), width:gl.getUniformLocation(prog,'u_emWidth'),
+  colInt:gl.getUniformLocation(prog,'u_emColInt'), lightInt:gl.getUniformLocation(prog,'u_emLightInt'),
+  distort:gl.getUniformLocation(prog,'u_emDistort'), colA:gl.getUniformLocation(prog,'u_emColA'),
+  colB:gl.getUniformLocation(prog,'u_emColB'), lightCol:gl.getUniformLocation(prog,'u_emLightCol') };
+const eOn=new Float32Array(MAXE),eColOn=new Float32Array(MAXE),eLitOn=new Float32Array(MAXE),
+  eW=new Float32Array(MAXE),eCI=new Float32Array(MAXE),eLI=new Float32Array(MAXE),eD=new Float32Array(MAXE),
+  eCA=new Float32Array(MAXE*3),eCB=new Float32Array(MAXE*3),eLC=new Float32Array(MAXE*3);
+
+// ---- background management ----
+function makeTex(){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([200,200,200,255]));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); return t; }
+const dummyTex=makeTex();
+const backgrounds=[
+  {type:'preset',bg:3,name:'Pink·Green'},
+  {type:'preset',bg:4,name:'Sage'},
+  {type:'preset',bg:0,name:'Blue-grey'},
+  {type:'checker'},
+];
+let bgIndex=0, curTex=dummyTex, curBg=3, curHasPhoto=0, curAspect=1.0;
+const bgIdxEl=document.getElementById('bgIdx');
+function applyBg(){
+  const it=backgrounds[bgIndex];
+  if(it.type==='preset'){ curBg=it.bg; curHasPhoto=0; curTex=dummyTex; }
+  else if(it.type==='checker'){ curBg=2; curHasPhoto=0; curTex=dummyTex; }
+  else { curBg=1; curHasPhoto=1; curTex=it.tex; curAspect=it.aspect; }
+  bgIdxEl.textContent=`${bgIndex+1}/${backgrounds.length}`;
+}
+applyBg();
+document.getElementById('bgPrev').onclick=()=>{ bgIndex=(bgIndex-1+backgrounds.length)%backgrounds.length; applyBg(); };
+document.getElementById('bgNext').onclick=()=>{ bgIndex=(bgIndex+1)%backgrounds.length; applyBg(); };
+const fileInput=document.getElementById('file');
+document.getElementById('bgUp').onclick=()=>fileInput.click();
+fileInput.onchange=e=>{
+  const files=[...e.target.files]; let added=0;
+  files.forEach(f=>{ const img=new Image();
+    img.onload=()=>{ const t=makeTex(); gl.bindTexture(gl.TEXTURE_2D,t);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+      backgrounds.push({type:'photo',tex:t,aspect:img.width/img.height});
+      bgIndex=backgrounds.length-1; applyBg(); URL.revokeObjectURL(img.src); };
+    img.src=URL.createObjectURL(f); });
+  fileInput.value='';
+};
+
+// ---- resize ----
+let DPR=Math.min(window.devicePixelRatio||1,2);
+function resize(){ DPR=Math.min(window.devicePixelRatio||1,2);
+  const r=cv.getBoundingClientRect();
+  cv.width=Math.max(1,Math.floor(r.width*DPR)); cv.height=Math.max(1,Math.floor(r.height*DPR));
+  gl.viewport(0,0,cv.width,cv.height); }
+window.addEventListener('resize',resize); resize();
+
+// ---- drop animation ----
+let prog2=0, loop=false, playing=true, simTime=0, last=performance.now();
+function frame(now){
+  const dt=Math.min((now-last)/1000,0.05); last=now;
+  if(playing) simTime+=dt;
+  prog2=Math.min(prog2+dt*state.dropSpeed*0.6,1.0);
+  if(loop && prog2>=1.0) prog2=0;
+
+  gl.uniform2f(Uextra.res,cv.width,cv.height);
+  gl.uniform1f(Uextra.time,simTime);
+  gl.uniform1f(Uextra.prog,prog2);
+  gl.uniform1i(Uextra.bg,curBg);
+  gl.uniform1f(Uextra.hasPhoto,curHasPhoto);
+  gl.uniform1f(Uextra.photoAspect,curAspect);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,curTex);
+
+  const N=Math.min(state.layers.length,MAXL);
+  for(let i=0;i<N;i++){ const L=state.layers[i];
+    bType[i]=L.type; bShape[i]=L.shape; bOn[i]=L.on?1:0; bBlur[i]=L.blur; bSize[i]=L.size; bInt[i]=L.intensity;
+    bPos[i*2]=L.posx; bPos[i*2+1]=L.posy; const c=hx(L.color); bCol[i*3]=c[0];bCol[i*3+1]=c[1];bCol[i*3+2]=c[2]; }
+  gl.uniform1i(Ul.count,N);
+  gl.uniform1iv(Ul.type,bType); gl.uniform1iv(Ul.shape,bShape);
+  gl.uniform1fv(Ul.blur,bBlur); gl.uniform1fv(Ul.size,bSize); gl.uniform1fv(Ul.int,bInt); gl.uniform1fv(Ul.on,bOn);
+  gl.uniform2fv(Ul.pos,bPos); gl.uniform3fv(Ul.color,bCol);
+
+  for(let i=0;i<6;i++){ sBlur[i]=state.segBlur[i]||0; sHue[i]=state.segHue[i]||0; }
+  gl.uniform1fv(Useg.blur,sBlur); gl.uniform1fv(Useg.hue,sHue);
+
+  const E=Math.min(state.edges.length,MAXE);
+  for(let i=0;i<E;i++){ const G=state.edges[i];
+    eOn[i]=G.on?1:0; eColOn[i]=G.colorOn?1:0; eLitOn[i]=G.lightOn?1:0;
+    eW[i]=G.width; eCI[i]=G.colInt; eLI[i]=G.lightInt; eD[i]=G.distort;
+    const a=hx(G.colA),b=hx(G.colB),c=hx(G.lightCol);
+    eCA[i*3]=a[0];eCA[i*3+1]=a[1];eCA[i*3+2]=a[2];
+    eCB[i*3]=b[0];eCB[i*3+1]=b[1];eCB[i*3+2]=b[2];
+    eLC[i*3]=c[0];eLC[i*3+1]=c[1];eLC[i*3+2]=c[2]; }
+  gl.uniform1i(Uem.count,E);
+  gl.uniform1fv(Uem.on,eOn); gl.uniform1fv(Uem.colorOn,eColOn); gl.uniform1fv(Uem.lightOn,eLitOn);
+  gl.uniform1fv(Uem.width,eW); gl.uniform1fv(Uem.colInt,eCI); gl.uniform1fv(Uem.lightInt,eLI); gl.uniform1fv(Uem.distort,eD);
+  gl.uniform3fv(Uem.colA,eCA); gl.uniform3fv(Uem.colB,eCB); gl.uniform3fv(Uem.lightCol,eLC);
+
+  for(const k in META){ const t=META[k], l=loc[k]; if(l==null) continue;
+    if(t==='f') gl.uniform1f(l,state[k]);
+    else if(t==='i') gl.uniform1i(l,state[k]|0);
+    else if(t==='b') gl.uniform1f(l,state[k]?1:0);
+    else if(t==='c'){ const c=hx(state[k]); gl.uniform3f(l,c[0],c[1],c[2]); } }
+
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- generic control wiring ----
+document.querySelectorAll('input[type=range][data-k]').forEach(el=>{
+  const k=el.dataset.k; el.value=state[k];
+  const out=el.parentElement.querySelector('b');
+  const upd=()=>{ state[k]=parseFloat(el.value); if(out) out.textContent=(+state[k]).toFixed(2); };
+  el.addEventListener('input',upd); upd();
+});
+document.querySelectorAll('input[type=color][data-k]').forEach(el=>{
+  const k=el.dataset.k; el.value=state[k];
+  el.addEventListener('input',()=>state[k]=el.value);
+});
+document.querySelectorAll('.seg[data-k]').forEach(seg=>{
+  const k=seg.dataset.k;
+  seg.querySelectorAll('button').forEach(btn=>{
+    if(parseInt(btn.dataset.v)===state[k]) btn.classList.add('active');
+    btn.addEventListener('click',()=>{ seg.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); state[k]=parseInt(btn.dataset.v); });
+  });
+});
+document.querySelectorAll('.tg[data-k]').forEach(btn=>{
+  const k=btn.dataset.k; btn.classList.toggle('active',!!state[k]);
+  const sec=btn.closest('.sec'); if(sec) sec.classList.toggle('off',!state[k]);
+  btn.addEventListener('click',ev=>{ ev.stopPropagation(); state[k]=state[k]?0:1;
+    btn.classList.toggle('active',!!state[k]);
+    if(sec) sec.classList.toggle('off',!state[k]); });
+});
+// section collapse (+/-)
+document.querySelectorAll('.sechd').forEach(hd=>{
+  const sec=hd.closest('.sec'), exp=hd.querySelector('.exp');
+  const toggle=()=>{ const c=sec.classList.toggle('col'); if(exp) exp.textContent=c?'+':'−'; };
+  hd.addEventListener('click',e=>{ if(e.target.classList.contains('tg')) return; toggle(); });
+});
+
+// ---- blur layers (dynamic) ----
+const layerBox=document.getElementById('layerBox');
+function renderLayers(){
+  layerBox.innerHTML='';
+  state.layers.forEach((L,i)=>{
+    const el=document.createElement('div'); el.className='layer';
+    el.innerHTML=
+      '<div class="lhd"><b>Layer '+(i+1)+'</b><span>'+
+        '<button class="tg lon'+(L.on?' active':'')+'">ON</button>'+
+        '<button class="rm">✕</button></span></div>'+
+      '<div class="seg lt"><button data-v="0"'+(L.type==0?' class="active"':'')+'>컬러 블러</button>'+
+        '<button data-v="1"'+(L.type==1?' class="active"':'')+'>라이트 블러</button></div>'+
+      '<div class="seg ls"><button data-v="0"'+(L.shape==0?' class="active"':'')+'>네모</button>'+
+        '<button data-v="1"'+(L.shape==1?' class="active"':'')+'>원형</button></div>'+
+      '<div class="cl">Color <input type="color" class="lc" value="'+L.color+'"></div>'+
+      '<div class="row"><label>Blur <b>'+L.blur.toFixed(2)+'</b></label><input type="range" class="lb" min="0" max="5" step="0.01" value="'+L.blur+'"></div>'+
+      '<div class="row"><label>Size <b>'+L.size.toFixed(2)+'</b></label><input type="range" class="lsz" min="0.1" max="2" step="0.01" value="'+L.size+'"></div>'+
+      '<div class="row"><label>Intensity <b>'+L.intensity.toFixed(2)+'</b></label><input type="range" class="li" min="0" max="2" step="0.01" value="'+L.intensity+'"></div>'+
+      '<div class="row"><label>Pos X <b>'+L.posx.toFixed(2)+'</b></label><input type="range" class="lpx" min="-1" max="1" step="0.01" value="'+L.posx+'"></div>'+
+      '<div class="row"><label>Pos Y <b>'+L.posy.toFixed(2)+'</b></label><input type="range" class="lpy" min="-1" max="1" step="0.01" value="'+L.posy+'"></div>';
+    el.querySelector('.lon').onclick=ev=>{ L.on=!L.on; ev.target.classList.toggle('active',L.on); };
+    el.querySelector('.rm').onclick=()=>{ state.layers.splice(i,1); renderLayers(); };
+    el.querySelectorAll('.lt button').forEach(b=>b.onclick=()=>{ L.type=+b.dataset.v;
+      el.querySelectorAll('.lt button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); });
+    el.querySelectorAll('.ls button').forEach(b=>b.onclick=()=>{ L.shape=+b.dataset.v;
+      el.querySelectorAll('.ls button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); });
+    el.querySelector('.lc').oninput=ev=>L.color=ev.target.value;
+    const sl=(cls,key)=>{ const inp=el.querySelector(cls), out=inp.parentElement.querySelector('b');
+      inp.oninput=()=>{ L[key]=parseFloat(inp.value); out.textContent=L[key].toFixed(2); }; };
+    sl('.lb','blur'); sl('.lsz','size'); sl('.li','intensity'); sl('.lpx','posx'); sl('.lpy','posy');
+    layerBox.appendChild(el);
+  });
+}
+document.getElementById('addLayer').onclick=()=>{
+  if(state.layers.length>=MAXL){ return; }
+  state.layers.push({on:true,type:0,shape:1,blur:2.0,size:0.7,intensity:0.7,posx:0,posy:0,color:'#ffd2e0'});
+  renderLayers();
+};
+renderLayers();
+
+// ---- partial blur masking: 6 faces ----
+const segBox=document.getElementById('segBox');
+for(let i=0;i<6;i++){
+  const el=document.createElement('div'); el.className='layer';
+  el.innerHTML='<div class="lhd"><b>면 '+(i+1)+'</b></div>'+
+    '<div class="row"><label>Blur <b>'+state.segBlur[i].toFixed(2)+'</b></label><input type="range" class="sb" min="0" max="4" step="0.01" value="'+state.segBlur[i]+'"></div>'+
+    '<div class="row"><label>Hue <b>'+state.segHue[i].toFixed(2)+'</b></label><input type="range" class="sh" min="-0.5" max="0.5" step="0.005" value="'+state.segHue[i]+'"></div>';
+  const bind=(cls,arr)=>{ const inp=el.querySelector(cls), out=inp.parentElement.querySelector('b');
+    inp.oninput=()=>{ arr[i]=parseFloat(inp.value); out.textContent=arr[i].toFixed(2); }; };
+  bind('.sb',state.segBlur); bind('.sh',state.segHue);
+  segBox.appendChild(el);
+}
+
+// ---- edge-mask layers (dynamic) ----
+const edgeBox=document.getElementById('edgeBox');
+function renderEdges(){
+  edgeBox.innerHTML='';
+  state.edges.forEach((G,i)=>{
+    const el=document.createElement('div'); el.className='layer';
+    el.innerHTML=
+      '<div class="lhd"><b>Edge '+(i+1)+'</b><span>'+
+        '<button class="tg eon'+(G.on?' active':'')+'">ON</button><button class="rm">✕</button></span></div>'+
+      '<div class="cl"><button class="tg ecol'+(G.colorOn?' active':'')+'">Color</button>'+
+        ' <input type="color" class="eca" value="'+G.colA+'"> → <input type="color" class="ecb" value="'+G.colB+'"></div>'+
+      '<div class="row"><label>Color Int <b>'+G.colInt.toFixed(2)+'</b></label><input type="range" class="eci" min="0" max="2" step="0.01" value="'+G.colInt+'"></div>'+
+      '<div class="cl"><button class="tg elit'+(G.lightOn?' active':'')+'">Light</button>'+
+        ' <input type="color" class="elc" value="'+G.lightCol+'"></div>'+
+      '<div class="row"><label>Light Int <b>'+G.lightInt.toFixed(2)+'</b></label><input type="range" class="eli" min="0" max="2" step="0.01" value="'+G.lightInt+'"></div>'+
+      '<div class="row"><label>Width <b>'+G.width.toFixed(2)+'</b></label><input type="range" class="ew" min="0.02" max="1" step="0.01" value="'+G.width+'"></div>'+
+      '<div class="row"><label>왜곡(Distortion) <b>'+G.distort.toFixed(2)+'</b></label><input type="range" class="ed" min="0" max="2" step="0.01" value="'+G.distort+'"></div>';
+    el.querySelector('.eon').onclick=ev=>{ G.on=!G.on; ev.target.classList.toggle('active',G.on); };
+    el.querySelector('.ecol').onclick=ev=>{ G.colorOn=!G.colorOn; ev.target.classList.toggle('active',G.colorOn); };
+    el.querySelector('.elit').onclick=ev=>{ G.lightOn=!G.lightOn; ev.target.classList.toggle('active',G.lightOn); };
+    el.querySelector('.rm').onclick=()=>{ state.edges.splice(i,1); renderEdges(); };
+    el.querySelector('.eca').oninput=ev=>G.colA=ev.target.value;
+    el.querySelector('.ecb').oninput=ev=>G.colB=ev.target.value;
+    el.querySelector('.elc').oninput=ev=>G.lightCol=ev.target.value;
+    const sl=(cls,key)=>{ const inp=el.querySelector(cls), out=inp.parentElement.querySelector('b');
+      inp.oninput=()=>{ G[key]=parseFloat(inp.value); out.textContent=G[key].toFixed(2); }; };
+    sl('.eci','colInt'); sl('.eli','lightInt'); sl('.ew','width'); sl('.ed','distort');
+    edgeBox.appendChild(el);
+  });
+}
+document.getElementById('addEdge').onclick=()=>{
+  if(state.edges.length>=MAXE){ return; }
+  state.edges.push({on:true,colorOn:true,lightOn:false,colA:'#ffffff',colB:'#bcd9ff',lightCol:'#ffffff',
+    width:0.35,colInt:0.6,lightInt:0.5,distort:0.0});
+  renderEdges();
+};
+renderEdges();
+
+// random card colours
+const randHex=()=>'#'+Array.from({length:3},()=>Math.floor(Math.random()*200+30).toString(16).padStart(2,'0')).join('');
+document.getElementById('randCol').onclick=()=>{
+  ['cardColor','cardColor2','cardColor3'].forEach(k=>{ state[k]=randHex();
+    const el=document.querySelector('input[type=color][data-k="'+k+'"]'); if(el) el.value=state[k]; });
+};
+
+// drop / loop / playback
+document.getElementById('dropBtn').onclick=()=>{ prog2=0; };
+const loopBtn=document.getElementById('loopBtn');
+loopBtn.onclick=()=>{ loop=!loop; loopBtn.classList.toggle('active',loop); };
+const playBtn=document.getElementById('play');
+playBtn.onclick=()=>{ playing=!playing; playBtn.textContent=playing?'⏸ 정지':'▶ 재생'; playBtn.classList.toggle('active',playing); };
+
+// recording
+let recorder=null,chunks=[];
+const recBtn=document.getElementById('rec');
+recBtn.onclick=()=>{
+  if(recorder&&recorder.state==='recording'){ recorder.stop(); return; }
+  const stream=cv.captureStream(60);
+  const types=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mime=types.find(t=>MediaRecorder.isTypeSupported(t))||'';
+  try{ recorder=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:12_000_000}:undefined); }
+  catch(e){ alert('이 브라우저에서 녹화를 지원하지 않습니다.'); return; }
+  chunks=[]; recorder.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+  recorder.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='frosted-glass-lockscreen.webm'; a.click();
+    URL.revokeObjectURL(url); recBtn.classList.remove('on'); recBtn.textContent='● 녹화'; };
+  recorder.start(); recBtn.classList.add('on'); recBtn.textContent='■ 정지';
+};
+</script>
+</body>
+</html>
