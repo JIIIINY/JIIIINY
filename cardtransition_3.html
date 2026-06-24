@@ -454,6 +454,7 @@ uniform float u_zoneBlur[6];   // 6사분면(2열×3행) 영역별 추가 블러
 uniform vec3 u_anim;                             // 카드 등장 애니메이션 (offX, offY, scale)
 uniform float u_settle;                          // 정착 진행도 0(내려오는 중·기체)→1(자리잡음·컬러)
 uniform float u_centerFill;                       // 중앙 집중 채움 0(균일)→1(중앙만 색, 외곽은 배경 블러)
+uniform float u_fxAmt;                             // 효과 게이트 0(낙하 중·흰색만)→1(정착 후·컬러+라이트 등장)
 uniform vec3 u_cardC1,u_cardC2,u_cardC3;          // 카드색 1·2·3
 // 카드 안쪽 엣지 그라데이션 마스크 레이어(최대 4) + 카드 외곽 형태 opacity 마스크
 uniform float u_clN; uniform float u_clType[4],u_clInt[4],u_clWidth[4]; uniform vec3 u_clC1[4],u_clC2[4],u_clC3[4];
@@ -516,7 +517,7 @@ void main(){
   // 카드 등장 애니메이션: 카드+아이콘만 이동/스케일(배경은 고정)
   vec2 Pc=(P-u_cardC)/max(u_anim.z,0.05)+u_cardC-u_anim.xy;
   float d=scene(Pc); vec2 n=nrm(Pc);
-  float stl=clamp(u_settle,0.0,1.0); float ef=(1.0-stl)*0.06; float fxAmt=smoothstep(0.5,1.0,stl);   // 내려올 때 외곽 흐림(기체) / fxAmt: 효과는 정착 시 등장
+  float stl=clamp(u_settle,0.0,1.0); float ef=(1.0-stl)*0.06; float fxAmt=clamp(u_fxAmt,0.0,1.0);   // 내려올 때 외곽 흐림(기체) / fxAmt: 효과는 '낙하 완료 후'에만 등장
   float inside=smoothstep(0.002+ef,-0.002-ef,d);
   // 배경(고정): bg 블러만
   vec3 base = u_bgBlur>0.02 ? frost(uvT,u_bgBlur*0.02) : smp(uvT);
@@ -673,7 +674,7 @@ let glassReady=false; const GU={}; let gtex=null;
   const ga=gg.getAttribLocation(gp,'a_pos'); gg.enableVertexAttribArray(ga); gg.vertexAttribPointer(ga,2,gg.FLOAT,false,0,0);
   { const arrs=['u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol','u_clType','u_clInt','u_clWidth','u_clC1','u_clC2','u_clC3','u_zoneBlur','u_smType','u_smOpacity','u_smBlur','u_smAngle','u_smCx','u_smCy','u_smSx','u_smSy','u_smInv','u_rimInt','u_rimW','u_rimS','u_rimSpd','u_rimC','u_swInt','u_swW','u_swS','u_swSpd','u_swC'];
     ['u_res','u_bg','u_frost','u_tint','u_cardC','u_cardH','u_cardRT','u_cardRB','u_circR','u_time','u_bgBlur','u_quad','u_cardType','u_icons','u_cardAlpha','u_anim','u_cardC1','u_cardC2','u_cardC3',
-     'u_settle','u_centerFill','u_transOn','u_lN','u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol',
+     'u_settle','u_centerFill','u_fxAmt','u_transOn','u_lN','u_lType','u_lMode','u_lSweep','u_lDir','u_lSpin','u_lBright','u_lInten','u_lWidth','u_lThick','u_lBlur','u_lSpeed','u_lSize','u_lGlow','u_lSoft','u_lShadow','u_lAngle','u_lCol','u_lBlurCol','u_lShadCol',
      'u_iriOn','u_iriInt','u_iriHue','u_iriHueShift','u_iriSat','u_iriSharp','u_iriWobble','u_iriDir',
      'u_sfxOn','u_rimN','u_rimInt','u_rimW','u_rimS','u_rimSpd','u_rimC','u_glintInt','u_glintW','u_glintS','u_glintC','u_swN','u_swInt','u_swW','u_swS','u_swSpd','u_swC','u_eyeInt','u_eyeW','u_eyeS','u_eyeC',
      'u_innOn','u_innPulse','u_innCaustics','u_innFlare',
@@ -687,13 +688,14 @@ let glassReady=false; const GU={}; let gtex=null;
   gg.uniform1i(GU.u_bg,0); glassReady=true; })();
 // 카드 등장 애니메이션 값 — 카드(셰이더)와 카드 텍스트(2D)가 함께 움직이도록 공유
 function cardAnim(t){ const dsp=(GLASS.dropSpeed==null?1:GLASS.dropSpeed), dm=(GLASS.dropMode==null?0:GLASS.dropMode)|0;
-  if(dm===3) return {ox:0, oy:0, sc:1.0, settle:1.0};       // 고정(애니메이션 없음, 완전 정착)
+  if(dm===3) return {ox:0, oy:0, sc:1.0, settle:1.0, fx:1.0};       // 고정(완전 정착, 효과 ON)
   const dur=Math.max(0.4, 2.4/Math.max(dsp,0.05));          // 1회 등장 시간(루프 X → 깜빡임 없음)
   const p=Math.min(1.0, Math.max(0.0,(t||0))/dur);          // 0→1 한 번만, 이후 정착 유지
   const ease=1.0-Math.pow(1.0-p,3.0); let oy=0,sc=1.0;
   if(dm===0||dm===2) oy=-1.6*(1.0-ease);       // 위에서 아래로 내려옴
   if(dm===1||dm===2) sc=0.2+0.8*ease;          // Z 앞으로(작게→크게)
-  return {ox:0, oy, sc, settle:ease}; }        // settle: 0(내려오는 중)→1(자리잡음)
+  const fx=Math.min(1.0, Math.max(0.0, ((t||0)-dur)/0.6));  // 효과(컬러/라이트)는 '낙하 완료 후'에만 0→1
+  return {ox:0, oy, sc, settle:ease, fx:fx}; }   // settle: 낙하 진행 / fx: 도착 후 효과 등장
 // #3 카드 렌더: 키스크린(360dp=720px) 기준 좌표 → P=(px-360)/720, (py-780)/720
 function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCanvas;
   gg.viewport(0,0,gcv.width,gcv.height);
@@ -705,7 +707,7 @@ function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCan
   gg.uniform1f(GU.u_frost,GLASS.frost); gg.uniform1f(GU.u_tint,GLASS.solid==null?0.7:GLASS.solid);
   gg.uniform1f(GU.u_bgBlur,GLASS.bgBlur); gg.uniform1f(GU.u_quad,GLASS.quad);
   // 카드 등장 애니메이션(위→아래 / Z앞으로 / 둘다) — 루프
-  { const A=cardAnim(t||0); gg.uniform3f(GU.u_anim,A.ox,A.oy,A.sc); gg.uniform1f(GU.u_settle,A.settle==null?1:A.settle); }
+  { const A=cardAnim(t||0); gg.uniform3f(GU.u_anim,A.ox,A.oy,A.sc); gg.uniform1f(GU.u_settle,A.settle==null?1:A.settle); gg.uniform1f(GU.u_fxAmt,A.fx==null?1:A.fx); }
   gg.uniform1f(GU.u_centerFill,GLASS.centerFill==null?0:GLASS.centerFill);
   const k1=hexToRGB(GLASS.cardC1),k2=hexToRGB(GLASS.cardC2),k3=hexToRGB(GLASS.cardC3);
   gg.uniform1f(GU.u_cardType,GLASS.cardType); gg.uniform1f(GU.u_icons,GLASS.icons?1:0); gg.uniform1f(GU.u_cardAlpha,GLASS.cardAlpha==null?1:GLASS.cardAlpha); gg.uniform3f(GU.u_cardC1,k1[0],k1[1],k1[2]); gg.uniform3f(GU.u_cardC2,k2[0],k2[1],k2[2]); gg.uniform3f(GU.u_cardC3,k3[0],k3[1],k3[2]);
@@ -780,7 +782,7 @@ function drawCardText(t){ const DP=view.width/360, pad=20*DP;
   vctx.translate(ccx,ccy); vctx.translate(A.sc*A.ox*M, A.sc*A.oy*M); vctx.scale(A.sc*csz,A.sc*csz); vctx.translate(-ccx,-ccy);
   vctx.beginPath(); vctx.rect(tx,ty,tw,th); vctx.clip();   // 카드 영역 밖으로 넘치지 않게
   // 좌측 폰트 패널(FONT)의 옵션을 카드 텍스트에 실시간 반영(색/폰트/굵기/내용)
-  vctx.globalAlpha=(A.settle==null?1:A.settle);   // 텍스트도 정착 시 함께 등장
+  vctx.globalAlpha=(A.fx==null?1:A.fx);   // 텍스트도 '낙하 완료 후' 효과와 함께 등장
   const F=(typeof FONT!=='undefined'&&FONT)?FONT:{}; const fam=F.fontFamily?famString(F.fontFamily):famString('One UI Sans');
   vctx.font=(F.weight||'500')+' '+px+'px '+fam; vctx.textAlign='center'; vctx.textBaseline='top'; vctx.fillStyle=F.color||GLASS.cardTextColor||'#ffffff';
   vctx.shadowColor='rgba(0,0,0,0.30)'; vctx.shadowBlur=6; vctx.shadowOffsetY=1;
