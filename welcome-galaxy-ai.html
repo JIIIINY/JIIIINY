@@ -3,14 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Welcome to Galaxy AI · Adaptive Text</title>
+<title>Welcome to Galaxy AI · Adaptive Text (Controls)</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;background:#0c0d10;
+  html,body{min-height:100%;background:#0c0d10;color:#e8e8ea;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-  body{display:flex;align-items:center;justify-content:center;min-height:100%;padding:24px}
+  .stage{display:flex;align-items:center;justify-content:center;gap:40px;
+    min-height:100vh;padding:30px 30px 30px 30px;flex-wrap:nowrap}
 
-  .device{position:relative;width:360px;height:800px;border-radius:46px;background:#000;
+  /* ---- device ---- */
+  .device{position:relative;flex:0 0 auto;width:360px;height:800px;border-radius:46px;background:#000;
     box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 0 11px #111,0 0 0 12px #2a2a2e;overflow:hidden}
   canvas{position:absolute;inset:0;width:360px;height:800px;display:block;border-radius:46px}
   .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;
@@ -24,9 +26,42 @@
   .bat::before{content:"";position:absolute;inset:1.5px;background:rgba(255,255,255,.9);border-radius:1px}
   .home{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:110px;height:5px;
     border-radius:3px;background:rgba(255,255,255,.7);z-index:3}
+
+  /* ---- control panel : ALWAYS pinned to the right ---- */
+  .panel{position:fixed;top:50%;right:28px;transform:translateY(-50%);
+    width:300px;max-height:92vh;overflow-y:auto;padding:22px;border-radius:20px;
+    background:rgba(20,21,26,.82);backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.08);box-shadow:0 20px 60px rgba(0,0,0,.5);z-index:10}
+  .panel h1{font-size:15px;font-weight:700;letter-spacing:.02em;margin-bottom:4px}
+  .panel p.lead{font-size:11.5px;color:#9a9aa2;line-height:1.6;margin-bottom:16px}
+  .row{margin:13px 0}
+  .row label{display:flex;justify-content:space-between;font-size:11px;color:#9a9aa2;margin-bottom:7px;letter-spacing:.02em}
+  .row label b{color:#c9b8ff;font-weight:700}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:rgba(255,255,255,.16);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:15px;height:15px;
+    border-radius:50%;background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0);box-shadow:0 1px 6px rgba(0,0,0,.4)}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border:none;border-radius:50%;
+    background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0)}
+  #hue{background:linear-gradient(90deg,#ff4040,#ffe040,#40ff60,#40e0ff,#6040ff,#ff40d0,#ff4040)}
+  .txtin{width:100%;margin-top:6px;padding:9px 11px;font-size:13px;color:#fff;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;outline:none}
+  .modes{display:flex;gap:7px;margin-top:8px}
+  .modes button{flex:1;padding:9px 0;font-size:11px;font-weight:600;color:#e8e8ea;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;cursor:pointer}
+  .modes button.active{border-color:#c9b8ff;color:#fff;background:rgba(201,184,255,.12)}
+  .actions{display:flex;gap:8px;margin-top:6px}
+  .btn{flex:1;padding:11px 0;font-size:12px;font-weight:700;cursor:pointer;border:none;border-radius:11px;color:#0c0d10}
+  .btn.rand{background:linear-gradient(135deg,#ffd66f,#ff7eb3,#7ee8fa)}
+  .btn.copy{background:linear-gradient(135deg,#ffd2f0,#c9b8ff,#bdeef0)}
+  .btn.done{background:linear-gradient(135deg,#9ff0c2,#6fe0a0)!important}
+  .btn:hover{filter:brightness(1.06)}
+  .note{font-size:10px;color:#75757e;line-height:1.6;margin-top:14px;
+    border-top:1px solid rgba(255,255,255,.08);padding-top:12px}
 </style>
 </head>
 <body>
+<div class="stage">
   <div class="device">
     <canvas id="cv" width="720" height="1600"></canvas>
     <div class="notch"></div>
@@ -43,95 +78,230 @@
     <div class="home"></div>
   </div>
 
+  <div class="panel">
+    <h1>Adaptive Text · Controls</h1>
+    <p class="lead">움직이는 배경에 따라 텍스트 색이 실시간으로 변합니다. 우측 패널에서 조절하세요.</p>
+
+    <div class="row">
+      <label>문구</label>
+      <input class="txtin" id="text" value="Welcome to Galaxy AI" maxlength="40">
+    </div>
+    <div class="row">
+      <label>대비 강도 <b id="vStrength">0.20</b></label>
+      <input type="range" id="strength" min="0" max="1" step="0.01" value="0.2">
+    </div>
+    <div class="row">
+      <label>채도 부스트 <b id="vSat">2.00</b></label>
+      <input type="range" id="sat" min="0.6" max="2" step="0.01" value="2.0">
+    </div>
+    <div class="row">
+      <label>배경 속도 <b id="vSpeed">1.00</b></label>
+      <input type="range" id="speed" min="0" max="3" step="0.05" value="1.0">
+    </div>
+    <div class="row">
+      <label>컬러 Hue <b id="vHue">0°</b></label>
+      <input type="range" id="hue" min="0" max="360" step="1" value="0">
+    </div>
+    <div class="row">
+      <label>적응 방식</label>
+      <div class="modes">
+        <button data-mode="lum" class="active">Luminance</button>
+        <button data-mode="comp">Complement</button>
+        <button data-mode="white">Static White</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="actions">
+        <button class="btn rand" id="randBtn">🎲 랜덤 컬러</button>
+        <button class="btn copy" id="copyBtn">⧉ 코드 복사</button>
+      </div>
+    </div>
+
+    <p class="note">
+      • 텍스트 = 배경 색조(H) 유지 + 밝기를 가독 방향으로 이동 + 채도 부스트.<br>
+      • <b>컬러 Hue</b> 슬라이더는 배경 전체 색상을 회전시킵니다.<br>
+      • <b>랜덤 컬러</b>는 배경 팔레트를 무작위 비비드 색으로 교체합니다.<br>
+      • <b>코드 복사</b>: 현재 설정이 반영된 자기완결형 코드를 클립보드로 복사.
+    </p>
+  </div>
+</div>
+
 <script>
-/* ============================================================
-   Adaptive text that follows a MOVING background.
-   text = background hue, lightness pushed toward the legible
-   extreme, saturation boosted. Recolored every animation frame
-   so the color shifts as the gradient flows.
-   ============================================================ */
-(function(){
-  // ---- settings ----
-  var LINES   = ["Welcome to","Galaxy AI"];   // 2-line auto-fit
-  var STRENGTH= 0.2;     // 대비 강도 (낮을수록 tone-on-tone)
-  var SAT     = 2.0;     // 채도 부스트 (max)
-  var SPEED   = 1.0;     // 배경 속도
-  var WEIGHT  = 500;     // medium
-  var MODE    = "lum";   // "lum" | "comp" | "white"
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d',{willReadFrequently:true});
+const W=cv.width,H=cv.height;
 
-  var cv=document.getElementById("cv");
-  var ctx=cv.getContext("2d",{willReadFrequently:true});
-  var W=cv.width,H=cv.height;
-  var PAL=[[0.07,0.22,0.85],[0.02,0.10,0.45],[1.00,0.78,0.10],[0.98,0.45,0.06],[0.85,0.16,0.10],[0.20,0.40,0.95]];
+// default vivid palette (blue / navy / gold / orange / red / bright-blue)
+let PAL=[[0.07,0.22,0.85],[0.02,0.10,0.45],[1.00,0.78,0.10],[0.98,0.45,0.06],[0.85,0.16,0.10],[0.20,0.40,0.95]];
 
-  function rgb2hsl(r,g,b){var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2,h=0,s=0;
-    if(d>1e-6){s=d/(1-Math.abs(2*l-1)+1e-6); if(mx===r)h=((g-b)/d)%6; else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; if(h<0)h+=1;} return [h,s,l];}
-  function hsl2rgb(h,s,l){if(s<1e-6)return [l,l,l]; var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
-    var f=function(t){t=(t%1+1)%1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p;};
-    return [f(h+1/3),f(h),f(h-1/3)];}
-  function lum(r,g,b){return 0.2126*r+0.7152*g+0.0722*b;}
+let P={text:"Welcome to Galaxy AI", strength:0.2, sat:2.0, speed:1.0, hue:0, mode:'lum', weight:500};
 
-  // ---- moving background (larger amplitude -> motion is obvious) ----
-  var bgImg=ctx.createImageData(W,H);
-  function renderBG(t){
-    var data=bgImg.data,NP=PAL.length;
-    // [baseX,ampX,freqX,phX, baseY,ampY,freqY,phY, palPhase]
-    var def=[[0.18,0.30,0.40,0.0, 0.20,0.26,0.31,1.0, 0.0],
+function rgb2hsl(r,g,b){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2;let h=0,s=0;
+  if(d>1e-6){s=d/(1-Math.abs(2*l-1)+1e-6); if(mx===r)h=((g-b)/d)%6; else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; if(h<0)h+=1;} return [h,s,l];}
+function hsl2rgb(h,s,l){if(s<1e-6)return [l,l,l];const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+  const f=t=>{t=(t%1+1)%1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p;};
+  return [f(h+1/3),f(h),f(h-1/3)];}
+const lum=(r,g,b)=>0.2126*r+0.7152*g+0.0722*b;
+
+const bgImg=ctx.createImageData(W,H);
+function renderBG(t){
+  const data=bgImg.data,NP=PAL.length, hueShift=P.hue/360;
+  const def=[[0.18,0.30,0.40,0.0, 0.20,0.26,0.31,1.0, 0.0],
              [0.85,0.24,0.34,2.1, 0.28,0.28,0.47,0.4, 1.7],
              [0.30,0.28,0.27,3.4, 0.82,0.24,0.38,2.7, 3.1],
              [0.78,0.26,0.45,1.7, 0.80,0.22,0.29,0.9, 4.5]];
-    var cs=def.map(function(d){return [d[0]+d[1]*Math.sin(t*d[2]+d[3]),d[4]+d[5]*Math.cos(t*d[6]+d[7]),d[8]];});
-    var rad=0.42,inv=1/(2*rad*rad);
-    for(var y=0;y<H;y++){var ny=y/H; for(var x=0;x<W;x++){var nx=x/W,ar=0,ag=0,ab=0,ws=0;
-      for(var i=0;i<cs.length;i++){var dx=nx-cs[i][0],dy=ny-cs[i][1],w=Math.exp(-(dx*dx+dy*dy)*inv); w*=w;
-        var f=(t*0.13+cs[i][2])%NP; if(f<0)f+=NP; var i0=Math.floor(f)%NP,i1=(i0+1)%NP,fr=f-Math.floor(f),c0=PAL[i0],c1=PAL[i1];
-        ar+=w*(c0[0]*(1-fr)+c1[0]*fr); ag+=w*(c0[1]*(1-fr)+c1[1]*fr); ab+=w*(c0[2]*(1-fr)+c1[2]*fr); ws+=w;}
-      var r=ar/ws,g=ag/ws,b=ab/ws,hsl=rgb2hsl(r,g,b),rgb=hsl2rgb(hsl[0],Math.min(hsl[1]*1.35+0.05,1),Math.min(hsl[2]*0.97+0.02,1));
-      var sh=0.94+0.12*ny,idx=(y*W+x)*4;
-      data[idx]=Math.min(rgb[0]*sh,1)*255; data[idx+1]=Math.min(rgb[1]*sh,1)*255; data[idx+2]=Math.min(rgb[2]*sh,1)*255; data[idx+3]=255;}}
-  }
+  const cs=def.map(d=>[d[0]+d[1]*Math.sin(t*d[2]+d[3]),d[4]+d[5]*Math.cos(t*d[6]+d[7]),d[8]]);
+  const rad=0.42,inv=1/(2*rad*rad);
+  for(let y=0;y<H;y++){const ny=y/H; for(let x=0;x<W;x++){const nx=x/W;let ar=0,ag=0,ab=0,ws=0;
+    for(let i=0;i<cs.length;i++){const dx=nx-cs[i][0],dy=ny-cs[i][1];let w=Math.exp(-(dx*dx+dy*dy)*inv);w*=w;
+      let f=(t*0.13+cs[i][2])%NP; if(f<0)f+=NP; const i0=Math.floor(f)%NP,i1=(i0+1)%NP,fr=f-Math.floor(f),c0=PAL[i0],c1=PAL[i1];
+      ar+=w*(c0[0]*(1-fr)+c1[0]*fr); ag+=w*(c0[1]*(1-fr)+c1[1]*fr); ab+=w*(c0[2]*(1-fr)+c1[2]*fr); ws+=w;}
+    let r=ar/ws,g=ag/ws,b=ab/ws; let [h,s,l]=rgb2hsl(r,g,b);
+    [r,g,b]=hsl2rgb((h+hueShift)%1, Math.min(s*1.35+0.05,1), Math.min(l*0.97+0.02,1));
+    const sh=0.94+0.12*ny,idx=(y*W+x)*4;
+    data[idx]=Math.min(r*sh,1)*255; data[idx+1]=Math.min(g*sh,1)*255; data[idx+2]=Math.min(b*sh,1)*255; data[idx+3]=255;}}
+}
 
-  // ---- adaptive text color from a bg pixel ----
-  function adapt(r,g,b){var Lb=lum(r,g,b);
-    if(MODE==="white"){var v=Lb<0.5?0.97:0.12; return [v,v,v];}
-    var hsl=rgb2hsl(r,g,b),h=hsl[0],s=hsl[1],l=hsl[2];
-    if(MODE==="comp"){return hsl2rgb((h+0.5)%1,Math.min(s*1.3+0.2,1),Lb<0.5?0.88:0.30);}
-    var target=Lb<0.5?1.0:0.18, st=STRENGTH*(0.7+0.6*Math.abs(Lb-0.5)*2);
-    var tL=Math.max(0.05,Math.min(0.97,l*(1-st)+target*st)), tS=Math.min(s*SAT+0.12,1);
-    return hsl2rgb(h,tS,tL);}
+function adapt(r,g,b){const Lb=lum(r,g,b);
+  if(P.mode==='white'){const v=Lb<0.5?0.97:0.12; return [v,v,v];}
+  let [h,s,l]=rgb2hsl(r,g,b);
+  if(P.mode==='comp'){return hsl2rgb((h+0.5)%1,Math.min(s*1.3+0.2,1),Lb<0.5?0.88:0.30);}
+  const target=Lb<0.5?1.0:0.18, st=P.strength*(0.7+0.6*Math.abs(Lb-0.5)*2);
+  const tL=Math.max(0.05,Math.min(0.97,l*(1-st)+target*st)), tS=Math.min(s*P.sat+0.12,1);
+  return hsl2rgb(h,tS,tL);}
 
-  // ---- multi-line, auto-fit text mask ----
-  var mc=document.createElement("canvas"); mc.width=W; mc.height=H; var mctx=mc.getContext("2d");
-  function buildMask(){
-    mctx.clearRect(0,0,W,H); mctx.fillStyle="#fff"; mctx.textAlign="center"; mctx.textBaseline="middle";
-    var maxW=W*0.84, size=170;
-    while(size>20){ mctx.font=WEIGHT+" "+size+"px -apple-system,Helvetica,Arial,sans-serif";
-      var wmax=0; for(var k=0;k<LINES.length;k++) wmax=Math.max(wmax,mctx.measureText(LINES[k]).width);
-      if(wmax<=maxW) break; size-=2; }
-    mctx.font=WEIGHT+" "+size+"px -apple-system,Helvetica,Arial,sans-serif";
-    var lh=size*1.14, total=lh*LINES.length, y0=H*0.46-total/2+lh/2;
-    for(var j=0;j<LINES.length;j++) mctx.fillText(LINES[j], W/2, y0+j*lh);
-    // small adaptive ring below the text
-    var iy=y0+(LINES.length-1)*lh+lh*0.95;
-    mctx.lineWidth=6; mctx.strokeStyle="#fff"; mctx.beginPath(); mctx.arc(W/2,iy,24,0,7); mctx.stroke();
-    mctx.beginPath(); mctx.arc(W/2,iy,6,0,7); mctx.fill();
-    return mctx.getImageData(0,0,W,H);
-  }
-  var mask=buildMask();
-  addEventListener("resize",function(){mask=buildMask();});
+// ---- multi-line word-wrap + auto-fit text mask ----
+const mc=document.createElement('canvas'); mc.width=W; mc.height=H; const mctx=mc.getContext('2d');
+function wrap(text,maxW){const words=text.split(/\s+/).filter(Boolean);const lines=[];let cur='';
+  for(const w of words){const test=cur?cur+' '+w:w;
+    if(!cur||mctx.measureText(test).width<=maxW)cur=test; else {lines.push(cur);cur=w;}}
+  if(cur)lines.push(cur); return lines;}
+function buildMask(){
+  mctx.clearRect(0,0,W,H); mctx.fillStyle='#fff'; mctx.textAlign='center'; mctx.textBaseline='middle';
+  const maxW=W*0.84; let size=170, lines=[];
+  while(size>20){ mctx.font=P.weight+' '+size+'px -apple-system,Helvetica,Arial,sans-serif';
+    lines=wrap(P.text,maxW); let ok=lines.length<=3, wmax=0;
+    for(const ln of lines)wmax=Math.max(wmax,mctx.measureText(ln).width);
+    if(ok&&wmax<=maxW)break; size-=2; }
+  mctx.font=P.weight+' '+size+'px -apple-system,Helvetica,Arial,sans-serif';
+  const lh=size*1.14, total=lh*lines.length, y0=H*0.46-total/2+lh/2;
+  for(let j=0;j<lines.length;j++) mctx.fillText(lines[j], W/2, y0+j*lh);
+  const iy=y0+(lines.length-1)*lh+lh*0.95;
+  mctx.lineWidth=6; mctx.strokeStyle='#fff'; mctx.beginPath(); mctx.arc(W/2,iy,24,0,7); mctx.stroke();
+  mctx.beginPath(); mctx.arc(W/2,iy,6,0,7); mctx.fill();
+  return mctx.getImageData(0,0,W,H);
+}
+let mask=buildMask();
 
-  // ---- compose every frame ----
-  function frame(now){
-    var t=SPEED*(now/1000); renderBG(t);
-    var out=ctx.createImageData(W,H),o=out.data,bg=bgImg.data,m=mask.data;
-    for(var i=0;i<o.length;i+=4){var a=m[i+3]/255;
-      if(a<0.004){o[i]=bg[i];o[i+1]=bg[i+1];o[i+2]=bg[i+2];o[i+3]=255;continue;}
-      var r=bg[i]/255,g=bg[i+1]/255,b=bg[i+2]/255,tc=adapt(r,g,b);
-      o[i]=(r*(1-a)+tc[0]*a)*255; o[i+1]=(g*(1-a)+tc[1]*a)*255; o[i+2]=(b*(1-a)+tc[2]*a)*255; o[i+3]=255;}
-    ctx.putImageData(out,0,0); requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-})();
+function frame(now){
+  const t=P.speed*(now/1000); renderBG(t);
+  const out=ctx.createImageData(W,H),o=out.data,bg=bgImg.data,m=mask.data;
+  for(let i=0;i<o.length;i+=4){const a=m[i+3]/255;
+    if(a<0.004){o[i]=bg[i];o[i+1]=bg[i+1];o[i+2]=bg[i+2];o[i+3]=255;continue;}
+    const r=bg[i]/255,g=bg[i+1]/255,b=bg[i+2]/255,tc=adapt(r,g,b);
+    o[i]=(r*(1-a)+tc[0]*a)*255; o[i+1]=(g*(1-a)+tc[1]*a)*255; o[i+2]=(b*(1-a)+tc[2]*a)*255; o[i+3]=255;}
+  ctx.putImageData(out,0,0); requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- UI ----
+const $=id=>document.getElementById(id);
+$('text').oninput=e=>{P.text=e.target.value||' '; mask=buildMask();};
+$('strength').oninput=e=>{P.strength=+e.target.value; $('vStrength').textContent=(+e.target.value).toFixed(2);};
+$('sat').oninput=e=>{P.sat=+e.target.value; $('vSat').textContent=(+e.target.value).toFixed(2);};
+$('speed').oninput=e=>{P.speed=+e.target.value; $('vSpeed').textContent=(+e.target.value).toFixed(2);};
+$('hue').oninput=e=>{P.hue=+e.target.value; $('vHue').textContent=e.target.value+'°';};
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.modes button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); P.mode=b.dataset.mode;});
+
+$('randBtn').onclick=()=>{
+  const n=6,out=[];
+  for(let i=0;i<n;i++){const h=Math.random();
+    const s=0.7+Math.random()*0.3, l=0.32+Math.random()*0.34;
+    out.push(hsl2rgb(h,s,l).map(v=>Math.round(v*1000)/1000));}
+  PAL=out;
+};
+
+// ---- export self-contained snippet ----
+function genCode(){
+  const esc=s=>String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"');
+  const palStr='['+PAL.map(c=>'['+c.map(v=>+(+v).toFixed(3)).join(',')+']').join(',')+']';
+  const head=
+'<!-- ===== Adaptive Text widget (movable bg) ===== -->\n'+
+'<canvas id="adaptiveText" width="720" height="1600"\n'+
+'        style="width:360px;height:800px;display:block;border-radius:24px"></canvas>\n'+
+'<script>\n(function(){\n'+
+'  var TEXT="'+esc(P.text)+'", STRENGTH='+(+P.strength)+', SAT='+(+P.sat)+', SPEED='+(+P.speed)+',\n'+
+'      HUE='+(+P.hue)+', MODE="'+P.mode+'", WEIGHT='+(+P.weight)+';\n'+
+'  var PAL='+palStr+';\n'+
+ENGINE_SRC+
+'})();\n<\/script>\n';
+  return head;
+}
+const ENGINE_SRC=[
+'  var cv=document.getElementById("adaptiveText"),ctx=cv.getContext("2d",{willReadFrequently:true}),W=cv.width,H=cv.height;',
+'  function rgb2hsl(r,g,b){var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2,h=0,s=0;',
+'    if(d>1e-6){s=d/(1-Math.abs(2*l-1)+1e-6); if(mx===r)h=((g-b)/d)%6; else if(mx===g)h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; if(h<0)h+=1;} return [h,s,l];}',
+'  function hsl2rgb(h,s,l){if(s<1e-6)return [l,l,l]; var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;',
+'    var f=function(t){t=(t%1+1)%1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p;};',
+'    return [f(h+1/3),f(h),f(h-1/3)];}',
+'  function lum(r,g,b){return 0.2126*r+0.7152*g+0.0722*b;}',
+'  var bgImg=ctx.createImageData(W,H);',
+'  function renderBG(t){var data=bgImg.data,NP=PAL.length,hs=HUE/360;',
+'    var def=[[0.18,0.30,0.40,0.0,0.20,0.26,0.31,1.0,0.0],[0.85,0.24,0.34,2.1,0.28,0.28,0.47,0.4,1.7],[0.30,0.28,0.27,3.4,0.82,0.24,0.38,2.7,3.1],[0.78,0.26,0.45,1.7,0.80,0.22,0.29,0.9,4.5]];',
+'    var cs=def.map(function(d){return [d[0]+d[1]*Math.sin(t*d[2]+d[3]),d[4]+d[5]*Math.cos(t*d[6]+d[7]),d[8]];});',
+'    var rad=0.42,inv=1/(2*rad*rad);',
+'    for(var y=0;y<H;y++){var ny=y/H; for(var x=0;x<W;x++){var nx=x/W,ar=0,ag=0,ab=0,ws=0;',
+'      for(var i=0;i<cs.length;i++){var dx=nx-cs[i][0],dy=ny-cs[i][1],w=Math.exp(-(dx*dx+dy*dy)*inv); w*=w;',
+'        var f=(t*0.13+cs[i][2])%NP; if(f<0)f+=NP; var i0=Math.floor(f)%NP,i1=(i0+1)%NP,fr=f-Math.floor(f),c0=PAL[i0],c1=PAL[i1];',
+'        ar+=w*(c0[0]*(1-fr)+c1[0]*fr); ag+=w*(c0[1]*(1-fr)+c1[1]*fr); ab+=w*(c0[2]*(1-fr)+c1[2]*fr); ws+=w;}',
+'      var r=ar/ws,g=ag/ws,b=ab/ws,hsl=rgb2hsl(r,g,b),rgb=hsl2rgb((hsl[0]+hs)%1,Math.min(hsl[1]*1.35+0.05,1),Math.min(hsl[2]*0.97+0.02,1));',
+'      var sh=0.94+0.12*ny,idx=(y*W+x)*4;',
+'      data[idx]=Math.min(rgb[0]*sh,1)*255; data[idx+1]=Math.min(rgb[1]*sh,1)*255; data[idx+2]=Math.min(rgb[2]*sh,1)*255; data[idx+3]=255;}}}',
+'  function adapt(r,g,b){var Lb=lum(r,g,b);',
+'    if(MODE==="white"){var v=Lb<0.5?0.97:0.12; return [v,v,v];}',
+'    var hsl=rgb2hsl(r,g,b),h=hsl[0],s=hsl[1],l=hsl[2];',
+'    if(MODE==="comp"){return hsl2rgb((h+0.5)%1,Math.min(s*1.3+0.2,1),Lb<0.5?0.88:0.30);}',
+'    var target=Lb<0.5?1.0:0.18, st=STRENGTH*(0.7+0.6*Math.abs(Lb-0.5)*2);',
+'    var tL=Math.max(0.05,Math.min(0.97,l*(1-st)+target*st)), tS=Math.min(s*SAT+0.12,1);',
+'    return hsl2rgb(h,tS,tL);}',
+'  var mc=document.createElement("canvas"); mc.width=W; mc.height=H; var mctx=mc.getContext("2d");',
+'  function wrap(text,maxW){var words=text.split(/\\s+/).filter(Boolean),lines=[],cur="";',
+'    for(var k=0;k<words.length;k++){var test=cur?cur+" "+words[k]:words[k];',
+'      if(!cur||mctx.measureText(test).width<=maxW)cur=test; else {lines.push(cur);cur=words[k];}}',
+'    if(cur)lines.push(cur); return lines;}',
+'  function buildMask(){mctx.clearRect(0,0,W,H); mctx.fillStyle="#fff"; mctx.textAlign="center"; mctx.textBaseline="middle";',
+'    var maxW=W*0.84,size=170,lines=[];',
+'    while(size>20){mctx.font=WEIGHT+" "+size+"px -apple-system,Helvetica,Arial,sans-serif"; lines=wrap(TEXT,maxW);',
+'      var wmax=0; for(var q=0;q<lines.length;q++)wmax=Math.max(wmax,mctx.measureText(lines[q]).width);',
+'      if(lines.length<=3&&wmax<=maxW)break; size-=2;}',
+'    mctx.font=WEIGHT+" "+size+"px -apple-system,Helvetica,Arial,sans-serif";',
+'    var lh=size*1.14,total=lh*lines.length,y0=H*0.46-total/2+lh/2;',
+'    for(var j=0;j<lines.length;j++)mctx.fillText(lines[j],W/2,y0+j*lh);',
+'    var iy=y0+(lines.length-1)*lh+lh*0.95; mctx.lineWidth=6; mctx.strokeStyle="#fff";',
+'    mctx.beginPath(); mctx.arc(W/2,iy,24,0,7); mctx.stroke(); mctx.beginPath(); mctx.arc(W/2,iy,6,0,7); mctx.fill();',
+'    return mctx.getImageData(0,0,W,H);}',
+'  var mask=buildMask();',
+'  function frame(now){var t=SPEED*(now/1000); renderBG(t);',
+'    var out=ctx.createImageData(W,H),o=out.data,bg=bgImg.data,m=mask.data;',
+'    for(var i=0;i<o.length;i+=4){var a=m[i+3]/255;',
+'      if(a<0.004){o[i]=bg[i];o[i+1]=bg[i+1];o[i+2]=bg[i+2];o[i+3]=255;continue;}',
+'      var r=bg[i]/255,g=bg[i+1]/255,b=bg[i+2]/255,tc=adapt(r,g,b);',
+'      o[i]=(r*(1-a)+tc[0]*a)*255; o[i+1]=(g*(1-a)+tc[1]*a)*255; o[i+2]=(b*(1-a)+tc[2]*a)*255; o[i+3]=255;}',
+'    ctx.putImageData(out,0,0); requestAnimationFrame(frame);}',
+'  requestAnimationFrame(frame);'
+].join('\n')+'\n';
+
+$('copyBtn').onclick=async()=>{
+  const code=genCode(),btn=$('copyBtn'); let ok=false;
+  try{ await navigator.clipboard.writeText(code); ok=true; }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=code; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); try{ok=document.execCommand('copy');}catch(_){ } ta.remove(); }
+  btn.textContent= ok ? '✓ 복사됨!' : '복사 실패(콘솔 출력)'; btn.classList.add('done');
+  if(!ok) console.log(code);
+  setTimeout(()=>{ btn.textContent='⧉ 코드 복사'; btn.classList.remove('done'); },1800);
+};
 </script>
 </body>
 </html>
