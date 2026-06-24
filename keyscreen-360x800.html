@@ -89,6 +89,7 @@ uniform float u_time;
 uniform float u_wid, u_rim, u_riw, u_sct, u_lgt, u_shd, u_iri, u_irs, u_pls;
 uniform float u_litAng, u_litW, u_litInt, u_shadowAmt, u_shadowBlur, u_colSplit;
 uniform float u_alpha, u_contrast, u_flr, u_fli;
+uniform float u_eyi, u_eyg;
 uniform vec3  u_cP, u_cS, u_cC, u_lit, u_litShadow, u_flcc;
 
 float hash(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
@@ -168,6 +169,58 @@ void main(){
   float spec = pow(clamp(dot(N,H),0.0,1.0), 60.0);
   col += vec3(1.0)*spec*0.9*u_lgt;
 
+  // ================= EYES (character face) =================
+  // eyes sit on the front of the sphere; gaze drifts + occasional blink
+  vec2 gaze = vec2(sin(t*0.5)*0.018, sin(t*0.37+1.0)*0.012);   // slow look-around
+  float blink = smoothstep(0.0,0.06, abs(fract(t*0.12)-0.5)-0.40); // 1 = open, dips to 0
+  blink = clamp(blink*1.6, 0.0, 1.0);
+
+  float eyeSep = R*0.42;          // distance between eyes
+  float eyeY   = R*0.10;          // vertical placement (slightly above center)
+  float eyeR   = R*(0.20+u_eyi*0.06);
+
+  // project onto the curved surface so eyes hug the sphere
+  vec2 fp = p / max(z,0.35);
+  for(int e=0;e<2;e++){
+    vec2 ec = vec2(e==0?-eyeSep:eyeSep, eyeY);
+    vec2 d2 = (fp - ec - gaze);
+    // squash vertically for a blink
+    d2.y /= max(blink,0.04);
+    float de = length(d2);
+
+    float white = smoothstep(eyeR, eyeR*0.92, de);            // eye-white / socket
+    if(white>0.001){
+      // soft glossy white
+      vec3 eyeWhite = mix(vec3(0.92,0.94,1.0), u_litShadow*0.6, 0.25);
+      col = mix(col, eyeWhite, white*0.96);
+
+      // iris (uses iridescent palette + complement tint)
+      float irisR = eyeR*(0.55);
+      vec2 id = (fp - ec - gaze*1.6);
+      float di = length(id);
+      float irisM = smoothstep(irisR, irisR*0.86, di)*white;
+      vec3 irisCol = mix(u_lit, u_cC, 0.4) * (0.7+0.6*irid(di*5.0+t*0.2).r);
+      col = mix(col, irisCol, irisM*0.95);
+
+      // pupil
+      float pupR = irisR*(0.45);
+      float pupM = smoothstep(pupR, pupR*0.8, di)*white;
+      col = mix(col, vec3(0.02,0.02,0.04), pupM);
+
+      // catch-light glint (top-left)
+      float gl1 = smoothstep(eyeR*0.16, 0.0, length(id-vec2(-irisR*0.4,irisR*0.4)));
+      col += vec3(1.0)*gl1*white*(0.8+u_eyg*1.5);
+      // tiny secondary glint
+      float gl2 = smoothstep(eyeR*0.08, 0.0, length(id-vec2(irisR*0.25,-irisR*0.25)));
+      col += vec3(1.0)*gl2*white*0.4;
+
+      // eyelid rim shadow for depth
+      float lid = smoothstep(eyeR*0.92, eyeR, de)*white;
+      col = mix(col, col*0.55, lid);
+    }
+  }
+  // ============================================================
+
   // soft outer halo / flare bloom
   float halo = smoothstep(R+0.18, R, r)*(1.0-sphere);
   vec3 bloom = u_flcc * halo * u_fli * 0.5;
@@ -201,7 +254,7 @@ const U={res:u('u_res'),time:u('u_time'),wid:u('u_wid'),rim:u('u_rim'),riw:u('u_
   litAng:u('u_litAng'),litW:u('u_litW'),litInt:u('u_litInt'),shadowAmt:u('u_shadowAmt'),
   shadowBlur:u('u_shadowBlur'),colSplit:u('u_colSplit'),alpha:u('u_alpha'),contrast:u('u_contrast'),
   flr:u('u_flr'),fli:u('u_fli'),cP:u('u_cP'),cS:u('u_cS'),cC:u('u_cC'),lit:u('u_lit'),
-  litShadow:u('u_litShadow'),flcc:u('u_flcc')};
+  litShadow:u('u_litShadow'),flcc:u('u_flcc'),eyi:u('u_eyi'),eyg:u('u_eyg')};
 
 gl.viewport(0,0,cv.width,cv.height);
 
@@ -229,6 +282,8 @@ function frame(now){
   gl.uniform1f(U.contrast,S.contrastSlider);
   gl.uniform1f(U.flr,S.flr);
   gl.uniform1f(U.fli,S.fli);
+  gl.uniform1f(U.eyi,S.eyi);
+  gl.uniform1f(U.eyg,S.eyg);
   gl.uniform3fv(U.cP,hex(C.cP));
   gl.uniform3fv(U.cS,hex(C.cS));
   gl.uniform3fv(U.cC,hex(C.cC));
