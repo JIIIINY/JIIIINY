@@ -144,8 +144,11 @@
             <button id="randCol" class="exp" style="width:auto;padding:0 8px;margin-left:auto">🎲 Random</button>
           </div>
           <div class="row"><label>그라데이션 각도 <b></b></label><input type="range" data-k="cardAngle" min="0" max="6.28" step="0.01"></div>
-          <div class="row"><label>카드 알파(투명도) <b></b></label><input type="range" data-k="cardAlpha" min="0" max="1" step="0.01"></div>
-          <div class="row"><label>카드 블러(프로스트) <b></b></label><input type="range" data-k="cardBlur" min="0" max="4" step="0.01"></div>
+          <div class="row"><label>면 컬러 Opacity (솔리드) <b></b></label><input type="range" data-k="cardAlpha" min="0" max="1" step="0.01"></div>
+          <div class="sub">COLOR 범위 (HSV)</div>
+          <div class="row"><label>Hue <b></b></label><input type="range" data-k="colHue" min="-0.5" max="0.5" step="0.005"></div>
+          <div class="row"><label>Saturation <b></b></label><input type="range" data-k="colSat" min="0" max="2" step="0.01"></div>
+          <div class="row"><label>Brightness <b></b></label><input type="range" data-k="colBright" min="0" max="2" step="0.01"></div>
           <div class="sub">MOTION</div>
           <div class="row"><label>Z축 전진(기준점) <b></b></label><input type="range" data-k="zAnchor" min="0" max="1" step="0.01"></div>
           <div class="row"><label>드롭 속도 <b></b></label><input type="range" data-k="dropSpeed" min="0.1" max="3" step="0.01"></div>
@@ -158,6 +161,25 @@
         <div class="secbody">
           <div class="btns"><button id="addLayer">＋ 레이어 추가</button></div>
           <div id="layerBox"></div>
+        </div>
+      </div>
+
+      <!-- PARTIAL BLUR MASKING -->
+      <div class="sec"><div class="sechd"><span>PARTIAL BLUR MASKING</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="sub">일괄 (GLOBAL)</div>
+          <div class="row"><label>Blur <b></b></label><input type="range" data-k="cardBlur" min="0" max="4" step="0.01"></div>
+          <div class="row"><label>BG Hue <b></b></label><input type="range" data-k="bgHue" min="-0.5" max="0.5" step="0.005"></div>
+          <div class="sub">6 FACES (상 1·2·3 / 하 4·5·6)</div>
+          <div id="segBox"></div>
+        </div>
+      </div>
+
+      <!-- EDGE MASK -->
+      <div class="sec"><div class="sechd"><span>EDGE MASK</span><div class="hr"><button class="exp">−</button></div></div>
+        <div class="secbody">
+          <div class="btns"><button id="addEdge">＋ 엣지마스크 추가</button></div>
+          <div id="edgeBox"></div>
         </div>
       </div>
 
@@ -194,7 +216,6 @@
         <div class="secbody">
           <div class="seg">
             <button class="tg" data-k="layerInner">Inner layer</button>
-            <button class="tg" data-k="layerOuter">Outer layer</button>
           </div>
           <div class="cl">Color <input type="color" data-k="trColor"></div>
           <div class="row"><label>Light glow <b></b></label><input type="range" data-k="trGlow" min="0" max="2" step="0.01"></div>
@@ -279,7 +300,7 @@ uniform float u_zAnchor, u_cardAlpha,u_cardBlur,u_cardAngle;
 uniform int   u_lightMode; uniform int u_lightDir; uniform int u_sweepType;
 uniform float u_lwidth,u_lsize,u_lblur,u_lintensity,u_shadowAmt,u_langle,u_lspeed,u_glow;
 uniform vec3  u_shadowColor;
-uniform float u_trOn,u_layerInner,u_layerOuter,u_trGlow,u_trBlur,u_softFocus;
+uniform float u_trOn,u_layerInner,u_trGlow,u_trBlur,u_softFocus;
 uniform vec3  u_trColor,u_trBlurColor;
 uniform float u_irOn,u_irInt,u_irHue,u_irHueShift,u_irSat,u_irSharp,u_irWobble,u_irDir;
 uniform float u_sfOn;
@@ -294,6 +315,15 @@ uniform int   u_layType[5];   uniform int u_layShape[5];
 uniform float u_layBlur[5];   uniform float u_laySize[5];
 uniform float u_layInt[5];    uniform float u_layOn[5];
 uniform vec2  u_layPos[5];    uniform vec3  u_layColor[5];
+// card colour HSV adjust + global background hue
+uniform float u_colHue,u_colSat,u_colBright,u_bgHue;
+// partial blur masking — 6 faces (top 0,1,2 / bottom 3,4,5)
+uniform float u_segBlur[6];   uniform float u_segHue[6];
+// edge-mask layers (inner border)
+uniform int   u_emCount;
+uniform float u_emOn[3],u_emColorOn[3],u_emLightOn[3];
+uniform float u_emWidth[3],u_emColInt[3],u_emLightInt[3],u_emDistort[3];
+uniform vec3  u_emColA[3],u_emColB[3],u_emLightCol[3];
 
 const vec2  DP       = vec2(360.0,800.0);
 const vec2  CARD_MIN = vec2(10.0,10.0);
@@ -306,6 +336,23 @@ float noise(vec2 p){ vec2 i=floor(p),f=fract(p);
   vec2 u=f*f*(3.0-2.0*f); return mix(mix(a,b,u.x),mix(c,d,u.x),u.y); }
 float fbm(vec2 p){ float v=0.0,amp=0.5; for(int i=0;i<4;i++){ v+=amp*noise(p); p=p*2.0+vec2(11.3,7.1); amp*=0.5; } return v; }
 vec3 palette(float t){ return vec3(0.55)+vec3(0.45)*cos(6.28318*(t+vec3(0.0,0.33,0.67))); }
+vec3 rgb2hsv(vec3 c){
+  vec4 K=vec4(0.0,-1.0/3.0,2.0/3.0,-1.0);
+  vec4 p=mix(vec4(c.bg,K.wz),vec4(c.gb,K.xy),step(c.b,c.g));
+  vec4 q=mix(vec4(p.xyw,c.r),vec4(c.r,p.yzx),step(p.x,c.r));
+  float dd=q.x-min(q.w,q.y), e=1.0e-10;
+  return vec3(abs(q.z+(q.w-q.y)/(6.0*dd+e)), dd/(q.x+e), q.x);
+}
+vec3 hsv2rgb(vec3 c){
+  vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
+  vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www);
+  return c.z*mix(K.xxx,clamp(p-K.xxx,0.0,1.0),c.y);
+}
+vec3 hueShift(vec3 col,float h){ vec3 v=rgb2hsv(col); v.x=fract(v.x+h); return hsv2rgb(v); }
+vec3 adjustHSV(vec3 col,float h,float s,float v){
+  vec3 c=rgb2hsv(col); c.x=fract(c.x+h); c.y=clamp(c.y*s,0.0,1.0); c.z=clamp(c.z*v,0.0,2.0);
+  return hsv2rgb(c);
+}
 vec3 lightTint(float t){ return mix(vec3(1.0), 0.5+0.5*cos(6.28318*(t+vec3(0.0,0.33,0.67))), 0.78); }
 
 vec3 bgColor(vec2 uv){
@@ -374,10 +421,10 @@ float layerMask(vec2 nl, vec2 pos, float size, int shape, float soft){  // rect 
 vec3 cardBase(vec2 nl){                     // solid / linear / radial / mesh fill
   if(u_cardFill==0) return u_cardColor;
   float ca=cos(u_cardAngle), sa=sin(u_cardAngle);
-  float t=clamp((nl.x*ca+nl.y*sa)*0.6+0.5,0.0,1.0);
+  float t=smoothstep(0.0,1.0, clamp((nl.x*ca+nl.y*sa)*0.6+0.5,0.0,1.0));          // smooth blend
   if(u_cardFill==1) return mix(u_cardColor,u_cardColor2,t);                       // linear
-  if(u_cardFill==2){ float r=clamp(length(nl)*0.85,0.0,1.0); return mix(u_cardColor,u_cardColor2,r); } // radial
-  float b=clamp(length(nl-vec2(0.35,-0.35))*0.7,0.0,1.0);                         // mesh / gradient
+  if(u_cardFill==2){ float r=smoothstep(0.0,1.0,clamp(length(nl)*0.85,0.0,1.0)); return mix(u_cardColor,u_cardColor2,r); } // radial
+  float b=smoothstep(0.0,1.0,clamp(length(nl-vec2(0.35,-0.35))*0.7,0.0,1.0));     // mesh / gradient
   return mix(mix(u_cardColor,u_cardColor2,t), u_cardColor3, 1.0-b);
 }
 
@@ -419,8 +466,8 @@ void main(){
   vec3 lcol = (u_sweepType==0)? vec3(1.0) : lightTint(u_time*0.06);
   if(u_trOn>0.5) lcol=mix(lcol,u_trColor,0.7);
 
-  // ---- card surface (solid / gradient base) ----
-  vec3 surf=cardBase(nl);
+  // ---- card surface (solid / gradient base + HSV range adjust) ----
+  vec3 surf=adjustHSV(cardBase(nl), u_colHue, u_colSat, u_colBright);
 
   // ---- stackable blur layers (frosted patches) ----
   for(int i=0;i<5;i++){
@@ -475,19 +522,36 @@ void main(){
     surf+=lcol*ef*u_edgeFlareInt;                                         // edge flare
   }
 
+  // ---- edge-mask layers: smooth colour gradient + light along the inner border ----
+  for(int i=0;i<3;i++){
+    if(i>=u_emCount) break;
+    if(u_emOn[i]<0.5) continue;
+    float w=max(u_emWidth[i]*120.0,1.0);
+    float din=max(-d,0.0) + u_emDistort[i]*40.0*(fbm(nl*2.5+u_time*0.2)-0.5);  // distortion
+    float t=clamp(din/w,0.0,1.0);
+    float vis=(1.0-smoothstep(0.55,1.0,t))*inside;          // band fades inward, clipped to card
+    if(u_emColorOn[i]>0.5){
+      vec3 g=mix(u_emColA[i], u_emColB[i], smoothstep(0.0,1.0,t));   // start<->end blended
+      surf=mix(surf, g, vis*u_emColInt[i]);
+    }
+    if(u_emLightOn[i]>0.5) surf+=u_emLightCol[i]*vis*u_emLightInt[i];
+  }
+
   // ---- soft focus (gentle lift + bloom) ----
   surf=mix(surf, surf+vec3(0.04)+spot*0.18, clamp((u_trOn>0.5?u_softFocus:0.0),0.0,1.0)*0.6);
 
-  // ---- composite: alpha (opacity) + frosted backdrop blur, with drop fade-in ----
-  vec3 behind=blurBg(suv,u_cardBlur);                       // background seen through the card
+  // ---- partial blur masking: 6 faces (top 0,1,2 / bottom 3,4,5), each own blur + bg hue ----
+  float cx=(nl.x+1.0)*0.5;
+  int colI=(cx<0.3333)?0:((cx<0.6667)?1:2);
+  int rowI=(nl.y>0.0)?0:1;
+  int seg=rowI*3+colI;
+  float blurAmt=u_cardBlur, hueAmt=u_bgHue;
+  for(int s=0;s<6;s++){ if(s==seg){ blurAmt+=u_segBlur[s]; hueAmt+=u_segHue[s]; } }
+
+  // ---- composite: opacity + frosted backdrop blur, with drop fade-in ----
+  vec3 behind=hueShift(blurBg(suv,blurAmt), hueAmt);        // per-face blurred, hue-shifted bg
   vec3 cardPix=mix(behind, surf, clamp(u_cardAlpha,0.0,1.0));
   outc=mix(outc, cardPix, inside*e);
-
-  // ---- outer light layer, masked INSIDE the card only (no bleed outside) ----
-  if(u_layerOuter>0.5){
-    float ring=exp(-pow(max(-d,0.0)/42.0,1.4));   // glow band just inside the edge
-    outc+=lcol*ring*inside*e*0.28*u_lintensity;
-  }
 
   gl_FragColor=vec4(outc,1.0);
 }`;
@@ -519,7 +583,8 @@ const META={
   cardColor:'c', cardColor2:'c', cardColor3:'c', cardFill:'i', cardAngle:'f', zAnchor:'f', cardAlpha:'f', cardBlur:'f',
   lightMode:'i', lightDir:'i', sweepType:'i',
   lwidth:'f',lsize:'f',lblur:'f',lintensity:'f',shadowAmt:'f',shadowColor:'c',langle:'f',lspeed:'f',glow:'f',
-  trOn:'b',layerInner:'b',layerOuter:'b',trColor:'c',trGlow:'f',trBlur:'f',trBlurColor:'c',softFocus:'f',
+  trOn:'b',layerInner:'b',trColor:'c',trGlow:'f',trBlur:'f',trBlurColor:'c',softFocus:'f',
+  colHue:'f',colSat:'f',colBright:'f',bgHue:'f',
   irOn:'b',irInt:'f',irHue:'f',irHueShift:'f',irSat:'f',irSharp:'f',irWobble:'f',irDir:'f',
   sfOn:'b',
   rimInt:'f',rimColor:'c',rimWidth:'f',rimSize:'f',
@@ -533,7 +598,8 @@ const state={
   zAnchor:0.6, dropSpeed:1.0, cardAlpha:1.0, cardBlur:0.6,
   lightMode:0, lightDir:3, sweepType:1,
   lwidth:0.5, lsize:0.5, lblur:0.6, lintensity:0.7, shadowAmt:0.35, shadowColor:'#9aa3b2', langle:0.0, lspeed:1.0, glow:0.7,
-  trOn:0, layerInner:1, layerOuter:1, trColor:'#ffd2a6', trGlow:0.5, trBlur:0.3, trBlurColor:'#b8c6ff', softFocus:0.3,
+  trOn:0, layerInner:1, trColor:'#ffd2a6', trGlow:0.5, trBlur:0.3, trBlurColor:'#b8c6ff', softFocus:0.3,
+  colHue:0.0, colSat:1.0, colBright:1.0, bgHue:0.0,
   irOn:1, irInt:0.5, irHue:0.1, irHueShift:1.0, irSat:0.9, irSharp:0.4, irWobble:0.6, irDir:0.8,
   sfOn:1,
   rimInt:0.5, rimColor:'#ffffff', rimWidth:0.3, rimSize:0.5,
@@ -544,6 +610,12 @@ const state={
 };
 state.layers=[
   {on:true, type:0, shape:1, blur:2.2, size:0.85, intensity:0.7, posx:-0.15, posy:0.15, color:'#bcd9ff'},
+];
+state.segBlur=[0,0,0,0,0,0];          // per-face extra blur (faces 1..6)
+state.segHue =[0,0,0,0,0,0];          // per-face bg hue shift
+state.edges=[                          // edge-mask layers
+  {on:true, colorOn:true, lightOn:false, colA:'#ffffff', colB:'#bcd9ff', lightCol:'#ffffff',
+   width:0.35, colInt:0.6, lightInt:0.5, distort:0.0},
 ];
 const loc={}; for(const k in META) loc[k]=gl.getUniformLocation(prog,'u_'+k);
 const Uextra={ res:gl.getUniformLocation(prog,'u_res'), time:gl.getUniformLocation(prog,'u_time'),
@@ -563,6 +635,20 @@ const Ul={ count:gl.getUniformLocation(prog,'u_layerCount'),
 const bType=new Int32Array(MAXL),bShape=new Int32Array(MAXL),bOn=new Float32Array(MAXL),
   bBlur=new Float32Array(MAXL),bSize=new Float32Array(MAXL),bInt=new Float32Array(MAXL),
   bPos=new Float32Array(MAXL*2),bCol=new Float32Array(MAXL*3);
+
+// partial-blur 6 faces + edge-mask layers
+const Useg={ blur:gl.getUniformLocation(prog,'u_segBlur'), hue:gl.getUniformLocation(prog,'u_segHue') };
+const sBlur=new Float32Array(6), sHue=new Float32Array(6);
+const MAXE=3;
+const Uem={ count:gl.getUniformLocation(prog,'u_emCount'),
+  on:gl.getUniformLocation(prog,'u_emOn'), colorOn:gl.getUniformLocation(prog,'u_emColorOn'),
+  lightOn:gl.getUniformLocation(prog,'u_emLightOn'), width:gl.getUniformLocation(prog,'u_emWidth'),
+  colInt:gl.getUniformLocation(prog,'u_emColInt'), lightInt:gl.getUniformLocation(prog,'u_emLightInt'),
+  distort:gl.getUniformLocation(prog,'u_emDistort'), colA:gl.getUniformLocation(prog,'u_emColA'),
+  colB:gl.getUniformLocation(prog,'u_emColB'), lightCol:gl.getUniformLocation(prog,'u_emLightCol') };
+const eOn=new Float32Array(MAXE),eColOn=new Float32Array(MAXE),eLitOn=new Float32Array(MAXE),
+  eW=new Float32Array(MAXE),eCI=new Float32Array(MAXE),eLI=new Float32Array(MAXE),eD=new Float32Array(MAXE),
+  eCA=new Float32Array(MAXE*3),eCB=new Float32Array(MAXE*3),eLC=new Float32Array(MAXE*3);
 
 // ---- background management ----
 function makeTex(){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
@@ -636,6 +722,22 @@ function frame(now){
   gl.uniform1iv(Ul.type,bType); gl.uniform1iv(Ul.shape,bShape);
   gl.uniform1fv(Ul.blur,bBlur); gl.uniform1fv(Ul.size,bSize); gl.uniform1fv(Ul.int,bInt); gl.uniform1fv(Ul.on,bOn);
   gl.uniform2fv(Ul.pos,bPos); gl.uniform3fv(Ul.color,bCol);
+
+  for(let i=0;i<6;i++){ sBlur[i]=state.segBlur[i]||0; sHue[i]=state.segHue[i]||0; }
+  gl.uniform1fv(Useg.blur,sBlur); gl.uniform1fv(Useg.hue,sHue);
+
+  const E=Math.min(state.edges.length,MAXE);
+  for(let i=0;i<E;i++){ const G=state.edges[i];
+    eOn[i]=G.on?1:0; eColOn[i]=G.colorOn?1:0; eLitOn[i]=G.lightOn?1:0;
+    eW[i]=G.width; eCI[i]=G.colInt; eLI[i]=G.lightInt; eD[i]=G.distort;
+    const a=hx(G.colA),b=hx(G.colB),c=hx(G.lightCol);
+    eCA[i*3]=a[0];eCA[i*3+1]=a[1];eCA[i*3+2]=a[2];
+    eCB[i*3]=b[0];eCB[i*3+1]=b[1];eCB[i*3+2]=b[2];
+    eLC[i*3]=c[0];eLC[i*3+1]=c[1];eLC[i*3+2]=c[2]; }
+  gl.uniform1i(Uem.count,E);
+  gl.uniform1fv(Uem.on,eOn); gl.uniform1fv(Uem.colorOn,eColOn); gl.uniform1fv(Uem.lightOn,eLitOn);
+  gl.uniform1fv(Uem.width,eW); gl.uniform1fv(Uem.colInt,eCI); gl.uniform1fv(Uem.lightInt,eLI); gl.uniform1fv(Uem.distort,eD);
+  gl.uniform3fv(Uem.colA,eCA); gl.uniform3fv(Uem.colB,eCB); gl.uniform3fv(Uem.lightCol,eLC);
 
   for(const k in META){ const t=META[k], l=loc[k]; if(l==null) continue;
     if(t==='f') gl.uniform1f(l,state[k]);
@@ -720,6 +822,57 @@ document.getElementById('addLayer').onclick=()=>{
   renderLayers();
 };
 renderLayers();
+
+// ---- partial blur masking: 6 faces ----
+const segBox=document.getElementById('segBox');
+for(let i=0;i<6;i++){
+  const el=document.createElement('div'); el.className='layer';
+  el.innerHTML='<div class="lhd"><b>면 '+(i+1)+'</b></div>'+
+    '<div class="row"><label>Blur <b>'+state.segBlur[i].toFixed(2)+'</b></label><input type="range" class="sb" min="0" max="4" step="0.01" value="'+state.segBlur[i]+'"></div>'+
+    '<div class="row"><label>Hue <b>'+state.segHue[i].toFixed(2)+'</b></label><input type="range" class="sh" min="-0.5" max="0.5" step="0.005" value="'+state.segHue[i]+'"></div>';
+  const bind=(cls,arr)=>{ const inp=el.querySelector(cls), out=inp.parentElement.querySelector('b');
+    inp.oninput=()=>{ arr[i]=parseFloat(inp.value); out.textContent=arr[i].toFixed(2); }; };
+  bind('.sb',state.segBlur); bind('.sh',state.segHue);
+  segBox.appendChild(el);
+}
+
+// ---- edge-mask layers (dynamic) ----
+const edgeBox=document.getElementById('edgeBox');
+function renderEdges(){
+  edgeBox.innerHTML='';
+  state.edges.forEach((G,i)=>{
+    const el=document.createElement('div'); el.className='layer';
+    el.innerHTML=
+      '<div class="lhd"><b>Edge '+(i+1)+'</b><span>'+
+        '<button class="tg eon'+(G.on?' active':'')+'">ON</button><button class="rm">✕</button></span></div>'+
+      '<div class="cl"><button class="tg ecol'+(G.colorOn?' active':'')+'">Color</button>'+
+        ' <input type="color" class="eca" value="'+G.colA+'"> → <input type="color" class="ecb" value="'+G.colB+'"></div>'+
+      '<div class="row"><label>Color Int <b>'+G.colInt.toFixed(2)+'</b></label><input type="range" class="eci" min="0" max="2" step="0.01" value="'+G.colInt+'"></div>'+
+      '<div class="cl"><button class="tg elit'+(G.lightOn?' active':'')+'">Light</button>'+
+        ' <input type="color" class="elc" value="'+G.lightCol+'"></div>'+
+      '<div class="row"><label>Light Int <b>'+G.lightInt.toFixed(2)+'</b></label><input type="range" class="eli" min="0" max="2" step="0.01" value="'+G.lightInt+'"></div>'+
+      '<div class="row"><label>Width <b>'+G.width.toFixed(2)+'</b></label><input type="range" class="ew" min="0.02" max="1" step="0.01" value="'+G.width+'"></div>'+
+      '<div class="row"><label>왜곡(Distortion) <b>'+G.distort.toFixed(2)+'</b></label><input type="range" class="ed" min="0" max="2" step="0.01" value="'+G.distort+'"></div>';
+    el.querySelector('.eon').onclick=ev=>{ G.on=!G.on; ev.target.classList.toggle('active',G.on); };
+    el.querySelector('.ecol').onclick=ev=>{ G.colorOn=!G.colorOn; ev.target.classList.toggle('active',G.colorOn); };
+    el.querySelector('.elit').onclick=ev=>{ G.lightOn=!G.lightOn; ev.target.classList.toggle('active',G.lightOn); };
+    el.querySelector('.rm').onclick=()=>{ state.edges.splice(i,1); renderEdges(); };
+    el.querySelector('.eca').oninput=ev=>G.colA=ev.target.value;
+    el.querySelector('.ecb').oninput=ev=>G.colB=ev.target.value;
+    el.querySelector('.elc').oninput=ev=>G.lightCol=ev.target.value;
+    const sl=(cls,key)=>{ const inp=el.querySelector(cls), out=inp.parentElement.querySelector('b');
+      inp.oninput=()=>{ G[key]=parseFloat(inp.value); out.textContent=G[key].toFixed(2); }; };
+    sl('.eci','colInt'); sl('.eli','lightInt'); sl('.ew','width'); sl('.ed','distort');
+    edgeBox.appendChild(el);
+  });
+}
+document.getElementById('addEdge').onclick=()=>{
+  if(state.edges.length>=MAXE){ return; }
+  state.edges.push({on:true,colorOn:true,lightOn:false,colA:'#ffffff',colB:'#bcd9ff',lightCol:'#ffffff',
+    width:0.35,colInt:0.6,lightInt:0.5,distort:0.0});
+  renderEdges();
+};
+renderEdges();
 
 // random card colours
 const randHex=()=>'#'+Array.from({length:3},()=>Math.floor(Math.random()*200+30).toString(16).padStart(2,'0')).join('');
