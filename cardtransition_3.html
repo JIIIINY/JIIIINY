@@ -784,22 +784,43 @@ function renderGlass(t,src){ if(!glassReady) return; const S=720; src=src||glCan
 const CARD_TEXT="Welcome to Galaxy AI. How would you like to set up your device? Whatever you'd like to do first, I'll assist you get started.";
 function drawCardText(t){ const DP=view.width/360, pad=20*DP;
   const cardX=10*DP, cardY=10*DP, cardW=340*DP, cardH=233*DP;
-  const tx=cardX+pad, ty=cardY+pad, tw=cardW-2*pad, th=cardH-2*pad, px=18*2;   // 18pt → 36px(360dp=720px)
   vctx.save();
   // 카드 등장 애니메이션과 동일한 이동/스케일을 텍스트에도 적용(카드와 함께 움직임)
   const A=cardAnim(t||0), ccx=cardX+cardW/2, ccy=cardY+cardH/2, M=Math.min(view.width,view.height), csz=(GLASS.cardSize==null?1:GLASS.cardSize);
   vctx.translate(ccx,ccy); vctx.translate(A.sc*A.ox*M, A.sc*A.oy*M); vctx.scale(A.sc*csz,A.sc*csz); vctx.translate(-ccx,-ccy);
-  vctx.beginPath(); vctx.rect(tx,ty,tw,th); vctx.clip();   // 카드 영역 밖으로 넘치지 않게
-  // 좌측 폰트 패널(FONT)의 옵션을 카드 텍스트에 실시간 반영(색/폰트/굵기/내용)
-  vctx.globalAlpha=(A.fx==null?1:A.fx);   // 텍스트도 '낙하 완료 후' 효과와 함께 등장
-  const F=(typeof FONT!=='undefined'&&FONT)?FONT:{}; const fam=F.fontFamily?famString(F.fontFamily):famString('One UI Sans');
-  vctx.font=(F.weight||'500')+' '+px+'px '+fam; vctx.textAlign='center'; vctx.textBaseline='top'; vctx.fillStyle=F.color||GLASS.cardTextColor||'#ffffff';
-  vctx.shadowColor='rgba(0,0,0,0.30)'; vctx.shadowBlur=6; vctx.shadowOffsetY=1;
+  vctx.beginPath(); vctx.rect(cardX,cardY,cardW,cardH); vctx.clip();   // 카드 영역 밖으로 넘치지 않게
+  // ===== 좌측 「폰트」 패널(FONT)의 모든 옵션을 카드 텍스트에 실시간 반영 =====
+  const F=(typeof FONT!=='undefined'&&FONT)?FONT:{};
   const CT=(F.text&&String(F.text).trim())?String(F.text):CARD_TEXT;
-  const words=CT.split(' '); let line='', lines=[];
-  for(const w of words){ const t=line?line+' '+w:w; if(vctx.measureText(t).width>tw && line){ lines.push(line); line=w; } else line=t; } if(line) lines.push(line);
-  const lh=px*1.32, cx=cardX+cardW/2, sy=ty+Math.max(0,(th-lines.length*lh)/2);   // 가로·세로 중앙
-  lines.forEach((ln,i)=>vctx.fillText(ln,cx,sy+i*lh));
+  if(!CT){ vctx.restore(); return; }
+  const fam=F.fontFamily?famString(F.fontFamily):famString('One UI Sans');
+  const px=Math.max(4,(F.size==null?26:F.size)*DP);    // 크기(pt) 반영(DP 비례)
+  const weight=F.weight||'500';
+  vctx.font=weight+' '+px+'px '+fam; vctx.textAlign='left'; vctx.textBaseline='middle';
+  vctx.shadowColor='transparent'; vctx.shadowBlur=0; vctx.shadowOffsetX=0; vctx.shadowOffsetY=0;   // 기본 그림자 없음(패널에서 켜면 적용)
+  // 줄바꿈(카드 폭 기준 + 사용자 개행 \n 유지)
+  const maxW=cardW-2*pad; const lines=[];
+  String(CT).split('\n').forEach(par=>{ const words=par.split(' '); let cur='';
+    words.forEach(w=>{ const test=cur?cur+' '+w:w; if(vctx.measureText(test).width>maxW && cur){ lines.push(cur); cur=w; } else cur=test; }); lines.push(cur); });
+  const lh=px*1.32, ax=F.align||'center';
+  const anchorX=cardX + (F.x==null?0.5:F.x)*cardW, anchorY=cardY + (F.y==null?0.5:F.y)*cardH;   // X/Y 위치 반영(카드 내부 0~1)
+  const g=[];
+  lines.forEach((ln,li)=>{ const w=vctx.measureText(ln).width;
+    let sx = ax==='center'? anchorX-w/2 : (ax==='right'? anchorX-w : anchorX);   // 정렬 반영
+    sx=Math.max(cardX+pad, Math.min(sx, cardX+cardW-pad-w));
+    const yy=anchorY + (li-(lines.length-1)/2)*lh; let cx=sx;
+    for(const ch of ln){ const cw=vctx.measureText(ch).width; g.push({ch,x:cx,y:yy}); cx+=cw; } });
+  // 투명도 = 폰트 alpha × 등장 fx(도착 후 등장). 굵기/그림자/타이핑 모두 반영
+  const base=(F.alpha==null?1:F.alpha)*(A.fx==null?1:A.fx);
+  vctx.fillStyle=F.color||GLASS.cardTextColor||'#ffffff'; vctx.strokeStyle=vctx.fillStyle; vctx.lineJoin='round'; vctx.lineCap='round';
+  const wN=parseInt(F.weight)||500, boldW=wN>=600?px*0.04:(wN>=500?px*0.012:0);
+  const ink=(ch,x,y)=>{ vctx.fillText(ch,x,y); if(boldW>0){ vctx.lineWidth=boldW; vctx.strokeText(ch,x,y); } };
+  const typed=(F.typing? typedCount(F, t||0) : null);
+  if(!(F.typing && typed!=null)){ applyShadow(F,vctx); vctx.globalAlpha=base; g.forEach(gl=>ink(gl.ch,gl.x,gl.y)); }
+  else { const cur=Math.floor(typed), frac=typed-cur;
+    for(let i=0;i<g.length && i<=cur;i++){ vctx.save(); applyShadow(F,vctx);
+      if(i<cur) vctx.globalAlpha=base; else { vctx.globalAlpha=base*Math.min(1,frac*1.3); vctx.filter='blur('+((F.typeBlur||0)*2*(1-frac)).toFixed(2)+'px)'; }
+      ink(g[i].ch,g[i].x,g[i].y); vctx.restore(); } }
   vctx.restore(); }
 const stopsFlat=new Float32Array(36);
 function applyPalette(idx){ palIdx=(idx+PALETTES.length)%PALETTES.length; PALETTES[palIdx].stops.forEach((s,i)=>{ const c=hexToRGB(s); stopsFlat[i*3]=c[0]; stopsFlat[i*3+1]=c[1]; stopsFlat[i*3+2]=c[2]; }); refreshPaletteUI(); }
